@@ -6,7 +6,8 @@
   <meta name="color-scheme" content="dark">
   <title>Rakurs — Енергомоніторинг</title>
   <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
-  <script defer src="/static/app-stable-20261124.js"></script>
+  <link rel="stylesheet" href="/static/clarity-ui-20261124.css">
+  <script defer src="/static/app-clarity-20261124.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -19,9 +20,9 @@
       <nav id="nav" class="nav"></nav>
       <div class="side-bottom">
         <div class="backend-icon" aria-hidden="true">◎</div>
-        <strong>Власна база MySQL</strong>
-        <small>192.168.5.30 · rakurs</small>
-        <small>Без залежності від Home Assistant</small>
+        <strong>Джерело показників — MySQL</strong>
+        <small>База Rakurs · захищений доступ</small>
+        <small>Усі значення мають позначку походження</small>
       </div>
     </aside>
     <div class="workarea">
@@ -32,24 +33,46 @@
         </div>
         <div class="top-actions">
           <span id="updated" class="updated">Оновлення даних…</span>
+          <span id="mode-indicator" class="mode-indicator {{ 'mode-simulation' if initial_simulated else 'mode-real' }}">{{ 'Тестові дані' if initial_simulated else 'Реальні вимірювання' }}</span>
           <span id="connection" class="connection pending"><i></i> Перевірка MySQL</span>
         </div>
       </header>
       <main id="content" class="content" data-initial-mode="{{ 'simulation' if initial_simulated else 'real' }}">
-        <div class="section-header">
-          <h2>Оперативні показники</h2>
-          <span class="subtle">Джерело: MySQL rakurs</span>
+        <div class="dashboard-intro">
+          <div class="eyebrow">ЕНЕРГОСИСТЕМА · ОГЛЯД</div>
+          <h2>Енергія під контролем</h2>
+          <p>Основні показники, напрямки потоків та зміни за часом — на одному екрані.</p>
         </div>
-        <div class="cards" aria-label="Показники Deye з бази даних">
-          {% for item in initial_cards %}
-          <article class="card">
-            <div class="card-icon">{{ item.icon }}</div>
+        <div class="section-header">
+          <h2>Зараз</h2>
+          <span class="subtle">Останні збережені показники · час Київ</span>
+        </div>
+        <div class="cards cards-main" aria-label="Показники Deye з бази даних">
+          {% for idx in [0, 1, 3, 2] %}
+          {% set item = initial_cards[idx] %}
+          <article class="card kpi kpi-{{ ['solar', 'load', 'grid', 'battery'][idx] }}">
+            <div class="kpi-head">
+              <span class="kpi-icon">{{ item.icon }}</span>
+              <span class="kpi-state">{{ 'Є запис' if item.quality else 'Немає даних' }}</span>
+            </div>
             <h3>{{ item.label }}</h3>
-            <div class="value">{{ item.value }}{% if item.unit and item.value != "—" %}<span class="unit">{{ item.unit }}</span>{% endif %}</div>
-            <div class="detail{% if item.quality %} verified{% endif %}">{{ item.quality or "Немає запису" }}</div>
+            <div class="kpi-reading">
+              <strong>{{ item.value }}</strong>
+              <span class="unit">{{ item.unit if item.value != '—' else '' }}</span>
+            </div>
+            {% if idx == 3 and item.value != '—' %}
+            <div class="soc-meter" role="meter" aria-label="Рівень заряду акумулятора"
+                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.value }}">
+              <div class="soc-fill" style="width:{{ item.value }}%"></div>
+            </div>
+            {% endif %}
+            <p class="kpi-caption">{{ 'Останній запис MySQL' if item.quality else 'Значення ще немає' }}</p>
           </article>
           {% endfor %}
         </div>
+        {% if initial_simulated %}
+        <p class="subtle" style="margin-top:16px">Відображаються тестові вимірювання, а не фактичні показники підключеного інвертора.</p>
+        {% endif %}
       </main>
       <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
     </div>
