@@ -564,8 +564,10 @@ async function renderHistory(cycle, archived) {
       }
       const unit = result.signal && result.signal.unit || "";
       const stats = element("div", "history-summary");
-      add(stats, element("strong", "", pretty(Number(points[points.length - 1].value_decimal), 3) +
-        " " + unit),
+      const numericPoints = points.filter(point => point.value_decimal !== null);
+      const latestNumeric = numericPoints.length ? numericPoints[numericPoints.length - 1] : null;
+      add(stats, element("strong", "",
+        latestNumeric ? pretty(Number(latestNumeric.value_decimal), 3) + " " + unit : "—"),
         element("span", "", points.length + " записів · " +
           time(points[0].observed_at_utc) + " — " +
           time(points[points.length - 1].observed_at_utc)));
