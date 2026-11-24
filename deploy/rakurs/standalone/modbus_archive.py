@@ -167,14 +167,15 @@ def normalize(payload):
                 frames=normalized, fields=fields, signals=signals)
 
 
-def persist(db, payload):
+def persist(db, payload, *, manage_transaction=True):
     """Atomic archive. Real devices must be verified before accepting live data.
 
     Database connection must use autocommit=False and a deliberately authorized
     ingest account. Returns an idempotent receipt, never alters catalog validity.
     """
     item = normalize(payload)
-    db.begin()
+    if manage_transaction:
+        db.begin()
     try:
         with db.cursor() as cur:
             cur.execute(
@@ -212,7 +213,8 @@ def persist(db, payload):
                                         if isinstance(previous, dict) else previous)
                 if prev_device != device_id:
                     raise PayloadError("Poll UID already belongs to another device")
-                db.rollback()
+                if manage_transaction:
+                    db.rollback()
                 return {"status": "already_saved", "poll_id": prev_id}
             frames = item["frames"]
             responses = sum(f["status"] in {"ok", "simulated"} for f in frames)
@@ -306,11 +308,13 @@ def persist(db, payload):
                      decimal_or_none(record.get("value_decimal")),
                      record.get("raw_value"), item["quality"], item["source"]),
                 )
-        db.commit()
+        if manage_transaction:
+            db.commit()
         return {"status": "saved", "poll_id": poll_id, "frames": len(frames),
                 "raw_registers": raw_registers, "raw_bits": raw_bits,
                 "decoded_fields": len(item["fields"]),
                 "dashboard_signals": len(item["signals"])}
     except Exception:
-        db.rollback()
+        if manage_transaction:
+            db.rollback()
         raise
