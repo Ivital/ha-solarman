@@ -814,6 +814,8 @@ def parallel_device_latest():
     for sample in latest.values():
         stamp = sample.get("observed_at_utc")
         if isinstance(stamp, datetime):
+            if stamp.tzinfo is not None:
+                stamp = stamp.astimezone(timezone.utc).replace(tzinfo=None)
             age = (now_utc - stamp).total_seconds()
             sample["age_seconds"] = max(0, int(age))
             sample["freshness_state"] = (
@@ -936,7 +938,10 @@ def parallel_live_health():
         age = None
         freshness = "no_data"
         if last and isinstance(last.get("observed_at_utc"), datetime):
-            age = (now - last["observed_at_utc"]).total_seconds()
+            observed = last["observed_at_utc"]
+            if observed.tzinfo is not None:
+                observed = observed.astimezone(timezone.utc).replace(tzinfo=None)
+            age = (now - observed).total_seconds()
             freshness = ("invalid_time" if age < -60 else
                          "recent" if age <= 120 else
                          "delayed" if age <= 600 else "stale")
