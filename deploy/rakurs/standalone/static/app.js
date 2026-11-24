@@ -171,10 +171,29 @@ async function renderOverview(cycle) {
   if (!current(cycle)) return;
   keys.forEach((key, i) => deck.appendChild(metricCard(descriptors[i][0], descriptors[i][1], key, values)));
   const grid = element("div", "grid-two");
-  const flow = panel("Енергетичний баланс", "Напрямки потоків показуватимемо тільки після підтвердження регістрів Deye.");
-  flow.appendChild(createEmpty("Схема очікує телеметрію",
-    "Показники генерації, АКБ, мережі та навантаження не моделюються."));
-  const quality = panel("Повнота обліку", "Обліковуємо лише перевірені сигнали та реальні вимірювання.");
+  const flow = panel("Енергетичний баланс", DEMO_MODE ?
+    "Потоки одного тестового знімка" :
+    "Напрямки потоків покажемо після підтвердження регістрів Deye.");
+  if (DEMO_MODE) {
+    const balance = element("div", "kv");
+    for (const pair of [
+      ["Сонце", "pv_power"], ["Акумулятор", "battery_power"],
+      ["Мережа", "grid_power"], ["Навантаження", "load_power"]
+    ]) {
+      const item = element("div", "");
+      const reading = values[pair[1]];
+      add(item, element("strong", "", reading ? number(reading.value_decimal) : "—"),
+        element("small", "", pair[0] + " · кВт"));
+      balance.appendChild(item);
+    }
+    flow.appendChild(balance);
+  } else {
+    flow.appendChild(createEmpty("Схема очікує телеметрію",
+      "Показники генерації, АКБ, мережі та навантаження не моделюються."));
+  }
+  const quality = panel("Повнота обліку", DEMO_MODE ?
+      "Параметри поточного тестового знімка" :
+      "Обліковуємо лише перевірені сигнали та реальні вимірювання.");
   const info = element("div", "kv");
   [
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
@@ -406,7 +425,9 @@ async function renderSystem(cycle) {
     ["База", "rakurs"],
     ["Джерело", DEMO_MODE ? "MySQL · СИМУЛЯЦІЯ" : "MySQL"],
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    ["Підтверджені сигнали", state.status ? state.status.verified_signals : "—"],
+    [DEMO_MODE ? "Тестові параметри" : "Підтверджені сигнали",
+      state.status ? (DEMO_MODE ? state.status.simulated_signals :
+                                  state.status.verified_signals) : "—"],
     ["Колектор Deye", "Не запущений"]
   ].forEach(pair => {
     const item = element("div", "");
@@ -444,7 +465,7 @@ async function render() {
   }
 }
 async function boot() {
-  const switcher = element("a", "tag warning", DEMO_MODE ?
+  const switcher = element("a", "tag", DEMO_MODE ?
       "Звичайний режим" : "Демо Deye");
   switcher.href = DEMO_MODE ? "/" : "/?demo=1";
   switcher.title = DEMO_MODE ? "Показувати лише реальні вимірювання" :
