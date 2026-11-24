@@ -329,6 +329,11 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("proxy_pass http://127.0.0.1:8123;", script)
         self.assertIn("rakurs-https.conf", script)
         self.assertIn("--noproxy '*'", script)
+        self.assertIn("for attempt in $(seq 1 20)", script)
+        self.assertIn("STANDALONE_PAGE=$MATCH", script)
+        self.assertIn('RAKURS_HTTPS_UNAUTHORIZED_API=401', script)
+        self.assertIn('/api/v1/status', script)
+        self.assertIn("RAKURS_HTTPS_LOGIN=PASS", script)
 
 
 if __name__ == "__main__":
