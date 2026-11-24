@@ -539,9 +539,9 @@ def events():
         "SELECT e.observed_at_utc, e.severity, e.event_code, e.message, "
         "d.device_key FROM rakurs_device_events AS e "
         "JOIN rakurs_devices AS d ON d.id=e.device_id "
-        f"WHERE d.device_key{qualifier}%s "
+        f"WHERE d.kind{qualifier}%s "
         "ORDER BY e.observed_at_utc DESC LIMIT 50",
-        (DEMO_DEVICE_KEY,)
+        ("simulation",)
     )
     return jsonify({"data_source": "mysql", "simulation": demo_mode(),
                     "events": serialize(result)})
@@ -551,9 +551,9 @@ def devices():
     qualifier = "=" if demo_mode() else "<>"
     result = rows(
         "SELECT device_key, kind, model, commissioned_at_utc "
-        f"FROM rakurs_devices WHERE device_key{qualifier}%s "
+        f"FROM rakurs_devices WHERE kind{qualifier}%s "
         "ORDER BY device_key LIMIT 100",
-        (DEMO_DEVICE_KEY,)
+        ("simulation",)
     )
     return jsonify({"data_source": "mysql", "simulation": demo_mode(),
                     "devices": serialize(result)})
@@ -566,9 +566,9 @@ def batches():
         "b.accepted_count, b.rejected_count, b.status, b.error_code, "
         "d.device_key FROM rakurs_ingest_batches AS b "
         "JOIN rakurs_devices AS d ON d.id=b.device_id "
-        f"WHERE d.device_key{qualifier}%s "
+        f"WHERE d.kind{qualifier}%s "
         "ORDER BY b.started_at_utc DESC LIMIT 50",
-        (DEMO_DEVICE_KEY,)
+        ("simulation",)
     )
     return jsonify({"data_source": "mysql", "simulation": demo_mode(),
                     "batches": serialize(result)})
