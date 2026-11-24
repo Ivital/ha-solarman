@@ -37,7 +37,7 @@ if command -v node >/dev/null; then
 fi
 echo 'RAKURS_EVENTS_PREFLIGHT=PASS'
 
-if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-20261124.js' "$HERE/templates/index.html"; then
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-archive-20261124.js' "$HERE/templates/index.html"; then
   echo 'STOP: older Events installer would revert parallel UI. Use deploy_parallel_ui.sh.' >&2
   exit 2
 fi
