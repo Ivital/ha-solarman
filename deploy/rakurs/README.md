@@ -1,5 +1,16 @@
 # Rakurs — HTTPS publication of Home Assistant via existing Debian Nginx
 
+## Deployed HTTPS production acceptance (24.11.2026)
+
+Executed `RAKURS_FINAL_DEPLOY` successfully on `ergodata-lnx`:
+- HA accepted trusted reverse-proxy headers from Docker gateway `172.18.0.1` (`HTTP 200`);
+- Nginx HTTPS activation passed after a graceful reload: `rakurs.zakryttya.org.ua` returned `200`; `www.rakurs.zakryttya.org.ua` returned `301` to the canonical hostname;
+- Nginx `-t` PASS, `nginx` and `odoo18` active, HA container running and not OOM-killed;
+- Certbot `renew --dry-run` successfully simulated renewing all 6 installed certificates: `crm`, `data`, `data2`, `rakurs`, `toir`, and `toir2`. The Rakurs-specific renewal hook is installed.
+- The existing Nginx/Rakurs site is now **enabled**. Do not rerun `activate_https.sh`: intentionally fails when the site already exists.
+
+Remaining acceptance outside the server: manually open both names from an independent external network, verify HA login/WebSocket operation and admin MFA. No Modbus/RS485 read from Deye has yet been confirmed. Before enabling polling, establish whether Teltonika TCP 50006 runs `Modbus TCP over Serial Gateway` or transparent `Serial Over IP`.
+
 **Names:** `rakurs.zakryttya.org.ua` (canonical), `www.rakurs.zakryttya.org.ua` (HTTPS 301 redirect). Neither domain has been verified from outside as of 24.11.2026. No server-side DNS or firewall change has been performed.
 
 ## Gate: do not expose an uninitialized Home Assistant
