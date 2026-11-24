@@ -20,7 +20,7 @@ FILES=("$JS" "$CSS" "$HTML")
 for item in "${FILES[@]}"; do
   test -s "$HERE/$item" || { echo "STOP: source $item missing" >&2; exit 2; }
 done
-grep -Eq '/static/app-(clarity|events|parallel)-20261124.js' "$HERE/$HTML"
+grep -Eq '/static/app-(clarity|events|parallel(-archive)?)-20261124.js' "$HERE/$HTML"
 grep -Fq '/static/clarity-ui-20261124.css' "$HERE/$HTML"
 grep -Fq 'Показники Deye з бази даних' "$HERE/$HTML"
 grep -Fq 'restoreServerReadings();' "$HERE/$JS"
