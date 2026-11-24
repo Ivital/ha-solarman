@@ -118,6 +118,8 @@ function prepare(mode) {
           {pv_power: {...latest.pv_power, quality: "good"}}}
       : url.includes("/latest") ? {values: latest}
       : url.includes("/parallel/events") ? {events: []}
+      : url.includes("/parallel/history") ? {points: history}
+      : url.includes("/parallel/modbus-fields") ? {fields: [], count: 0}
       : url.includes("/parallel") ? {
           expected_inverters: 2, registered_inverters: mode === "two" ? 2 : 0,
           model: "SUN-20K-SG05LP3-EU-SM2", shared_battery: true,
@@ -248,6 +250,9 @@ async function run() {
   assert.equal(byClass(two.main, "parallel-reading").length, 6);
   assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_1")));
   assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_2")));
+  assert(two.fetchCalls.some(x => x.includes("/parallel/history?device=inverter_1")));
+  assert(two.fetchCalls.some(x => x.includes("/parallel/modbus-fields?device=inverter_2")));
+  assert.equal(byClass(two.main, "parallel-device-chart").length, 2);
   const parallelValueText = descendants(two.main).map(x => x.textContent || "").join("|");
   assert(parallelValueText.includes("5,1"), "Verified per-device reading visible");
   assert(parallelValueText.includes("SOC: —"), "Shared BMS SOC remains unknown");
