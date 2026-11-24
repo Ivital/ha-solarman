@@ -34,6 +34,9 @@ jobs:
           bash -n deploy/rakurs/standalone/apply_auth_schema.sh
           bash deploy/rakurs/standalone/apply_auth_schema.sh --check
           bash -n deploy/rakurs/standalone/stage_standalone.sh
+          bash -n deploy/rakurs/standalone/install_full_modbus_demo.sh
+          python -m py_compile deploy/rakurs/standalone/simulate_deye_once.py
+          python deploy/rakurs/standalone/simulate_deye_once.py
           bash deploy/rakurs/standalone/stage_standalone.sh --check
           bash -n deploy/rakurs/standalone/switch_rakurs_nginx.sh
           bash -n deploy/rakurs/standalone/retire_homeassistant.sh
