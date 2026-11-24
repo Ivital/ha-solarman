@@ -298,9 +298,9 @@ def parse_schema_ddl(sql: str) -> list[str]:
     actual = []
     for statement in statements:
         match = re.fullmatch(
-            r"CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+"
-            r"(rakurs_[a-z0-9_]+)\\s*\\([\\s\\S]+\\)\\s+"
-            r"ENGINE=InnoDB\\s+DEFAULT\\s+CHARSET=utf8mb4\\s+"
+            r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"
+            r"(rakurs_[a-z0-9_]+)\s*\([\s\S]+\)\s+"
+            r"ENGINE=InnoDB\s+DEFAULT\s+CHARSET=utf8mb4\s+"
             r"COLLATE=utf8mb4_unicode_ci",
             statement,
             flags=re.IGNORECASE,
