@@ -283,6 +283,22 @@ def write_once(password: str, fields, ui_metrics, reg_addresses):
                  len(fields), "simulated")
             )
             batch_id = cur.lastrowid
+            expected = {
+                "rakurs_devices": 1,
+                "rakurs_signals": len(ui_metrics),
+                "rakurs_samples": len(ui_metrics),
+                "rakurs_modbus_fields": len(fields),
+                "rakurs_modbus_field_samples": len(fields),
+                "rakurs_modbus_register_inventory": len(reg_addresses),
+                "rakurs_ingest_batches": 1,
+            }
+            for table, count in expected.items():
+                cur.execute("SELECT COUNT(*) FROM " + table)
+                actual = cur.fetchone()[0]
+                if actual != count:
+                    raise RuntimeError(
+                        f"Transaction validation failed: {table}={actual}, expected={count}"
+                    )
         db.commit()
         return batch_id
     except Exception:
