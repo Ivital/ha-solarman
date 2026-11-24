@@ -22,6 +22,6 @@ jobs:
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
       - name: Read-only integration tests
-        run: python -m unittest discover -s tests -p 'test_deye_readonly.py' -v
+        run: python -m unittest discover -s tests -p 'test_deye*.py' -v
       - name: Home Assistant hassfest validation
         uses: home-assistant/actions/hassfest@master
