@@ -706,9 +706,12 @@ async function renderParallel(cycle) {
       const place = element("div", "parallel-metric-list");
       card.appendChild(place);
       detail.appendChild(card);
-      const [latest, events] = await Promise.allSettled([
-        api("/parallel/latest?device=" + encodeURIComponent(data.device_key)),
-        api("/parallel/events?device=" + encodeURIComponent(data.device_key))
+      const deviceQuery = "?device=" + encodeURIComponent(data.device_key);
+      const [latest, events, history, registers] = await Promise.allSettled([
+        api("/parallel/latest" + deviceQuery),
+        api("/parallel/events" + deviceQuery),
+        api("/parallel/history" + deviceQuery + "&key=pv_power&hours=24"),
+        api("/parallel/modbus-fields" + deviceQuery)
       ]);
       if (!current(cycle)) return;
       if (latest.status !== "fulfilled") {
@@ -733,6 +736,25 @@ async function renderParallel(cycle) {
         "Подій у журналі: " + (events.value.events || []).length :
         "Журнал подій недоступний";
       card.appendChild(element("p", "parallel-device-events", eventLabel));
+      card.appendChild(element("p", "parallel-device-events",
+        registers.status === "fulfilled" ?
+        "Перевірених полів Modbus: " + registers.value.count :
+        "Реєстр Modbus недоступний"));
+      const chartBox = element("section", "parallel-device-chart");
+      chartBox.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
+      if (history.status !== "fulfilled") {
+        chartBox.appendChild(createEmpty("Графік недоступний",
+          "Історію інвертора не вдалося прочитати."));
+      } else {
+        const points = history.value.points || [];
+        if (points.filter(point => point.value_decimal !== null).length < 2) {
+          chartBox.appendChild(createEmpty("Ще немає реальної історії",
+            "Графік не підміняється синтетичними даними."));
+        } else {
+          chartBox.appendChild(svgChart(points, "кВт"));
+        }
+      }
+      card.appendChild(chartBox);
     }
     if (!devices.length) {
       const explain = element("p", "parallel-readonly-note",
