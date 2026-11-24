@@ -335,6 +335,25 @@ def persist(db, payload, *, manage_transaction=True):
                          for k, value in enumerate(frame["bits"])],
                     )
                     raw_bits += len(frame["bits"])
+            if item["quality"] != "simulated":
+                # Retain communication failures in both the lossless raw
+                # archive AND the operational device event stream. Never
+                # manufacture events from synthetic test frames.
+                for frame in frames:
+                    if frame["status"] in {"timeout", "exception", "error"}:
+                        event_code = "MODBUS_" + frame["status"].upper()
+                        details = (
+                            f"FC{frame['function_code']:02d} address="
+                            f"{frame['start_address']} frame="
+                            f"{frame['sequence_no']} status={frame['status']}"
+                        )
+                        cur.execute(
+                            "INSERT INTO rakurs_device_events "
+                            "(device_id,observed_at_utc,severity,event_code,"
+                            "message,source) VALUES (%s,%s,%s,%s,%s,%s)",
+                            (device_id, frame["captured"], "warning",
+                             event_code, details, item["source"]),
+                        )
             for record in item["fields"]:
                 cur.execute("SELECT id FROM rakurs_modbus_fields WHERE field_key=%s",
                             (record["field_key"],))
