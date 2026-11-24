@@ -9,11 +9,21 @@ MODE="${1:---check}"
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SRC="$(cd "$HERE/.." && pwd)"
 test -s "$SRC/signal_catalog.json"
-for f in app.py auth.py __init__.py requirements.txt; do
-  test -s "$HERE/$f" || { echo "STOP: missing $f" >&2; exit 2; }
-done
-for f in templates/index.html templates/login.html static/app.js static/style.css static/login.css; do
-  test -s "$HERE/$f" || { echo "STOP: missing $f" >&2; exit 2; }
+test -s "$HERE/release_manifest.txt"
+mapfile -t RELEASE_FILES < <(grep -v -E '^[[:space:]]*(#|$)' "$HERE/release_manifest.txt")
+test "${#RELEASE_FILES[@]}" -ge 17 || {
+  echo "STOP: incomplete release manifest" >&2; exit 2
+}
+declare -A RELEASE_SEEN
+for f in "${RELEASE_FILES[@]}"; do
+  [[ "$f" =~ ^[a-zA-Z0-9_./-]+$ && "$f" != /* && "$f" != *../* ]] || {
+    echo "STOP: unsafe manifest entry: $f" >&2; exit 2
+  }
+  [[ ! -v RELEASE_SEEN["$f"] ]] || { echo "STOP: duplicate $f" >&2; exit 2; }
+  RELEASE_SEEN["$f"]=1
+  test -f "$HERE/$f" && test -s "$HERE/$f" && ! test -L "$HERE/$f" || {
+    echo "STOP: required release file missing, empty or symlink: $f" >&2; exit 2
+  }
 done
 python3 -m py_compile "$HERE/app.py" "$HERE/auth.py" "$HERE/bootstrap_admin.py"
 echo 'RAKURS_STANDALONE_SOURCES=PASS'
@@ -23,6 +33,13 @@ if [[ "$MODE" == '--check' ]]; then
   exit 0
 fi
 sudo -v
+# Bootstrap is not a rolling update mechanism. Never overwrite a running
+# deployment with unbacked-up files: use the managed deploy script instead.
+if systemctl is-active --quiet rakurs-standalone.service; then
+  echo "STOP: service active; stage_standalone --install is unsafe on live Rakurs" >&2
+  echo "Use the versioned release deploy after a verified backup." >&2
+  exit 2
+fi
 if ! getent passwd rakurs >/dev/null; then
   sudo useradd --system --user-group --home-dir /var/lib/rakurs \
     --create-home --shell /usr/sbin/nologin rakurs
@@ -34,17 +51,9 @@ sudo install -d -m 0750 -o root -g rakurs \
   /opt/rakurs/standalone/templates
 sudo install -d -m 0750 -o rakurs -g rakurs /var/lib/rakurs
 sudo install -d -m 0750 -o root -g rakurs /etc/rakurs
-for f in app.py auth.py __init__.py requirements.txt; do
+for f in "${RELEASE_FILES[@]}"; do
   sudo install -m 0640 -o root -g rakurs "$HERE/$f" \
     "/opt/rakurs/standalone/$f"
-done
-for f in index.html login.html; do
-  sudo install -m 0640 -o root -g rakurs "$HERE/templates/$f" \
-    "/opt/rakurs/standalone/templates/$f"
-done
-for f in app.js style.css login.css; do
-  sudo install -m 0640 -o root -g rakurs "$HERE/static/$f" \
-    "/opt/rakurs/standalone/static/$f"
 done
 sudo install -m 0640 -o root -g rakurs "$SRC/signal_catalog.json" \
   /opt/rakurs/signal_catalog.json
