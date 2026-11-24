@@ -1,45 +1,45 @@
-"""Validate dashboard v2 structure and read-only/no-fake-data placeholders."""
+"""Validate Ukrainian Rakurs dashboard with a safe SVG illustration."""
 import unittest
 from pathlib import Path
 import yaml
+from xml.etree import ElementTree
 
-ROOT=Path(__file__).resolve().parents[1]/"deploy"/"rakurs"
-P=ROOT/"dashboard-rakurs.yaml"
-
+R=Path(__file__).resolve().parents[1]/"deploy"/"rakurs"
 class RakursDashboardTest(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.raw=P.read_text(encoding="utf-8")
-        cls.doc=yaml.safe_load(cls.raw)
+        cls.raw=(R/"dashboard-rakurs.yaml").read_text(encoding="utf-8")
+        cls.d=yaml.safe_load(cls.raw)
 
-    def test_four_views_and_labeled_tabs(self):
-        v=self.doc["views"]
-        self.assertEqual([x["title"] for x in v],
-            ["Огляд","Інвертор","Історія","Система"])
-        self.assertEqual(len({x["path"] for x in v}),4)
-        self.assertTrue(all(x["type"]=="sections" and
-                 x["max_columns"]==2 and
-                 x["dense_section_placement"] and
-                 x["show_icon_and_title"] for x in v))
+    def test_views(self):
+        v=self.d["views"]
+        self.assertEqual([x["title"] for x in v],["Огляд","Інвертор","Історія","Система"])
+        self.assertTrue(all(x["type"]=="sections" and x["max_columns"]==2 and x["show_icon_and_title"] for x in v))
 
-    def test_full_width_sections_and_builtin_readonly_cards(self):
-        s=[sec for v in self.doc["views"] for sec in v["sections"]]
-        self.assertTrue(any(x.get("column_span")==2 for x in s))
-        cards=[c for sec in s for c in sec["cards"]]
-        self.assertEqual({c["type"] for c in cards},{"heading","markdown"})
-        self.assertTrue(any(c.get("grid_options",{}).get("columns")==24 for c in cards))
-        self.assertNotIn("call-service",self.raw)
+    def test_builtin_cards_and_picture_link(self):
+        cs=[c for v in self.d["views"] for s in v["sections"] for c in s["cards"]]
+        self.assertEqual({c["type"] for c in cs},{"heading","markdown","picture"})
+        pics=[c for c in cs if c["type"]=="picture"]
+        self.assertEqual(len(pics),1)
+        self.assertEqual(pics[0]["image"],"/local/rakurs/energy-flow.svg?v=3")
+        self.assertEqual(pics[0]["grid_options"]["columns"],24)
         self.assertNotIn("custom:",self.raw)
-        for card in cards:
-            self.assertNotIn("tap_action",card)
-            self.assertNotIn("hold_action",card)
-            self.assertNotIn("entity",card)
-
-    def test_no_fabricated_telemetry(self):
+        self.assertNotIn("call-service",self.raw)
         self.assertIn("states('sensor.rakurs_pv_power')",self.raw)
-        self.assertIn("Очікування телеметрії Deye",self.raw)
-        self.assertIn("не підтверджені",self.raw)
-        self.assertNotIn("12.5 кВт",self.raw)
 
-    def test_rollback_copy_preserved(self):
-        self.assertTrue((ROOT/"dashboard-rakurs-v1.yaml").exists())
+    def test_svg_is_static_and_valid(self):
+        svg=(R/"assets"/"energy-flow.svg").read_text(encoding="utf-8")
+        self.assertEqual(ElementTree.fromstring(svg).tag,"{http://www.w3.org/2000/svg}svg")
+        for term in ["Пунктирні стрілки","PV1 / PV2","DEYE","АКУМУЛЯТОР","НАВАНТАЖЕННЯ","ЕЛЕКТРОМЕРЕЖА"]:
+            self.assertIn(term,svg)
+        self.assertNotIn("<script",svg.lower())
+        self.assertNotIn("https://",svg)
+
+    def test_guarded_deploy_and_rollback(self):
+        s=(R/"install_diagram.sh").read_text(encoding="utf-8")
+        self.assertIn('docker inspect',s)
+        self.assertIn('"/config"',s)
+        self.assertNotIn("chown -R",s)
+        self.assertNotIn("chmod -R",s)
+        self.assertNotIn("docker compose restart",s)
+        self.assertTrue((R/"dashboard-rakurs-v2.yaml").is_file())

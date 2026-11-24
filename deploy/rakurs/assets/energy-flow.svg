@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 520" width="1200" height="520" role="img" aria-labelledby="t d">
+<title id="t">RAKURS — схема енергетичних зв'язків Deye</title>
+<desc id="d">Потенційні зв'язки сонячних панелей, Deye, акумулятора, електромережі й навантаження. Вимірювань немає. Пунктирні лінії не є поточними потоками енергії.</desc>
+<style>
+:root{--bg:#F5F8FC;--card:#fff;--edge:#DCE4EF;--ink:#1A2B43;--muted:#63758F;--route:#9BACBE;--pill:#EAF0F8}
+@media(prefers-color-scheme:dark){:root{--bg:#111A28;--card:#1D2A3B;--edge:#425066;--ink:#F3F7FB;--muted:#B9C9D9;--route:#8799AD;--pill:#2B3B50}}
+text{font-family:"Segoe UI",Arial,sans-serif;fill:var(--ink)}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--edge);stroke-width:2}
+.eyebrow{font-size:17px;fill:var(--muted);font-weight:650;letter-spacing:.5px}
+.val{font-size:29px;font-weight:750}.secondary{font-size:17px;fill:var(--muted)}
+.title{font-size:27px;font-weight:800}.note{font-size:16px;fill:var(--muted)}
+.flow{fill:none;stroke:var(--route);stroke-width:5;stroke-dasharray:10 9;stroke-linejoin:round;stroke-linecap:round}
+</style>
+<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#94A6BD"/></marker></defs>
+<rect class="bg" x="0" y="0" width="1200" height="520" rx="22"/>
+<text x="45" y="55" class="title">ЕНЕРГЕТИЧНІ ЗВ'ЯЗКИ</text>
+<rect x="903" y="23" width="246" height="44" rx="22" fill="var(--pill)"/>
+<circle cx="925" cy="45" r="7" fill="#E4AA3D"/><text x="943" y="51" class="eyebrow">ОЧІКУВАННЯ ДАНИХ</text>
+<path class="flow" d="M331 200H398V259H467" marker-end="url(#arr)"/>
+<path class="flow" d="M331 407H398V330H467" marker-start="url(#arr)" marker-end="url(#arr)"/>
+<path class="flow" d="M733 259H802V200H868" marker-end="url(#arr)"/>
+<path class="flow" d="M733 330H802V407H868" marker-start="url(#arr)" marker-end="url(#arr)"/>
+<rect class="card" x="49" y="126" width="282" height="150" rx="21"/>
+<rect class="card" x="49" y="332" width="282" height="150" rx="21"/>
+<rect class="card" x="467" y="196" width="266" height="190" rx="22"/>
+<rect class="card" x="868" y="126" width="282" height="150" rx="21"/>
+<rect class="card" x="868" y="332" width="282" height="150" rx="21"/>
+<!-- PV symbol -->
+<g stroke="#E4A22F" stroke-width="3.5" fill="none" stroke-linecap="round" transform="translate(74 161)">
+ <circle cx="25" cy="18" r="11"/><path d="M25 0V4M25 32V36M7 18H11M39 18H43M12 5L15 8M35 28L38 31M12 31L15 28M35 8L38 5"/>
+ <path d="M5 45H45L50 64H0Z M18 45L16 64M32 45L34 64M2 54H48"/>
+</g>
+<text x="151" y="169" class="eyebrow">СОНЯЧНІ ПАНЕЛІ</text>
+<text x="151" y="214" class="val">PV1 / PV2</text>
+<text x="151" y="251" class="secondary">Генерація — кВт</text>
+<!-- Battery symbol -->
+<g stroke="#23A67A" stroke-width="4" fill="none" stroke-linejoin="round" transform="translate(78 396)">
+ <rect x="0" y="-2" width="53" height="31" rx="6"/><path d="M53 9H60V20H53M13 5V22M26 5V22M39 5V22"/>
+</g>
+<text x="151" y="376" class="eyebrow">АКУМУЛЯТОР</text>
+<text x="151" y="420" class="val">SOC — %</text>
+<text x="151" y="456" class="secondary">Заряд / розряд —</text>
+<!-- Deye icon -->
+<g transform="translate(494 248)">
+<rect x="0" y="0" width="49" height="89" rx="10" fill="#EAF0F8" stroke="#7895B6" stroke-width="3"/>
+<rect x="11" y="12" width="27" height="23" rx="4" fill="#D1E4F7" stroke="#7895B6" stroke-width="2"/>
+<path d="M9 59Q16 45 24 59T40 59" stroke="#1E84C3" stroke-width="3" fill="none"/><circle cx="25" cy="75" r="4" fill="#24A77C"/>
+</g>
+<text x="561" y="256" class="eyebrow">ГІБРИДНИЙ ІНВЕРТОР</text>
+<text x="561" y="302" class="val">DEYE</text>
+<text x="561" y="338" class="secondary">Потужність — кВт</text>
+<text x="561" y="367" class="note">Телеметрія відсутня</text>
+<!-- House icon -->
+<g transform="translate(895 177)" stroke="#2C8DBB" stroke-width="4" fill="none" stroke-linejoin="round">
+<path d="M0 19L27 -6L55 19V50H0Z M18 50V27H39V50"/>
+</g>
+<text x="985" y="171" class="eyebrow">НАВАНТАЖЕННЯ</text>
+<text x="985" y="214" class="val">— кВт</text>
+<text x="985" y="251" class="secondary">Споживачі</text>
+<!-- Tower icon -->
+<g transform="translate(901 382)" stroke="#6390B9" stroke-width="3.5" fill="none" stroke-linejoin="round">
+<path d="M26 -9L0 60H52Z M26 -9V60M12 20H40M7 38H45M1 51H51M14 7H38"/>
+</g>
+<text x="985" y="376" class="eyebrow">ЕЛЕКТРОМЕРЕЖА</text>
+<text x="985" y="420" class="val">— кВт</text>
+<text x="985" y="456" class="secondary">Імпорт / експорт</text>
+<text x="47" y="504" class="note">Пунктирні стрілки — лише можливі напрями, не поточні потоки. Дані Deye ще не надходять.</text>
+</svg>

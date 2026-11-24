@@ -27,6 +27,7 @@ jobs:
           bash -n deploy/rakurs/activate_https.sh
           bash -n deploy/rakurs/diagnose_tls.sh
           bash -n deploy/rakurs/preflight_proxy_trust.sh
+          bash -n deploy/rakurs/install_diagram.sh
           sh -n deploy/rakurs/renewal-nginx-reload.sh
           python -m unittest discover -s tests -p 'test_rakurs_proxy.py' -v
       - name: Validate Docker Compose configuration

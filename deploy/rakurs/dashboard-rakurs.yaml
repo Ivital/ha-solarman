@@ -1,6 +1,6 @@
-# RAKURS | dashboard v2 | UI-managed custom dashboard only
+# RAKURS | dashboard v3 | UI-managed custom dashboard only
 # Not configuration.yaml. All sensor.rakurs_* IDs are placeholders until Deye is verified.
-# 2026-11-24. Built-in Sections, Heading and Markdown cards only.
+# 2026-11-24. Built-in Sections, Heading, Markdown and Picture cards.
 views:
   - title: "Огляд"
     path: overview
@@ -141,18 +141,16 @@ views:
         - type: heading
           heading: "Енергетичний баланс"
           icon: mdi:chart-sankey
+        - type: picture
+          image: /local/rakurs/energy-flow.svg?v=3
+          grid_options:
+            columns: 24
         - type: markdown
           grid_options:
             columns: 24
+          text_only: true
           content: |-
-            ### Енергетична схема
-            
-            | Джерело | | Перетворення | | Призначення |
-            |:--:|:--:|:--:|:--:|:--:|
-            | ☀️ **PV1 / PV2** | → | ⚡ **DEYE** | → | 🏠 **Споживачі** |
-            | 🔋 **АКБ** | ↔ | ⚡ **DEYE** | ↔ | 🌐 **Мережа** |
-            
-            _Стрілки зображають можливі напрямки енергії, а не реальний потік. Після перевірки регістрів додамо динамічну схему._
+            _Пунктирні стрілки означають можливі електричні зв'язки, а не виміряні потоки. Після перевірки регістрів Deye додамо реальні значення та напрямки енергії._
       - type: grid
         column_span: 2
         cards:
