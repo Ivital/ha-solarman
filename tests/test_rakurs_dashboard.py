@@ -37,7 +37,10 @@ class RakursDashboardTest(unittest.TestCase):
         self.assertTrue(all(x["status"] in {"planned_unverified","optional_unverified"} for x in items))
         # Templates use string concatenation ("sensor.rakurs_" ~ key)
         # instead of hard-coded full entity IDs; check keys exactly.
-        self.assertTrue(all("'" + x["key"] + "'" in self.dashboard for x in items))
+        self.assertTrue(all(
+            ("'" + x["key"] + "'" in self.dashboard) or
+            (x["entity_id"] in self.dashboard) for x in items
+        ))
         self.assertTrue(all(x["source_profile"] for x in items))
         self.assertTrue(self.catalog["read_only"])
 

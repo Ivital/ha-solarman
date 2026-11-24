@@ -314,6 +314,14 @@ views:
             _Лише реальні вимірювання_
       - type: grid
         cards:
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Стан здоров’я АКБ (SOH)**
+
+            {% set v = states('sensor.rakurs_battery_soh') %}
+            ## {{ v ~ ' %' if v not in ['unknown','unavailable','none',''] else '—' }}
         - type: heading
           heading: "Електричні параметри"
           icon: mdi:current-dc
