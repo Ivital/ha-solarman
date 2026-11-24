@@ -17,7 +17,7 @@ if [[ ! -f "$TEMPLATE" ]]; then echo 'STOP: template absent' >&2; exit 2; fi
 if ! systemctl is-active --quiet rakurs-standalone.service; then
   echo 'STOP: Rakurs standalone service is not active' >&2; exit 2
 fi
-STATUS="$(curl --silent --show-error --max-time 8 --output /dev/null \
+STATUS="$(curl --noproxy '*' --silent --show-error --max-time 8 --output /dev/null \
   --write-out '%{http_code}' http://127.0.0.1:8765/login)"
 [[ "$STATUS" == '200' ]] || {
   echo "STOP: standalone /login HTTP=$STATUS (expected 200)" >&2; exit 2
@@ -57,7 +57,7 @@ sudo nginx -t
 sudo systemctl reload nginx
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
-CODE="$(curl --silent --show-error --max-time 12 --resolve "$SITE:443:127.0.0.1" \
+CODE="$(curl --noproxy '*' --silent --show-error --max-time 12 --resolve "$SITE:443:127.0.0.1" \
   --output "$TMP" --write-out '%{http_code}' "https://$SITE/login")"
 [[ "$CODE" == 200 ]] && grep -Fq 'Вхід — RAKURS' "$TMP" || {
   echo "STOP: HTTPS login check failed (HTTP=$CODE)" >&2; false
