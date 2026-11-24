@@ -1,0 +1,33 @@
+/* Verified-only parallel inverter overview. */
+.parallel-intro,.parallel-shared{margin:18px 0}
+.parallel-warning{background:#342817;border:1px solid #68533c;color:#f7ddb4!important;
+  border-radius:10px;padding:12px 14px;font-size:12px!important;line-height:1.5}
+.parallel-devices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+  margin:20px 0}
+.parallel-device{min-width:0;border:1px solid #35536b;background:#12283b;
+  border-radius:16px;padding:19px 18px}
+.parallel-device-head{display:flex;justify-content:space-between;align-items:center;
+  gap:12px;flex-wrap:wrap}
+.parallel-device-name{font-size:17px;font-weight:750}
+.parallel-state{border:1px solid #8d7451;color:#eed2a0;background:#362b223d;
+  font-size:10.5px;padding:6px 9px;border-radius:100px}
+.parallel-device-model{color:#97b6c8;font-size:11.5px;margin:5px 0 18px}
+.parallel-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.parallel-fact{min-width:0;border:1px solid #30475a;border-radius:10px;
+  background:#182e42;padding:11px 12px;overflow-wrap:anywhere}
+.parallel-fact small{display:block;color:#91aabf;font-size:10px;margin-bottom:4px}
+.parallel-fact strong{font-size:11px;font-weight:600;line-height:1.4;color:#d5e8f1}
+.parallel-metric-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:15px}
+.parallel-reading{background:#17364b;border:1px solid #32546a;padding:10px;
+  border-radius:10px;display:flex;flex-direction:column;gap:5px}
+.parallel-reading small{font-size:10px;color:#a8c1d2}
+.parallel-reading strong{font-size:17px;color:#e3f5f5}
+.parallel-reading span{font-size:9px;color:#86a4b8}
+.parallel-device-events{font-size:11px;color:#abc8d5;margin:12px 0 0}
+.shared-soc{font-size:26px;font-weight:780;color:#82d9e4;margin:10px 0}
+.parallel-aggregate{font-size:13px;border:1px dashed #416175;background:#173148;
+  padding:15px;border-radius:12px;color:#c2deea}
+.parallel-readonly-note{color:#a8c1d2;font-size:12px;line-height:1.5}
+@media(max-width:1100px){.parallel-devices{grid-template-columns:1fr}}
+@media(max-width:600px){.parallel-facts{grid-template-columns:1fr}
+  .parallel-metric-list{grid-template-columns:1fr}}
