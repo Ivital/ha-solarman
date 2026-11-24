@@ -82,7 +82,7 @@ bash deploy/rakurs/standalone/stage_standalone.sh --install
 ~~~bash
 sudo /var/lib/rakurs/.venv/bin/python \
   deploy/rakurs/standalone/provision_mysql_web_user.py
-/var/lib/rakurs/.venv/bin/python \
+sudo /var/lib/rakurs/.venv/bin/python \
   deploy/rakurs/standalone/bootstrap_admin.py
 ~~~
 

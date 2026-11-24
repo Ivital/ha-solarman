@@ -70,6 +70,19 @@ def _attempt_key(kind, value):
     return hashlib.sha256((kind + ":" + value).encode("utf-8")).hexdigest()
 
 
+def _client_addr():
+    # Nginx ALWAYS replaces X-Real-IP with its own TCP peer and proxies
+    # only to loopback:8765. Ignore arbitrary X-Forwarded-For chains.
+    import ipaddress
+    candidate = request.headers.get("X-Real-IP", "")
+    try:
+        if request.remote_addr in ("127.0.0.1", "::1") and candidate:
+            return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        pass
+    return request.remote_addr or "unknown"
+
+
 def init_auth(app, one, conn):
     secret = load_key()
     app.config.update(
@@ -156,10 +169,8 @@ def init_auth(app, one, conn):
         if len(username) > 64 or len(password) > 512:
             abort(400)
 
-        # Only local Nginx proxy is allowed to call the Flask worker.
-        # This is NOT the remote browser IP; no untrusted XFF header accepted.
         keys = (_attempt_key("login", username.lower()),
-                _attempt_key("source", request.remote_addr or "unknown"))
+                _attempt_key("source", _client_addr()))
         if blocked(keys):
             return render_template(
                 "login.html", csrf=_csrf(),

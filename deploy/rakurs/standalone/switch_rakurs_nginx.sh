@@ -44,13 +44,13 @@ read -r -p "Type SWITCH-RAKURS to replace ONLY Rakurs HTTPS proxy: " CONFIRM </d
 BACKUP_DIR="/var/backups/rakurs-nginx-switch-$(date -u +%Y%m%dT%H%M%SZ)"
 sudo install -d -m 0700 "$BACKUP_DIR"
 sudo cp -p "$DEST" "$BACKUP_DIR/rakurs-https.conf"
-sudo install -m 0644 "$TEMPLATE" "$DEST"
 rollback() {
   echo 'SWITCH FAILED: restoring prior Rakurs HTTPS site' >&2
   sudo cp -p "$BACKUP_DIR/rakurs-https.conf" "$DEST"
   sudo nginx -t && sudo systemctl reload nginx || true
 }
 trap rollback ERR
+sudo install -m 0644 "$TEMPLATE" "$DEST"
 sudo nginx -t
 sudo systemctl reload nginx
 TMP="$(mktemp)"
