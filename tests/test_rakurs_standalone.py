@@ -323,6 +323,23 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("FAILED_STEP=$STEP", script)
         self.assertIn('X-Rakurs-Maintenance', template)
 
+    def test_post_switch_retirement_backups_before_deleting(self):
+        script = (RAKURS / "standalone/retire_homeassistant.sh").read_text()
+        self.assertIn("trap rollback_on_error ERR", script)
+        self.assertIn('sudo docker start "$CONTAINER" || true', script)
+        self.assertIn("sudo tar --one-file-system", script)
+        self.assertIn('sudo tar -tzf "$BACKUP"', script)
+        self.assertIn('sudo sha256sum "$BACKUP"', script)
+        self.assertIn("--noproxy '*'", script)
+        self.assertLess(
+            script.index('sudo tar -tzf "$BACKUP"'),
+            script.index('sudo docker rm "$CONTAINER"'),
+        )
+        self.assertLess(
+            script.index('sudo docker rm "$CONTAINER"'),
+            script.index('sudo rm -rf -- "$DATA"'),
+        )
+
     def test_publish_supports_prior_maintenance_vhost(self):
         script = (RAKURS / "standalone/switch_rakurs_nginx.sh").read_text()
         self.assertIn("RAKURS_MAINTENANCE_UPGRADING", script)
