@@ -1,7 +1,7 @@
 """RAKURS standalone read-only API backed EXCLUSIVELY by LAN MySQL rakurs.
 
-No Home Assistant, Recorder, SQLite, Modbus polling or SQL writes.
-LOCALHOST ONLY until separate app authentication is implemented.
+No Home Assistant, Recorder, SQLite or Modbus polling. Auth writes only to MySQL users/attempts.
+Localhost-only backend. User authentication is mandatory before any data read.
 """
 from __future__ import annotations
 
@@ -260,3 +260,8 @@ def batches():
         "ORDER BY b.started_at_utc DESC LIMIT 50"
     )
     return jsonify({"data_source": "mysql", "batches": serialize(result)})
+
+
+# Register MySQL-backed authorization only after all read-only routes exist.
+from .auth import init_auth
+init_auth(app, one, conn)
