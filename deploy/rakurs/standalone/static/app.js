@@ -157,8 +157,8 @@ async function renderOverview(cycle) {
     ["Заряд АКБ", "▣"], ["Потужність АКБ", "↯"], ["Температура інвертора", "♨"],
     ["Виробіток за добу", "◉"], ["Споживання за добу", "▥"]
   ];
-  section("Оперативні показники", DEMO_MODE ? "Демо · один знімок" :
-                                                    "Тільки фактичні значення MySQL");
+  section("Оперативні показники", DEMO_MODE ? "Збережені показники MySQL · симуляція" :
+                                                    "Фактичні показники MySQL");
   const deck = element("div", "cards");
   main.appendChild(deck);
   let values = {};
@@ -174,7 +174,7 @@ async function renderOverview(cycle) {
   keys.forEach((key, i) => deck.appendChild(metricCard(descriptors[i][0], descriptors[i][1], key, values)));
   const grid = element("div", "grid-two");
   const flow = panel("Енергетичний баланс", DEMO_MODE ?
-    "Потоки одного тестового знімка" :
+    "Потоки за останніми записаними значеннями" :
     "Напрямки потоків покажемо після підтвердження регістрів Deye.");
   if (DEMO_MODE) {
     const balance = element("div", "kv");
@@ -210,6 +210,43 @@ async function renderOverview(cycle) {
   quality.appendChild(info);
   add(grid, flow, quality);
   main.appendChild(grid);
+
+  // Trend charts live on the existing Rakurs homepage. They read the same
+  // authenticated MySQL archive as the dedicated History and Archive views.
+  section("Динаміка за 24 години", DEMO_MODE ?
+    "Історичні значення MySQL · симуляція" : "Підтверджені вимірювання MySQL");
+  const trends = element("div", "trend-grid");
+  main.appendChild(trends);
+  const series = [
+    ["pv_power", "Сонячна генерація", "кВт"],
+    ["load_power", "Навантаження", "кВт"],
+    ["battery_soc", "Заряд акумулятора", "%"]
+  ];
+  const chartBodies = series.map(([key, label, unit]) => {
+    const box = panel(label, "Останні 24 години · " + unit);
+    const body = element("div", "trend-content");
+    box.appendChild(body);
+    trends.appendChild(box);
+    return body;
+  });
+  const responses = await Promise.allSettled(series.map(([key]) =>
+    api("/history?key=" + encodeURIComponent(key) + "&hours=24")));
+  if (!current(cycle)) return;
+  responses.forEach((response, index) => {
+    const body = chartBodies[index];
+    if (response.status !== "fulfilled") {
+      body.appendChild(createEmpty("Динаміка недоступна", "Помилка читання MySQL."));
+      return;
+    }
+    const points = response.value.points || [];
+    if (points.filter(x => x.value_decimal !== null).length < 2) {
+      body.appendChild(createEmpty("Недостатньо точок",
+        "Для графіка необхідно щонайменше два часові значення."));
+      return;
+    }
+    body.appendChild(svgChart(points, series[index][2]));
+    body.appendChild(element("p", "subtle", "Точок у MySQL: " + points.length));
+  });
 }
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
@@ -261,7 +298,7 @@ function svgChart(points, unit) {
   svg.setAttribute("aria-label", "Графік вимірювань з MySQL");
   const real = points.map((p, index) => ({index, v: Number(p.value_decimal)}))
     .filter(p => points[p.index].value_decimal !== null && Number.isFinite(p.v));
-  if (!real.length) return createEmpty("Графік без точок", "За вибраний період реальних числових вимірювань немає.");
+  if (!real.length) return createEmpty("Графік без точок", "За вибраний період числових значень у MySQL немає.");
   const min = Math.min(...real.map(p => p.v));
   const max = Math.max(...real.map(p => p.v));
   const span = Math.max(max - min, Math.abs(max) * .08, .1);
@@ -290,7 +327,7 @@ function svgChart(points, unit) {
 async function renderHistory(cycle, archived) {
   addStatusMessage();
   section(archived ? "Архів вимірювань" : "Історія показників",
-          DEMO_MODE ? "СИМУЛЯЦІЯ · один тестовий знімок · час Київ" :
+          DEMO_MODE ? "Збережені часові ряди · симуляція · час Київ" :
                       "Час даних — UTC; відображення — Київ");
   const available = state.verified;
   if (!available.length) {
@@ -303,6 +340,7 @@ async function renderHistory(cycle, archived) {
   for (const s of available) {
     const option = element("option", "", s.label_uk + " (" + s.signal_key + ")");
     option.value = s.signal_key;
+    if (s.signal_key === "pv_power") option.selected = true;
     picker.appendChild(option);
   }
   const range = element("select", "");
@@ -318,12 +356,13 @@ async function renderHistory(cycle, archived) {
   main.appendChild(body);
   async function refresh() {
     clear(body);
-    add(body, element("h2", "", archived ? "Історичні записи MySQL" : "Графік фактичних вимірювань"));
+    add(body, element("h2", "", archived ? "Історичні записи MySQL" :
+      DEMO_MODE ? "Динаміка збережених симульованих значень" : "Графік фактичних вимірювань"));
     try {
       const result = await api("/history?key=" + encodeURIComponent(picker.value) + "&hours=" + range.value);
       if (!current(cycle)) return;
       if (!result.points.length) {
-        body.appendChild(createEmpty("Немає записів", "За вибраний період фактичних вимірювань немає."));
+        body.appendChild(createEmpty("Немає записів", "За вибраний період значень у MySQL немає."));
         return;
       }
       body.appendChild(svgChart(result.points, (result.signal && result.signal.unit) || ""));
