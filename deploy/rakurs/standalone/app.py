@@ -349,7 +349,7 @@ def demo_mode() -> bool:
                 "AND m.quality='good' AND m.observed_at_utc "
                 ">= UTC_TIMESTAMP(6) - INTERVAL 120 SECOND"
             )
-            g.use_simulated_samples = not (complete and complete["n"] >= 2)
+            g.use_simulated_samples = not (complete and complete.get("n", 0) >= 2)
         else:
             g.use_simulated_samples = real is None and synthetic is not None
     return g.use_simulated_samples
