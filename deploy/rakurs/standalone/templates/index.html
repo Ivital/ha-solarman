@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="dark">
+  <title>Rakurs — Енергомоніторинг</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script defer src="/static/app.js"></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar" aria-label="Навігація Rakurs">
+      <div class="brand">
+        <span class="brand-mark" aria-hidden="true">R</span>
+        <div><strong>RAKURS</strong><small>ЕНЕРГОМОНІТОРИНГ</small></div>
+      </div>
+      <p class="side-label">РОЗДІЛИ</p>
+      <nav id="nav" class="nav"></nav>
+      <div class="side-bottom">
+        <div class="backend-icon" aria-hidden="true">◎</div>
+        <strong>Власна база MySQL</strong>
+        <small>192.168.5.30 · rakurs</small>
+        <small>Без залежності від Home Assistant</small>
+      </div>
+    </aside>
+    <div class="workarea">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">СИСТЕМА ЕНЕРГОМОНІТОРИНГУ</div>
+          <h1 id="view-title">Огляд</h1>
+        </div>
+        <div class="top-actions">
+          <span id="updated" class="updated">Оновлення даних…</span>
+          <span id="connection" class="connection pending"><i></i> Перевірка MySQL</span>
+        </div>
+      </header>
+      <main id="content" class="content">
+        <div class="empty">Завантаження інтерфейсу…</div>
+      </main>
+      <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
+    </div>
+  </div>
+</body>
+</html>
