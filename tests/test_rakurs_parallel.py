@@ -158,6 +158,40 @@ class ParallelApiTests(unittest.TestCase):
                     if "FROM rakurs_device_events AS e" in q), "")
         self.assertIn("WHERE e.device_id=%s", sql)
 
+    def test_individual_history_does_not_mix_devices_or_simulation(self):
+        self.fake_devices = [
+            {"id": 21, "device_key": "inverter_1", "model": MODEL}
+        ]
+        res = self.client.get(
+            "/api/v1/parallel/history?device=inverter_1&key=pv_power&hours=24")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["device_key"], "inverter_1")
+        sql = next(q for q, _ in self.db_calls
+                   if "FROM rakurs_samples AS m" in q)
+        self.assertIn("WHERE m.device_id=%s", sql)
+        self.assertIn("s.signal_key=%s", sql)
+        self.assertIn("m.quality<>'simulated'", sql)
+        self.assertEqual(self.client.get(
+            "/api/v1/parallel/history?device=inverter_1&key=unknown_metric").status_code, 400)
+        self.assertEqual(self.client.get(
+            "/api/v1/parallel/history?device=inverter_1&key=pv_power&hours=169").status_code, 400)
+
+    def test_device_modbus_fields_are_scoped_to_single_inverter(self):
+        self.fake_devices = [
+            {"id": 22, "device_key": "inverter_2", "model": MODEL}
+        ]
+        res = self.client.get(
+            "/api/v1/parallel/modbus-fields?device=inverter_2")
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(res.get_json()["count"], 0)
+        self.assertTrue(res.get_json()["verified_only"])
+        sql = next(q for q, _ in self.db_calls
+                   if "FROM rakurs_modbus_fields AS f" in q)
+        self.assertIn("m.device_id=%s", sql)
+        self.assertIn("ms.device_id=%s", sql)
+        self.assertIn("f.verified=1", sql)
+        self.assertIn("m.quality<>'simulated'", sql)
+
     def test_requires_authenticated_access(self):
         module.app.config.update(SECRET_KEY="parallel-testing-key")
         guest = module.app.test_client()
