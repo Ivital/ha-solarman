@@ -197,6 +197,57 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(self.client.get("/login").status_code, 200)
         self.assertIn("csrf", self.client.get("/login").get_data(as_text=True))
 
+    def test_server_rendered_deye_routes_are_authenticated(self):
+        self.assertEqual(
+            self.client.get("/deye").headers["Location"], "/login?next=/deye"
+        )
+        self.assertEqual(
+            self.client.get("/deye/modbus").headers["Location"],
+            "/login?next=/deye/modbus"
+        )
+        login = self.client.get("/login?next=/deye/modbus")
+        self.assertIn('name="next" value="/deye/modbus"',
+                      login.get_data(as_text=True))
+        unsafe = self.client.get("/login?next=https://example.org/")
+        self.assertNotIn('name="next"', unsafe.get_data(as_text=True))
+        with self.client.session_transaction() as sess:
+            sess["uid"] = AUTH_ACCOUNT["id"]
+            sess["ver"] = AUTH_ACCOUNT["session_version"]
+            sess["at"] = int(time.time())
+        self.data_one = lambda sql, params: (
+            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql else None
+        )
+        ui = {
+            "signal_key": "pv_power", "label_uk": "Генерація PV",
+            "unit": "кВт", "value_decimal": Decimal("5.100000000"),
+            "quality": "simulated",
+            "observed_at_utc": datetime(2026, 11, 24, 17, 0),
+        }
+        field = {
+            "field_key": "p3_0001", "group_name": "PV", "field_name": "PV Power",
+            "unit": "W", "registers_json": "[672,673]",
+            "value_decimal": Decimal("5100"), "value_text": None,
+            "quality": "simulated",
+        }
+        with patch.object(module, "rows", side_effect=[[ui], [field]]) as query:
+            summary = self.client.get("/deye")
+            self.assertEqual(summary.status_code, 200)
+            body = summary.get_data(as_text=True)
+            self.assertIn("Генерація PV", body)
+            self.assertIn("5.1", body)
+            self.assertIn("DEYE", body)
+            self.assertNotIn("/static/app.js", body)
+            modbus = self.client.get("/deye/modbus")
+            self.assertEqual(modbus.status_code, 200)
+            modbus_html = modbus.get_data(as_text=True)
+            self.assertIn("PV Power", modbus_html)
+            self.assertIn("0x02A0, 0x02A1", modbus_html)
+            self.assertNotIn("/static/app.js", modbus_html)
+            self.assertEqual(query.call_count, 2)
+            for call in query.call_args_list:
+                self.assertIn("m.quality='simulated'", call.args[0])
+                self.assertIn("m.ingest_source=%s", call.args[0])
+
     def test_demo_login_redirect_preserves_explicit_selection(self):
         from werkzeug.security import generate_password_hash
         username = "demo_account"
