@@ -13,7 +13,7 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app.js?v=rakurs-primary-mysql-20261124-v2'
+ASSET_PATH='/static/app.js?v=rakurs-history-72h-v1'
 FILES=(app.py static/app.js templates/index.html)
 cd "$ROOT"
 
@@ -140,7 +140,7 @@ home = client.get("/", base_url="https://localhost")
 assert home.status_code == 200, f"MAIN_HOME_HTTP={home.status_code}"
 html = home.get_data(as_text=True)
 for marker in (
-    "rakurs-primary-mysql-20261124-v2",
+    "rakurs-history-72h-v1",
     'Показники Deye з бази даних',
     "5.1", "6.4", "72",
 ):
