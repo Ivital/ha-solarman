@@ -17,6 +17,7 @@ from pathlib import Path
 import pymysql
 from flask import Flask, abort, g, jsonify, render_template, request
 from .parallel_support import MODEL as PARALLEL_MODEL, SIGNAL_KEYS as PARALLEL_SIGNAL_KEYS, describe_topology
+from .mysql_transport import mysql_tls_options, mysql_transport_state
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_FILE = ROOT / "signal_catalog.json"
@@ -61,11 +62,15 @@ def open_db():
     user = os.environ.get("RAKURS_DB_USER", "").strip()
     if not user or not re.fullmatch(r"[A-Za-z0-9_]{1,32}", user):
         raise ConfigurationError("Dedicated read-only database user required")
+    try:
+        transport_options = mysql_tls_options()
+    except RuntimeError as exc:
+        raise ConfigurationError('MySQL trust anchor invalid') from exc
     return pymysql.connect(
         host=HOST, port=PORT, database=SCHEMA, user=user, password=_password(),
         cursorclass=pymysql.cursors.DictCursor, charset="utf8mb4",
         autocommit=True, connect_timeout=4, read_timeout=6, write_timeout=4,
-        ssl_disabled=True,  # explicit trusted-LAN decision
+        **transport_options,
     )
 
 
@@ -365,6 +370,8 @@ def status():
             "has_real_samples": False,
             "has_simulated_samples": sample_exists is not None,
             "collector_active": False, "home_assistant_dependency": False,
+        "mysql_transport": mysql_transport_state(),
+            "mysql_transport": mysql_transport_state(),
         })
     devices = one("SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key<>%s",
                   (DEMO_DEVICE_KEY,))
