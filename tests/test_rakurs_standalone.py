@@ -173,6 +173,26 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(self.client.get("/login").status_code, 200)
         self.assertIn("csrf", self.client.get("/login").get_data(as_text=True))
 
+    def test_browser_login_and_logout_forms_allowed_by_csp(self):
+        login = self.client.get("/login")
+        self.assertEqual(login.status_code, 200)
+        self.assertIn('action="/login" method="post"', login.get_data(as_text=True))
+        login_csp = login.headers["Content-Security-Policy"]
+        self.assertIn("form-action 'self'", login_csp)
+        self.assertNotIn("form-action 'none'", login_csp)
+        self.assertIn("frame-ancestors 'none'", login_csp)
+
+        with self.client.session_transaction() as sess:
+            sess["uid"] = AUTH_ACCOUNT["id"]
+            sess["ver"] = AUTH_ACCOUNT["session_version"]
+            sess["at"] = int(time.time())
+        self.data_one = lambda sql, params: (
+            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql else None
+        )
+        dashboard = self.client.get("/")
+        self.assertEqual(dashboard.status_code, 200)
+        self.assertIn("form-action 'self'", dashboard.headers["Content-Security-Policy"])
+
     def test_login_requires_csrf_and_no_default_credentials(self):
         self.assertEqual(self.client.post("/login", data={
             "username": "admin", "password": "incorrect", "csrf": "bogus",
@@ -308,6 +328,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("RAKURS_MAINTENANCE_UPGRADING", script)
         self.assertIn("proxy_pass http://127.0.0.1:8123;", script)
         self.assertIn("rakurs-https.conf", script)
+        self.assertIn("--noproxy '*'", script)
 
 
 if __name__ == "__main__":
