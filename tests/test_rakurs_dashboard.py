@@ -96,3 +96,11 @@ class RakursDashboardTest(unittest.TestCase):
             self.assertNotIn(forbidden, script)
         self.assertTrue((RAKURS / "assets" / "energy-flow.svg").exists())
         self.assertTrue((RAKURS / "dashboard-rakurs-v3.yaml").exists())
+
+    def test_long_term_archive_schema_is_not_activated(self):
+        sql = (RAKURS / "archive_schema.sql").read_text(encoding="utf-8")
+        for table in ("devices", "signals", "samples", "device_events", "ingest_batches"):
+            self.assertIn("CREATE TABLE IF NOT EXISTS " + table, sql)
+        self.assertIn("PRIMARY KEY (device_id, signal_id, observed_at_utc)", sql)
+        self.assertNotIn("DROP TABLE", sql)
+        self.assertNotIn("DELETE FROM", sql)
