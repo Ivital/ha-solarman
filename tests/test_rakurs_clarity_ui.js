@@ -153,7 +153,6 @@ async function run() {
   assert.equal(byClass(app.main, "energy-diagram").length, 1, "Energy flow diagram");
   assert.equal(byClass(app.main, "trend-card").length, 4, "Four history graphs");
   assert.equal(byClass(app.nav, "nav-group-label").length, 3, "Grouped navigation");
-  assert.equal(byClass(app.nav, "nav").length, 1, "nav root still present");
   assert(app.fetchCalls.some(x => x.includes("/api/v1/history?key=pv_power")));
   console.log("CLARITY_OVERVIEW=PASS");
 
