@@ -46,7 +46,23 @@ systemctl is-active --quiet rakurs-standalone.service || {
 
 echo '=== MANDATORY MYSQL BACKUP AND ATOMIC SYNTHETIC TWIN ARCHIVE ==='
 echo 'Real inverters will NOT be registered. This step writes simulated test data.'
-sudo /var/lib/rakurs/.venv/bin/python "$HERE/seed_two_parallel_demo.py" --execute </dev/tty
+BACKUP_TRANSPORT="${RAKURS_MYSQL_BACKUP_TRANSPORT:-VERIFY_TLS}"
+[[ "$BACKUP_TRANSPORT" == "VERIFY_TLS" ||
+   "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]] || {
+  echo 'STOP: use VERIFY_TLS or explicit LAN_PLAINTEXT_ACK' >&2
+  exit 2
+}
+if [[ "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]]; then
+  echo 'WARNING: backup traffic and MySQL credentials will be UNENCRYPTED within the LAN.'
+  echo 'This mode must only be used on the trusted 192.168.5.30 segment.'
+else
+  echo 'MYSQL_BACKUP_TLS_VERIFICATION=REQUIRED'
+fi
+# sudo normally discards shell environment. Forward ONLY these approved switches.
+sudo env \
+  "RAKURS_MYSQL_BACKUP_TRANSPORT=$BACKUP_TRANSPORT" \
+  "RAKURS_MYSQL_BACKUP_CA_FILE=${RAKURS_MYSQL_BACKUP_CA_FILE:-}" \
+  /var/lib/rakurs/.venv/bin/python "$HERE/seed_two_parallel_demo.py" --execute </dev/tty
 echo 'SYNTHETIC_DATABASE_COMMITTED=PASS'
 
 echo '=== VERIFY EXACT TWO-INVERTER DB COUNTS (READ-ONLY ACCOUNT) ==='
