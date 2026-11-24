@@ -31,6 +31,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_rakurs_proxy.py' -v
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
+      - name: RAKURS dashboard YAML and zero-fabrication tests
+        run: python -m unittest discover -s tests -p 'test_rakurs_dashboard.py' -v
       - name: Read-only integration tests
         run: python -m unittest discover -s tests -p 'test_deye*.py' -v
       - name: Home Assistant hassfest validation
