@@ -78,14 +78,14 @@ class LiveArchiveApiTests(unittest.TestCase):
                 return {"id": 123, "username": "test", "role": "admin",
                         "is_active": 1, "session_version": 1}
             self.recorded.append((sql, params))
+            if "COUNT(*)" in sql:
+                return {"n": 1}
             if "FROM rakurs_modbus_poll_runs" in sql:
                 return {"id": 77, "poll_uid": "poll_real_2026",
                         "observed_at_utc": datetime(2026, 11, 25, tzinfo=timezone.utc),
                         "quality": "good", "status": "complete",
                         "request_count": 1, "response_count": 1,
                         "exception_count": 0}
-            if "COUNT(*)" in sql:
-                return {"n": 1}
             return None
 
         def rows(sql, params=()):
@@ -122,7 +122,6 @@ class LiveArchiveApiTests(unittest.TestCase):
             self.assertFalse(payload["simulation"])
             self.assertEqual(payload["total"],1)
             self.assertEqual(len(payload[field]),1)
-        self.assertTrue(any("r" not in sql or True for sql,_ in self.recorded))
         for sql,params in self.recorded:
             if any(t in sql for t in ("rakurs_modbus_register_samples",
                                       "rakurs_modbus_bit_samples",
