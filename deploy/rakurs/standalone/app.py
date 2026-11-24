@@ -25,6 +25,8 @@ SCHEMA = "rakurs"
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 MAX_KEYS = 24
 MAX_HISTORY = 1000
+DEMO_DEVICE_KEY = "simulated_deye_sg05lp3"
+DEMO_INGEST_SOURCE = "rakurs_demo_one_shot"
 LOGGER = logging.getLogger("rakurs.standalone")
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -144,29 +146,71 @@ def catalog():
         return jsonify(json.load(source))
 
 
+def demo_mode() -> bool:
+    return request.args.get("demo") == "1"
+
+
 @app.get("/api/v1/status")
 def status():
-    devices = one("SELECT COUNT(*) AS n FROM rakurs_devices")
+    if demo_mode():
+        devices = one(
+            "SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key=%s",
+            (DEMO_DEVICE_KEY,)
+        )
+        signals = one(
+            "SELECT COUNT(DISTINCT m.signal_id) AS n FROM rakurs_samples AS m "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE d.device_key=%s AND m.quality='simulated' "
+            "AND m.ingest_source=%s",
+            (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
+        )
+        sample_exists = one(
+            "SELECT 1 AS n FROM rakurs_samples AS m "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE d.device_key=%s AND m.quality='simulated' "
+            "AND m.ingest_source=%s LIMIT 1",
+            (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
+        )
+        return jsonify({
+            "data_source": "mysql", "mode": "simulation", "database": SCHEMA,
+            "registered_devices": devices["n"], "verified_signals": 0,
+            "simulated_signals": signals["n"],
+            "has_real_samples": False,
+            "has_simulated_samples": sample_exists is not None,
+            "collector_active": False, "home_assistant_dependency": False,
+        })
+    devices = one("SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key<>%s",
+                  (DEMO_DEVICE_KEY,))
     verified = one("SELECT COUNT(*) AS n FROM rakurs_signals WHERE verified=1")
-    sample_exists = one("SELECT 1 AS n FROM rakurs_samples LIMIT 1")
+    sample_exists = one(
+        "SELECT 1 AS n FROM rakurs_samples WHERE quality<>'simulated' LIMIT 1"
+    )
     return jsonify({
-        "data_source": "mysql", "database": SCHEMA, "mysql_host": HOST,
-        "registered_devices": devices["n"],
-        "verified_signals": verified["n"],
-        "has_real_samples": sample_exists is not None,
-        "collector_active": False,
-        "home_assistant_dependency": False,
+        "data_source": "mysql", "mode": "real", "database": SCHEMA,
+        "mysql_host": HOST, "registered_devices": devices["n"],
+        "verified_signals": verified["n"], "has_real_samples": sample_exists is not None,
+        "collector_active": False, "home_assistant_dependency": False,
     })
-
 
 @app.get("/api/v1/signals")
 def signals():
+    if demo_mode():
+        result = rows(
+            "SELECT DISTINCT s.signal_key, s.label_uk, s.unit "
+            "FROM rakurs_signals AS s "
+            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE d.device_key=%s AND m.quality='simulated' "
+            "AND m.ingest_source=%s ORDER BY s.label_uk LIMIT 500",
+            (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
+        )
+        return jsonify({"data_source": "mysql", "simulation": True,
+                        "signals": serialize(result)})
     result = rows(
         "SELECT signal_key, label_uk, unit FROM rakurs_signals "
         "WHERE verified=1 ORDER BY label_uk LIMIT 500"
     )
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
-
 
 @app.get("/api/v1/latest")
 def latest():
@@ -176,18 +220,31 @@ def latest():
         return jsonify({"error": "Некоректний перелік сигналів"}), 400
     found = {}
     for key in keys:
-        result = one(
-            "SELECT s.signal_key, s.label_uk, s.unit, m.value_decimal, "
-            "m.raw_value, m.quality, m.observed_at_utc "
-            "FROM rakurs_signals AS s JOIN rakurs_samples AS m ON m.signal_id=s.id "
-            "WHERE s.signal_key=%s AND s.verified=1 "
-            "ORDER BY m.observed_at_utc DESC LIMIT 1",
-            (key,),
-        )
+        if demo_mode():
+            result = one(
+                "SELECT s.signal_key, s.label_uk, s.unit, m.value_decimal, "
+                "m.raw_value, m.quality, m.observed_at_utc "
+                "FROM rakurs_signals AS s "
+                "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+                "JOIN rakurs_devices AS d ON d.id=m.device_id "
+                "WHERE s.signal_key=%s AND d.device_key=%s "
+                "AND m.quality='simulated' AND m.ingest_source=%s "
+                "ORDER BY m.observed_at_utc DESC LIMIT 1",
+                (key, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
+            )
+        else:
+            result = one(
+                "SELECT s.signal_key, s.label_uk, s.unit, m.value_decimal, "
+                "m.raw_value, m.quality, m.observed_at_utc "
+                "FROM rakurs_signals AS s JOIN rakurs_samples AS m ON m.signal_id=s.id "
+                "WHERE s.signal_key=%s AND s.verified=1 "
+                "AND m.quality<>'simulated' "
+                "ORDER BY m.observed_at_utc DESC LIMIT 1",
+                (key,),
+            )
         if result is not None:
             found[key] = serialize(result)
-    return jsonify({"data_source": "mysql", "values": found})
-
+    return jsonify({"data_source": "mysql", "simulation": demo_mode(), "values": found})
 
 def checked_key():
     key = request.args.get("key", "")
@@ -205,62 +262,95 @@ def history():
         return jsonify({"error": "Некоректний проміжок часу"}), 400
     if hours < 1 or hours > 168:
         return jsonify({"error": "Доступно 1–168 годин"}), 400
-    signal = one(
-        "SELECT signal_key, label_uk, unit FROM rakurs_signals "
-        "WHERE signal_key=%s AND verified=1", (key,),
-    )
+    if demo_mode():
+        signal = one(
+            "SELECT s.signal_key, s.label_uk, s.unit FROM rakurs_signals AS s "
+            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE s.signal_key=%s AND d.device_key=%s "
+            "AND m.quality='simulated' AND m.ingest_source=%s LIMIT 1",
+            (key, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
+        )
+    else:
+        signal = one(
+            "SELECT signal_key, label_uk, unit FROM rakurs_signals "
+            "WHERE signal_key=%s AND verified=1", (key,)
+        )
     if signal is None:
         return jsonify({"data_source": "mysql", "signal": None,
                         "points": [], "truncated": False})
-    history_rows = rows(
-        "SELECT m.observed_at_utc, m.received_at_utc, m.value_decimal, "
-        "m.raw_value, m.quality FROM rakurs_samples AS m "
-        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
-        "WHERE s.signal_key=%s AND s.verified=1 "
-        "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
-        "ORDER BY m.observed_at_utc DESC LIMIT %s",
-        (key, hours, MAX_HISTORY + 1),
-    )
+    if demo_mode():
+        history_rows = rows(
+            "SELECT m.observed_at_utc, m.received_at_utc, m.value_decimal, "
+            "m.raw_value, m.quality FROM rakurs_samples AS m "
+            "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE s.signal_key=%s AND d.device_key=%s "
+            "AND m.quality='simulated' AND m.ingest_source=%s "
+            "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
+            "ORDER BY m.observed_at_utc DESC LIMIT %s",
+            (key, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE, hours, MAX_HISTORY + 1)
+        )
+    else:
+        history_rows = rows(
+            "SELECT m.observed_at_utc, m.received_at_utc, m.value_decimal, "
+            "m.raw_value, m.quality FROM rakurs_samples AS m "
+            "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+            "WHERE s.signal_key=%s AND s.verified=1 "
+            "AND m.quality<>'simulated' "
+            "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
+            "ORDER BY m.observed_at_utc DESC LIMIT %s",
+            (key, hours, MAX_HISTORY + 1)
+        )
     truncated = len(history_rows) > MAX_HISTORY
     history_rows = history_rows[:MAX_HISTORY]
     history_rows.reverse()
     return jsonify({
-        "data_source": "mysql", "signal": signal, "hours": hours,
+        "data_source": "mysql", "simulation": demo_mode(),
+        "signal": signal, "hours": hours,
         "points": serialize(history_rows), "truncated": truncated,
     })
 
-
 @app.get("/api/v1/events")
 def events():
+    qualifier = "=" if demo_mode() else "<>"
     result = rows(
         "SELECT e.observed_at_utc, e.severity, e.event_code, e.message, "
         "d.device_key FROM rakurs_device_events AS e "
         "JOIN rakurs_devices AS d ON d.id=e.device_id "
-        "ORDER BY e.observed_at_utc DESC LIMIT 50"
+        f"WHERE d.device_key{qualifier}%s "
+        "ORDER BY e.observed_at_utc DESC LIMIT 50",
+        (DEMO_DEVICE_KEY,)
     )
-    return jsonify({"data_source": "mysql", "events": serialize(result)})
-
+    return jsonify({"data_source": "mysql", "simulation": demo_mode(),
+                    "events": serialize(result)})
 
 @app.get("/api/v1/devices")
 def devices():
+    qualifier = "=" if demo_mode() else "<>"
     result = rows(
         "SELECT device_key, kind, model, commissioned_at_utc "
-        "FROM rakurs_devices ORDER BY device_key LIMIT 100"
+        f"FROM rakurs_devices WHERE device_key{qualifier}%s "
+        "ORDER BY device_key LIMIT 100",
+        (DEMO_DEVICE_KEY,)
     )
-    return jsonify({"data_source": "mysql", "devices": serialize(result)})
-
+    return jsonify({"data_source": "mysql", "simulation": demo_mode(),
+                    "devices": serialize(result)})
 
 @app.get("/api/v1/batches")
 def batches():
+    qualifier = "=" if demo_mode() else "<>"
     result = rows(
         "SELECT b.started_at_utc, b.finished_at_utc, b.received_count, "
         "b.accepted_count, b.rejected_count, b.status, b.error_code, "
         "d.device_key FROM rakurs_ingest_batches AS b "
         "JOIN rakurs_devices AS d ON d.id=b.device_id "
-        "ORDER BY b.started_at_utc DESC LIMIT 50"
+        f"WHERE d.device_key{qualifier}%s "
+        "ORDER BY b.started_at_utc DESC LIMIT 50",
+        (DEMO_DEVICE_KEY,)
     )
-    return jsonify({"data_source": "mysql", "batches": serialize(result)})
-
+    return jsonify({"data_source": "mysql", "simulation": demo_mode(),
+                    "batches": serialize(result)})
 
 # Register MySQL-backed authorization only after all read-only routes exist.
 from .auth import init_auth
