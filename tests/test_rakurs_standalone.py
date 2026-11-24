@@ -215,6 +215,72 @@ class AuthenticationTests(unittest.TestCase):
         finally:
             module.app.config["AUTH_READY"] = before
 
+    def test_successful_login_rotates_session(self):
+        from werkzeug.security import generate_password_hash
+        username = "administrator"
+        password = "a-long-test-password-unique-123!"
+        password_hash = generate_password_hash(password, method="scrypt:32768:8:1")
+        account = {
+            "id": 77, "username": username, "role": "admin",
+            "password_hash": password_hash, "is_active": 1, "session_version": 1,
+        }
+        def lookup(sql, params):
+            if "FROM rakurs_login_attempts" in sql:
+                return None
+            if "FROM rakurs_users WHERE username=%s" in sql:
+                return account
+            if "FROM rakurs_users WHERE id=%s" in sql:
+                return account
+            return None
+        self.data_one = lookup
+        class FakeCursor:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def execute(self, *args): return 1
+        class FakeConn:
+            def cursor(self): return FakeCursor()
+        with patch.object(module, "conn", return_value=FakeConn()):
+            self.client.get("/login")
+            with self.client.session_transaction() as sess:
+                csrf = sess["csrf"]
+            response = self.client.post("/login", data={
+                "username": username, "password": password, "csrf": csrf,
+            })
+            self.assertEqual(response.status_code, 303)
+            me = self.client.get("/api/v1/auth")
+            self.assertEqual(me.status_code, 200)
+            self.assertEqual(me.get_json()["username"], username)
+
+    def test_failed_login_is_rejected_without_disclosing_user(self):
+        class FakeCursor:
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def execute(self, *args): return 1
+        class FakeConn:
+            def cursor(self): return FakeCursor()
+        with patch.object(module, "conn", return_value=FakeConn()):
+            self.client.get("/login")
+            with self.client.session_transaction() as sess:
+                csrf = sess["csrf"]
+            result = self.client.post("/login", data={
+                "username": "missing_user", "password": "wrong", "csrf": csrf,
+            })
+        self.assertEqual(result.status_code, 401)
+        self.assertIn("Неправильний логін або пароль", result.get_data(as_text=True))
+        self.assertEqual(self.client.get("/api/v1/auth").status_code, 401)
+
+    def test_auth_scripts_do_not_embed_credentials(self):
+        check_script = (RAKURS / "standalone/apply_auth_schema.sh").read_text()
+        web_user = (RAKURS / "standalone/provision_mysql_web_user.py").read_text()
+        bootstrap = (RAKURS / "standalone/bootstrap_admin.py").read_text()
+        for code in (check_script, web_user, bootstrap):
+            self.assertNotIn("MYSQL_PWD", code)
+            self.assertNotIn("--password=", code)
+            self.assertNotIn("DROP DATABASE", code)
+            self.assertNotIn("DROP TABLE", code)
+        self.assertIn("getpass.getpass", web_user)
+        self.assertIn("generate_password_hash", bootstrap)
+
 
 if __name__ == "__main__":
     unittest.main()

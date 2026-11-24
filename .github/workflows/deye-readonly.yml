@@ -31,6 +31,16 @@ jobs:
           bash -n deploy/rakurs/audit_storage.sh
           bash -n deploy/rakurs/mysql_archive_preflight.sh
           bash -n deploy/rakurs/mysql_archive_apply_schema.sh
+          bash -n deploy/rakurs/standalone/apply_auth_schema.sh
+          bash deploy/rakurs/standalone/apply_auth_schema.sh --check
+          bash -n deploy/rakurs/standalone/stage_standalone.sh
+          bash deploy/rakurs/standalone/stage_standalone.sh --check
+          bash -n deploy/rakurs/standalone/switch_rakurs_nginx.sh
+          bash -n deploy/rakurs/standalone/retire_homeassistant.sh
+          python -m py_compile deploy/rakurs/standalone/app.py
+          python -m py_compile deploy/rakurs/standalone/auth.py
+          python -m py_compile deploy/rakurs/standalone/bootstrap_admin.py
+          python -m py_compile deploy/rakurs/standalone/provision_mysql_web_user.py
           bash deploy/rakurs/mysql_archive_apply_schema.sh --check
           python -m py_compile deploy/rakurs/mysql_archive_tls_diagnose.py
           sh -n deploy/rakurs/renewal-nginx-reload.sh

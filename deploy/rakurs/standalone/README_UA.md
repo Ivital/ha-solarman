@@ -4,8 +4,9 @@
 базою MySQL 8.0.45 на 192.168.5.30, база rakurs. Жодних запитів
 до Home Assistant, його Recorder, SQLite, датчиків або API немає.
 
-**На 24.11.2026 це окрема підготовлена версія, ще НЕ запущена замість
-працюючого сайту.** Існуючий HTTPS-сайт поки обслуговує HA.
+**Стан на 24.11.2026:** код окремого вебінтерфейсу та локальної
+авторизації готовий у GitHub, але ще НЕ встановлений на Debian як
+робочий сайт. Існуючий HTTPS-сайт поки обслуговує HA.
 
 ## Реалізовано в коді
 
@@ -24,14 +25,21 @@
 
 ## Обмеження та безпека
 
-Не робіть сервіс доступним з Інтернету: **немає незалежного входу,
-керування сесіями та MFA**. Під час тестування слухати лише
+Реалізовано локальну авторизацію: логін, хеші паролів scrypt,
+браузерні сесії з підписом, 8-годинний термін, CSRF, вихід із
+системи, 15-хвилинне блокування після повторних невдалих входів.
+Користувачі й лічильники спроб зберігаються тільки в MySQL rakurs
+(дві додаткові auth-таблиці). Немає стандартних паролів.
+**MFA поки не реалізовано.** Публічний доступ слід дозволяти
+лише після перевірки HTTPS, входу, виходу і прав користувачів.
+
+До перевірки слухати лише
 127.0.0.1:8765, без змін Nginx, DNS і брандмауера.
 
-Рекомендується окремий MySQL користувач, наприклад rakurs_reader,
-із правом тільки SELECT для бази rakurs та дозволом підключення
-тільки з 192.168.5.31. НЕ використовувати адміністративний акаунт
-Ivital@% для постійної роботи вебдодатка.
+Вебсервіс працює під системним користувачем rakurs із MySQL акаунтом
+rakurs_web@192.168.5.31, якому потрібен SELECT на rakurs.*, INSERT/UPDATE
+на rakurs_login_attempts і UPDATE на rakurs_users для останнього входу.
+Не використовувати широкі права Ivital@% у вебсервісі.
 
 Пароль лише в локальному файлі з правами 0600, який належить
 користувачу процесу. Змінна RAKURS_DB_PASSWORD_FILE вказує шлях.
@@ -39,29 +47,79 @@ Ivital@% для постійної роботи вебдодатка.
 Згідно з рішенням власника, TCP MySQL у внутрішній мережі без TLS;
 порт 3306 не відкривати в Інтернет.
 
-## Команди для майбутнього ТІЛЬКИ локального запуску
+## Порядок безпечного переходу на новий Rakurs
 
-До запуску створіть виділений read-only обліковий запис MySQL і файл
-пароля, налаштований адміністратором. Шлях нижче — приклад, він
-не існує автоматично.
+Початкові дії збережено в окремих перевірених скриптах:
+
+1. Оновити вихідні файли та виконати перевірку:
 
 ~~~bash
 cd ~/deye-monitoring-src
 git pull --ff-only
-python3 -m venv .venv-rakurs
-.venv-rakurs/bin/pip install -r deploy/rakurs/standalone/requirements.txt
-
-RAKURS_DB_USER=rakurs_reader \
-RAKURS_DB_PASSWORD_FILE=/path/to/private/password-file \
-.venv-rakurs/bin/gunicorn \
-  --chdir deploy/rakurs --bind 127.0.0.1:8765 \
-  --workers 2 --threads 2 --timeout 15 \
-  standalone.app:app
+bash deploy/rakurs/standalone/apply_auth_schema.sh --check
+bash deploy/rakurs/standalone/stage_standalone.sh --check
+bash deploy/rakurs/standalone/retire_homeassistant.sh --audit
 ~~~
 
-Локальний перегляд: http://127.0.0.1:8765. Для віддаленої роботи
-в браузері — SSH port-forwarding; не публікувати його через Nginx
-поки не створено й не перевірено автентифікацію.
+2. Додати дві таблиці авторизації до існуючих п'яти без видалення
+будь-яких даних:
+
+~~~bash
+bash deploy/rakurs/standalone/apply_auth_schema.sh --apply
+~~~
+
+3. Встановити незалежний сервіс у /opt/rakurs без перемикання
+працюючого сайту й без зупинки HA:
+
+~~~bash
+bash deploy/rakurs/standalone/stage_standalone.sh --install
+~~~
+
+4. Створити окремий MySQL account rakurs_web@192.168.5.31,
+локально згенерувати/захистити файл пароля та створити
+першого вебадміністратора:
+
+~~~bash
+sudo /var/lib/rakurs/.venv/bin/python \
+  deploy/rakurs/standalone/provision_mysql_web_user.py
+/var/lib/rakurs/.venv/bin/python \
+  deploy/rakurs/standalone/bootstrap_admin.py
+~~~
+
+Для bootstrap_admin.py потрібен веблогін і новий пароль
+мінімум 16 символів, які вводяться приховано. Ні GitHub, ні чат
+їх не отримують. Скрипти не перевстановлюють і не мігрують MySQL.
+
+5. Лише після цих дій запустити ізольований сервіс:
+
+~~~bash
+sudo systemctl enable --now rakurs-standalone.service
+bash deploy/rakurs/standalone/switch_rakurs_nginx.sh --check
+~~~
+
+6. Після приймання входу та API без Home Assistant:
+
+~~~bash
+bash deploy/rakurs/standalone/switch_rakurs_nginx.sh --apply
+~~~
+
+Цей перемикач змінює тільки Rakurs HTTPS vhost, робить backup
+і відкат у випадку помилки. Сертифікат HTTPS зберігається.
+
+7. Лише після успішного перемикання й окремої перевірки:
+
+~~~bash
+bash deploy/rakurs/standalone/retire_homeassistant.sh --audit
+bash deploy/rakurs/standalone/retire_homeassistant.sh --remove-ha
+~~~
+
+Останній сценарій видаляє лише контейнер deye-homeassistant і його
+локальний config bind mount після контрольної резервної копії.
+Двигун Docker, Nginx, Odoo, Ergodata та Teltonika не чіпає.
+
+**Не запускайте --remove-ha, доки Rakurs Standalone не працює
+на основному домені.** Якщо MySQL акаунт Ivital не має права CREATE USER,
+процедура зупиниться, а не змінюватиме загальні привілеї.
 
 ## API (тільки GET)
 
@@ -74,17 +132,12 @@ RAKURS_DB_PASSWORD_FILE=/path/to/private/password-file \
 - /api/v1/devices — зареєстровані пристрої.
 - /api/v1/batches — журнал циклів отримання.
 
-## Для повного переходу
+## Залишкова робота
 
-1. Перевірити доступ під обмеженим користувачем та захист секретів.
-2. Протестувати UI/API на localhost і резервне відновлення MySQL.
-3. Реалізувати автономну авторизацію з MFA або перевірений
-   зовнішній SSO перед Nginx (наразі цього немає).
-4. Після фізичного перенесення Teltonika від ІТМ до Deye
-   підтвердити транспорт RS485/Modbus і карту регістрів;
-   розробити службу читання Deye з записом у MySQL.
-5. Лише тоді переключити наявний Nginx із Home Assistant
-   на автономний Rakurs з резервною копією та можливістю відкату.
+Незалежну авторизацію на паролі вже реалізовано, MFA ще не готова.
+Автоматичне опитування Deye не активувати, поки Teltonika обслуговує ІТМ.
+Зовнішнє резервування MySQL та перевірка відновлення залишаються
+окремими задачами експлуатації.
 
 Існуючий HA-контейнер і його SQLite **не використовуються
 новим Rakurs**, але залишаються без змін до завершення переходу.
