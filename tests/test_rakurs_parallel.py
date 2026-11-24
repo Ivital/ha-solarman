@@ -258,6 +258,39 @@ class ParallelApiTests(unittest.TestCase):
                              404)
         self.assertTrue(all("INSERT " not in q and "UPDATE " not in q for q, _ in queries))
 
+    def test_two_real_inverters_never_mix_global_readings(self):
+        def one_real(sql, params=()):
+            if "FROM rakurs_users WHERE id=%s" in sql:
+                return {"id":123,"username":"tester","role":"admin",
+                        "is_active":1,"session_version":1}
+            if "WHERE quality<>'simulated' LIMIT 1" in sql:
+                return {"n":1}
+            if "WHERE kind='inverter' AND model LIKE" in sql:
+                return {"n":2}
+            return {"n":0} if "COUNT(*)" in sql else None
+
+        def mixed_rows(sql, params=()):
+            return [{"signal_key":"pv_power","unit":"кВт","quality":"good",
+                     "value_decimal":Decimal("5.1")}] if "FROM rakurs_signals" in sql else []
+
+        with patch.object(module, "one", side_effect=one_real), \
+             patch.object(module, "rows", side_effect=mixed_rows):
+            r = self.client.get("/api/v1/latest?keys=pv_power")
+            self.assertEqual(r.status_code, 200)
+            self.assertEqual(r.get_json()["values"], {})
+            self.assertTrue(r.get_json()["device_selection_required"])
+            h = self.client.get("/api/v1/history?key=pv_power&hours=24")
+            self.assertEqual(h.status_code, 200)
+            self.assertEqual(h.get_json()["points"], [])
+            self.assertTrue(h.get_json()["device_selection_required"])
+            m = self.client.get("/api/v1/modbus-fields")
+            self.assertEqual(m.status_code, 200)
+            self.assertEqual(m.get_json()["fields"], [])
+            self.assertTrue(m.get_json()["device_selection_required"])
+            home = self.client.get("/")
+            self.assertEqual(home.status_code, 200)
+            self.assertNotIn('>5.1<', home.get_data(as_text=True))
+
     def test_requires_authenticated_access(self):
         module.app.config.update(SECRET_KEY="parallel-testing-key")
         guest = module.app.test_client()
