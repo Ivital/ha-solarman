@@ -207,6 +207,8 @@ class ParallelApiTests(unittest.TestCase):
                 return {"id":77,"observed_at_utc":datetime(2026,11,24,20,0)}
             if "COUNT(*) AS n FROM rakurs_modbus_register_samples" in sql:
                 return {"n":815}
+            if "COUNT(*) AS n FROM rakurs_modbus_field_samples AS m" in sql:
+                return {"n":624}
             return None
 
         def fake_rows(sql, params=()):
@@ -230,6 +232,12 @@ class ParallelApiTests(unittest.TestCase):
                 return [{"function_code":3,"register_address":1234,
                          "raw_uint16":54321,"quality":"simulated",
                          "observed_at_utc":datetime(2026,11,24,20,0)}]
+            if "FROM rakurs_modbus_field_samples AS m" in sql:
+                return [{"field_key":"p3_0001","field_name":"PV output",
+                         "unit":"кВт","group_name":"PV",
+                         "value_decimal":Decimal("5.1"),"value_text":None,
+                         "quality":"simulated",
+                         "observed_at_utc":datetime(2026,11,24,20,0)}]
             return []
 
         with patch.object(module, "one", side_effect=fake_one), \
@@ -250,6 +258,17 @@ class ParallelApiTests(unittest.TestCase):
             self.assertEqual(raw.status_code, 200)
             self.assertEqual(raw.get_json()["total"], 815)
             self.assertEqual(raw.get_json()["raw_registers"][0]["raw_uint16"], 54321)
+            decoded = self.client.get(
+                "/api/v1/parallel/simulation/fields?device=sim_deye20k_parallel_1"
+                "&offset=0&limit=80")
+            self.assertEqual(decoded.status_code, 200)
+            self.assertTrue(decoded.get_json()["simulation"])
+            self.assertEqual(decoded.get_json()["total"], 624)
+            self.assertEqual(decoded.get_json()["fields"][0]["field_key"], "p3_0001")
+            self.assertEqual(decoded.get_json()["fields"][0]["value_decimal"], "5.1")
+            self.assertEqual(self.client.get(
+                "/api/v1/parallel/simulation/fields?device=sim_deye20k_parallel_1"
+                "&offset=0&limit=101").status_code, 400)
             self.assertEqual(self.client.get(
                 "/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1"
                 "&offset=0&limit=501").status_code, 400)
