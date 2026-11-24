@@ -378,6 +378,15 @@ class AuthenticationTests(unittest.TestCase):
 
 
 class FullModbusSimulationTests(unittest.TestCase):
+    def test_installed_web_files_checked_as_root(self):
+        script = (RAKURS / "standalone/install_full_modbus_demo.sh").read_text()
+        self.assertIn('sudo test -s "$TARGET/app.py"', script)
+        self.assertIn('sudo test -s "$TARGET/static/app.js"', script)
+        self.assertNotIn('\ntest -s "$TARGET/app.py"', script)
+        self.assertNotIn('\ntest -s "$TARGET/static/app.js"', script)
+        self.assertIn('STOP: installed Rakurs app.py missing or empty', script)
+        self.assertIn('STOP: installed Rakurs app.js missing or empty', script)
+
     def test_full_catalog_matches_every_yaml_source_item(self):
         import yaml
         profile = yaml.safe_load((
