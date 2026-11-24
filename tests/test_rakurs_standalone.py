@@ -106,6 +106,30 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertEqual(obj["value_decimal"], "2.500000000")
         self.assertEqual(obj["observed_at_utc"], "2026-11-24T14:30:00Z")
 
+    def test_full_modbus_fields_api_is_authenticated_and_demo_scoped(self):
+        self.data_rows = lambda sql, params: [{
+            "field_key": "p3_0001", "group_name": "Info", "field_name": "Device",
+            "platform": "sensor", "unit": None,
+            "registers_json": "[0]", "derived": 0, "verified": 0,
+            "value_decimal": Decimal("5"), "value_text": None,
+            "quality": "simulated",
+            "observed_at_utc": datetime(2026, 11, 24, 17, 0),
+        }]
+        self.data_one = lambda sql, params: {"n": 815}
+        response = self.client.get("/api/v1/modbus-fields?demo=1")
+        self.assertEqual(response.status_code, 200)
+        payload = response.get_json()
+        self.assertTrue(payload["simulation"])
+        self.assertEqual(payload["register_count"], 815)
+        self.assertEqual(payload["fields"][0]["field_key"], "p3_0001")
+        self.assertEqual(payload["fields"][0]["quality"], "simulated")
+        self.assertIn("m.quality='simulated'", self.data_calls[0][1])
+        self.data_calls.clear()
+        normal = self.client.get("/api/v1/modbus-fields")
+        self.assertEqual(normal.status_code, 200)
+        self.assertFalse(normal.get_json()["simulation"])
+        self.assertIn("m.quality<>'simulated'", self.data_calls[0][1])
+
     def test_malformed_keys_no_data_queries(self):
         for p in ("/api/v1/latest?keys=", "/api/v1/latest?keys=pv%27%3Bdrop",
                   "/api/v1/history?key=pv%3BDELETE"):
@@ -351,6 +375,86 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn('RAKURS_HTTPS_UNAUTHORIZED_API=401', script)
         self.assertIn('/api/v1/status', script)
         self.assertIn("RAKURS_HTTPS_LOGIN=PASS", script)
+
+
+class FullModbusSimulationTests(unittest.TestCase):
+    def test_full_catalog_matches_every_yaml_source_item(self):
+        import yaml
+        profile = yaml.safe_load((
+            REPO / "custom_components/solarman/inverter_definitions/deye_p3.yaml"
+        ).read_text(encoding="utf-8"))
+        catalog = json.loads((
+            RAKURS / "modbus_full_catalog.json"
+        ).read_text(encoding="utf-8"))
+        extracted = [
+            (group["group"], item)
+            for group in profile["parameters"]
+            for item in group["items"]
+        ]
+        fields = catalog["field_definitions"]
+        self.assertEqual(len(extracted), 624)
+        self.assertEqual(len(fields), len(extracted))
+        addresses = set()
+
+        def all_register_addresses(value):
+            if isinstance(value, dict):
+                for k, v in value.items():
+                    if k == "registers" and isinstance(v, list):
+                        yield from (x for x in v if isinstance(x, int))
+                    else:
+                        yield from all_register_addresses(v)
+            elif isinstance(value, list):
+                for v in value:
+                    yield from all_register_addresses(v)
+
+        for field, (group, entry) in zip(fields, extracted):
+            self.assertEqual(field["group"], group)
+            self.assertEqual(field["name"], entry.get("name") or "(unnamed switch)")
+            from_yaml = set(all_register_addresses(entry))
+            self.assertEqual(set(field["registers"]), from_yaml)
+            self.assertFalse(field["verified"] if "verified" in field else False)
+            addresses.update(field["registers"])
+        self.assertEqual(len(addresses), 815)
+        self.assertEqual(catalog["register_count"], 815)
+
+    def test_one_shot_dry_run_covers_every_field_without_db(self):
+        import runpy
+        ns = runpy.run_path(str(RAKURS / "standalone/simulate_deye_once.py"))
+        fields, ui_metrics, registers = ns["prepare"]()
+        self.assertEqual(len(fields), 624)
+        self.assertEqual(len(ui_metrics), 316)
+        self.assertEqual(len(registers), 815)
+        self.assertEqual(len(set(registers)), 815)
+        self.assertEqual(ns["INGEST_SOURCE"], "rakurs_demo_one_shot")
+        self.assertEqual(ns["QUALITY"], "simulated")
+        for i, field in enumerate(fields, 1):
+            number, text_value = ns["_demo_value"](
+                field["key"], field["name"], field["unit"], i
+            )
+            self.assertTrue(number is not None or text_value is not None)
+        for i, field in enumerate(ui_metrics, 1):
+            number, text_value = ns["_demo_value"](
+                field["key"], field["label"], field.get("unit"), i
+            )
+            self.assertTrue(number is not None or text_value is not None)
+        src = (RAKURS / "standalone/simulate_deye_once.py").read_text()
+        self.assertNotIn("socket.create_connection", src)
+        self.assertNotIn("ModbusTcpClient", src)
+        self.assertNotIn("requests.post", src)
+        self.assertIn("db.rollback()", src)
+        self.assertIn("db.commit()", src)
+
+    def test_schema_adds_only_three_typed_tables(self):
+        schema = (RAKURS / "standalone/modbus_full_schema.sql").read_text()
+        self.assertEqual(schema.count("CREATE TABLE IF NOT EXISTS"), 3)
+        self.assertIn("rakurs_modbus_fields", schema)
+        self.assertIn("rakurs_modbus_field_samples", schema)
+        self.assertIn("rakurs_modbus_register_inventory", schema)
+        self.assertIn("value_text VARCHAR(512)", schema)
+        self.assertIn("registers_json JSON", schema)
+        for dangerous in ("DROP TABLE", "TRUNCATE TABLE", "DELETE FROM",
+                          "ALTER TABLE rakurs_samples"):
+            self.assertNotIn(dangerous, schema)
 
 
 if __name__ == "__main__":
