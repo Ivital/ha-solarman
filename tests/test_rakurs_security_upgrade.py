@@ -134,6 +134,18 @@ class LiveArchiveApiTests(unittest.TestCase):
                 self.assertIn("device_id=%s", sql)
                 self.assertIn(21, params)
 
+    def test_health_is_observation_only_and_never_claims_collector_active(self):
+        res = self.client.get("/api/v1/parallel/health")
+        self.assertEqual(res.status_code, 200)
+        payload = res.get_json()
+        self.assertFalse(payload["collector_process_confirmed"])
+        self.assertFalse(payload["shared_battery_soc_verified"])
+        self.assertEqual(len(payload["devices"]), 1)
+        self.assertEqual(payload["devices"][0]["device_key"], "real_1")
+        self.assertIn(payload["devices"][0]["freshness_state"],
+                      ("recent", "delayed", "stale", "invalid_time"))
+        self.assertFalse(payload["devices"][0]["collector_process_confirmed"])
+
     def test_reject_cross_device_and_bad_poll_ids(self):
         self.assertEqual(self.client.get(
             "/api/v1/parallel/raw?device=invalid").status_code,404)
