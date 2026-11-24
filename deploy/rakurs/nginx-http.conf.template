@@ -1,0 +1,16 @@
+# Phase A: HTTP ACME challenge only. Enable before certbot --webroot.
+# Host Nginx handles public port 80. Do not modify existing default_server.
+server {
+    listen 80;
+    server_name rakurs.zakryttya.org.ua www.rakurs.zakryttya.org.ua;
+
+    location ^~ /.well-known/acme-challenge/ {
+        root /var/www/letsencrypt;
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 301 https://rakurs.zakryttya.org.ua$request_uri;
+    }
+}

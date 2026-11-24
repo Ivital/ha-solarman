@@ -249,6 +249,19 @@ sudo docker compose logs --tail=100 homeassistant
 Не встановлюйте два компоненти з доменом `solarman` в одному Home Assistant.
 Не запускайте цей стек паралельно з наявним HA без перевірки конфліктів портів.
 
+## Публічна адреса Rakurs (запит 24.11.2026)
+
+Користувач визначив домени `rakurs.zakryttya.org.ua` і
+`www.rakurs.zakryttya.org.ua`. Перший — канонічний, другий перенаправляє
+на перший через HTTPS. Для цього проєкту створено
+`deploy/rakurs/nginx-http.conf.template` (сертифікація ACME),
+`deploy/rakurs/nginx-https.conf.template` (TLS proxy до 127.0.0.1:8123),
+`deploy/rakurs/preflight.sh` (діагностика без змін) та докладну
+інструкцію `deploy/rakurs/README.md`. DNS, WAN-маршрути, сертифікат
+і Nginx **ще не змінено**. Спочатку потрібно створити локального
+адміністратора HA та виконати перевірку, щоб не порушити сайти Odoo
+або Ergodata, які вже обслуговує Nginx.
+
 ## Початкові параметри інтеграції
 
 У Home Assistant відкрийте `Settings → Devices & services → Add integration`
