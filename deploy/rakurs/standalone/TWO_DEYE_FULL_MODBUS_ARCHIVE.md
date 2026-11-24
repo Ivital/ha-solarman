@@ -73,6 +73,36 @@ sudo -u rakurs env RAKURS_DB_USER=rakurs_web \
   /home/ivital/deye-monitoring-src/deploy/rakurs/standalone/audit_two_inverters_mysql.py
 ```
 
+## Безпечне продовження після успішного запису БД
+
+Якщо сценарій уже вивів `SIMULATED_TWIN_SEED_COMMITTED=PASS`, але потім
+зупинився на `Permission denied` через спробу запустити
+`audit_two_inverters_mysql.py` з домашнього каталогу іншого користувача,
+**не запускайте повторно `--apply`**. Уся транзакція тестових записів уже
+зафіксована; потрібні тільки перевірка й оновлення вебінтерфейсу.
+
+```bash
+cd /home/ivital/deye-monitoring-src
+git pull --ff-only
+bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --check
+sudo -v
+bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --resume
+```
+
+`--resume` пропускає резервне копіювання, міграцію та всі INSERT/UPDATE,
+не запитує пароль MySQL адміністратора. Він спочатку перевіряє точну повноту
+двох архівів через `rakurs_web` (лише SELECT), лише після PASS установлює
+вебфайли й запускає повторну перевірку авторизованих API. Вихідний код
+аудитора подається через stdin, щоб `rakurs` не відкривав приватний
+`/home/ivital`. Права домашніх каталогів не змінювати.
+
+Контрольні рядки:
+`RESUME=SKIP_SEED_AND_BACKUP`, `TWIN_MODBUS_COVERAGE=PASS`,
+`TWIN_DATABASE_AUDIT_BEFORE_DEPLOY=PASS`,
+`RAKURS_PARALLEL_UI=PASS`,
+`FULL_DEYE_MODBUS_DATABASE_AND_WEB=PASS`,
+`TWO_DEYE_RESUME=PASS MYSQL_WRITES=0`.
+
 ## Контракт для майбутнього реального колектора (поки НЕ запускати)
 Лише після підтвердженої фізичної схеми, двох ідентичностей, адрес,
 режиму зчитування та регістрів:
