@@ -24,7 +24,7 @@ for item in "${FILES[@]}"; do
     echo "STOP: missing source $item" >&2; exit 2
   }
 done
-grep -Fq 'src="/static/app-events-20261124.js"' "$HERE/templates/index.html"
+grep -Eq 'src="/static/app-(events|parallel)-20261124.js"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/events-ui-20261124.css"' "$HERE/templates/index.html"
 grep -Fq 'function renderEvents(cycle)' "$HERE/static/app-events-20261124.js" ||
   grep -Fq 'async function renderEvents(cycle)' "$HERE/static/app-events-20261124.js"
@@ -37,6 +37,10 @@ if command -v node >/dev/null; then
 fi
 echo 'RAKURS_EVENTS_PREFLIGHT=PASS'
 
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-20261124.js' "$HERE/templates/index.html"; then
+  echo 'STOP: older Events installer would revert parallel UI. Use deploy_parallel_ui.sh.' >&2
+  exit 2
+fi
 if [[ "$MODE" == "--check" ]]; then
   echo 'DRY_RUN=PASS MYSQL_WRITES=0'
   exit 0
