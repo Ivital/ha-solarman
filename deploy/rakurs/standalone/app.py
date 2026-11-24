@@ -863,6 +863,134 @@ def parallel_device_history():
     })
 
 
+POLL_UID_RE = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
+
+
+def parallel_live_poll():
+    selected = parallel_selected_device()
+    poll_uid = request.args.get("poll_uid", "")
+    if poll_uid and not POLL_UID_RE.fullmatch(poll_uid):
+        abort(400, description="Некоректний ідентифікатор опитування")
+    where = "AND poll_uid=%s " if poll_uid else ""
+    params = ((selected["id"], poll_uid) if poll_uid else (selected["id"],))
+    poll = one(
+        "SELECT id,poll_uid,observed_at_utc,status,quality,request_count,"
+        "response_count,exception_count FROM rakurs_modbus_poll_runs "
+        "WHERE device_id=%s AND quality<>'simulated' " + where +
+        "ORDER BY observed_at_utc DESC,id DESC LIMIT 1", params,
+    )
+    return selected, poll
+
+
+def parallel_page_options(max_limit):
+    try:
+        offset = int(request.args.get("offset", "0"))
+        limit = int(request.args.get("limit", "100"))
+    except ValueError:
+        abort(400, description="Некоректні параметри сторінки")
+    if not 0 <= offset <= 100000 or not 1 <= limit <= max_limit:
+        abort(400, description="Некоректний діапазон сторінки")
+    return offset, limit
+
+
+@app.get("/api/v1/parallel/polls")
+def parallel_live_polls():
+    selected = parallel_selected_device()
+    offset, limit = parallel_page_options(100)
+    total = one(
+        "SELECT COUNT(*) AS n FROM rakurs_modbus_poll_runs "
+        "WHERE device_id=%s AND quality<>'simulated'", (selected["id"],),
+    )
+    polls = rows(
+        "SELECT poll_uid,observed_at_utc,finished_at_utc,status,quality,"
+        "transport,slave_id,request_count,response_count,exception_count "
+        "FROM rakurs_modbus_poll_runs "
+        "WHERE device_id=%s AND quality<>'simulated' "
+        "ORDER BY observed_at_utc DESC,id DESC LIMIT %s OFFSET %s",
+        (selected["id"], limit, offset),
+    )
+    return jsonify({
+        "data_source":"mysql","simulation":False,
+        "device_key":selected["device_key"],"offset":offset,"limit":limit,
+        "total":total["n"] if total else 0,"polls":serialize(polls),
+    })
+
+
+@app.get("/api/v1/parallel/raw")
+def parallel_live_raw():
+    selected, poll = parallel_live_poll()
+    offset, limit = parallel_page_options(500)
+    if not poll:
+        return jsonify({"device_key":selected["device_key"],"poll":None,
+                        "total":0,"raw_registers":[],"simulation":False})
+    total = one(
+        "SELECT COUNT(*) AS n FROM rakurs_modbus_register_samples "
+        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated'",
+        (selected["id"], poll["id"]),
+    )
+    records = rows(
+        "SELECT frame_id,observed_at_utc,function_code,register_address,"
+        "raw_uint16,quality,ingest_source "
+        "FROM rakurs_modbus_register_samples "
+        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated' "
+        "ORDER BY frame_id,register_address LIMIT %s OFFSET %s",
+        (selected["id"], poll["id"], limit, offset),
+    )
+    return jsonify({"device_key":selected["device_key"],"simulation":False,
+                    "poll":serialize(poll),"offset":offset,"limit":limit,
+                    "total":total["n"] if total else 0,
+                    "raw_registers":serialize(records)})
+
+
+@app.get("/api/v1/parallel/bits")
+def parallel_live_bits():
+    selected, poll = parallel_live_poll()
+    offset, limit = parallel_page_options(500)
+    if not poll:
+        return jsonify({"device_key":selected["device_key"],"poll":None,
+                        "total":0,"bits":[],"simulation":False})
+    total = one(
+        "SELECT COUNT(*) AS n FROM rakurs_modbus_bit_samples "
+        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated'",
+        (selected["id"], poll["id"]),
+    )
+    records = rows(
+        "SELECT frame_id,observed_at_utc,function_code,bit_address,"
+        "bit_value,quality,ingest_source FROM rakurs_modbus_bit_samples "
+        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated' "
+        "ORDER BY frame_id,bit_address LIMIT %s OFFSET %s",
+        (selected["id"], poll["id"], limit, offset),
+    )
+    return jsonify({"device_key":selected["device_key"],"simulation":False,
+                    "poll":serialize(poll),"offset":offset,"limit":limit,
+                    "total":total["n"] if total else 0,"bits":serialize(records)})
+
+
+@app.get("/api/v1/parallel/frames")
+def parallel_live_frames():
+    selected, poll = parallel_live_poll()
+    offset, limit = parallel_page_options(100)
+    if not poll:
+        return jsonify({"device_key":selected["device_key"],"poll":None,
+                        "total":0,"frames":[],"simulation":False})
+    total = one(
+        "SELECT COUNT(*) AS n FROM rakurs_modbus_frames "
+        "WHERE device_id=%s AND poll_id=%s", (selected["id"], poll["id"]),
+    )
+    records = rows(
+        "SELECT sequence_no,captured_at_utc,function_code,start_address,"
+        "requested_count,status,exception_code,error_code,"
+        "HEX(request_bytes) AS request_hex,HEX(response_bytes) AS response_hex "
+        "FROM rakurs_modbus_frames "
+        "WHERE device_id=%s AND poll_id=%s "
+        "ORDER BY sequence_no LIMIT %s OFFSET %s",
+        (selected["id"], poll["id"], limit, offset),
+    )
+    return jsonify({"device_key":selected["device_key"],"simulation":False,
+                    "poll":serialize(poll),"offset":offset,"limit":limit,
+                    "total":total["n"] if total else 0,"frames":serialize(records)})
+
+
 @app.get("/api/v1/parallel/modbus-fields")
 def parallel_device_modbus():
     selected = parallel_selected_device()
