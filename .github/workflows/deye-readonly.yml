@@ -40,6 +40,8 @@ jobs:
           bash -n deploy/rakurs/standalone/deploy_deye_server_view.sh
           bash -n deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh
           bash deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh --check
+          bash -n deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh
+          bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
           bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
           bash deploy/rakurs/standalone/fix_demo_visibility.sh --check
@@ -69,6 +71,7 @@ jobs:
       - name: Rakurs standalone MySQL-only application tests
         run: |
           python -m unittest discover -s tests -p 'test_rakurs_standalone.py' -v
+          python -m unittest discover -s tests -p 'test_rakurs_history_72h.py' -v
           node --check deploy/rakurs/standalone/static/app.js
       - name: Read-only integration tests
         run: python -m unittest discover -s tests -p 'test_deye*.py' -v
