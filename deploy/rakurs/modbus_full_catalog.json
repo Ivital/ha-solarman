@@ -3139,6 +3139,18 @@
       "platform": "sensor",
       "register_sets": [
         [
+          520
+        ],
+        [
+          529
+        ],
+        [
+          536
+        ],
+        [
+          515
+        ],
+        [
           521
         ],
         [
@@ -3150,8 +3162,12 @@
       ],
       "registers": [
         514,
+        515,
+        520,
         521,
-        526
+        526,
+        529,
+        536
       ],
       "derived": false,
       "rule": "1",
@@ -3169,6 +3185,22 @@
       "platform": "sensor",
       "register_sets": [
         [
+          522,
+          523
+        ],
+        [
+          534,
+          535
+        ],
+        [
+          537,
+          538
+        ],
+        [
+          518,
+          519
+        ],
+        [
           524,
           525
         ],
@@ -3184,10 +3216,18 @@
       "registers": [
         516,
         517,
+        518,
+        519,
+        522,
+        523,
         524,
         525,
         527,
-        528
+        528,
+        534,
+        535,
+        537,
+        538
       ],
       "derived": false,
       "rule": "3",
@@ -4356,6 +4396,30 @@
           590
         ],
         [
+          672
+        ],
+        [
+          673
+        ],
+        [
+          674
+        ],
+        [
+          675
+        ],
+        [
+          727
+        ],
+        [
+          728
+        ],
+        [
+          729
+        ],
+        [
+          730
+        ],
+        [
           636,
           694
         ]
@@ -4363,7 +4427,15 @@
       "registers": [
         590,
         636,
-        694
+        672,
+        673,
+        674,
+        675,
+        694,
+        727,
+        728,
+        729,
+        730
       ],
       "derived": false,
       "rule": "1",
@@ -4963,9 +5035,43 @@
       "group": "PV",
       "name": "PV Power",
       "platform": "sensor",
-      "register_sets": [],
-      "registers": [],
-      "derived": true,
+      "register_sets": [
+        [
+          672
+        ],
+        [
+          673
+        ],
+        [
+          674
+        ],
+        [
+          675
+        ],
+        [
+          727
+        ],
+        [
+          728
+        ],
+        [
+          729
+        ],
+        [
+          730
+        ]
+      ],
+      "registers": [
+        672,
+        673,
+        674,
+        675,
+        727,
+        728,
+        729,
+        730
+      ],
+      "derived": false,
       "rule": "1",
       "unit": "W",
       "scale": "[1, 10]",
@@ -5743,10 +5849,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10054
+        ],
+        [
           10055
         ]
       ],
       "registers": [
+        10054,
         10055
       ],
       "derived": false,
@@ -6179,10 +6289,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10092
+        ],
+        [
           10093
         ]
       ],
       "registers": [
+        10092,
         10093
       ],
       "derived": false,
@@ -6615,10 +6729,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10130
+        ],
+        [
           10131
         ]
       ],
       "registers": [
+        10130,
         10131
       ],
       "derived": false,
@@ -7051,10 +7169,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10168
+        ],
+        [
           10169
         ]
       ],
       "registers": [
+        10168,
         10169
       ],
       "derived": false,
@@ -7487,10 +7609,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10206
+        ],
+        [
           10207
         ]
       ],
       "registers": [
+        10206,
         10207
       ],
       "derived": false,
@@ -7923,10 +8049,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10244
+        ],
+        [
           10245
         ]
       ],
       "registers": [
+        10244,
         10245
       ],
       "derived": false,
@@ -8359,10 +8489,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10282
+        ],
+        [
           10283
         ]
       ],
       "registers": [
+        10282,
         10283
       ],
       "derived": false,
@@ -8795,10 +8929,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10320
+        ],
+        [
           10321
         ]
       ],
       "registers": [
+        10320,
         10321
       ],
       "derived": false,
@@ -9231,10 +9369,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10358
+        ],
+        [
           10359
         ]
       ],
       "registers": [
+        10358,
         10359
       ],
       "derived": false,
@@ -9667,10 +9809,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10396
+        ],
+        [
           10397
         ]
       ],
       "registers": [
+        10396,
         10397
       ],
       "derived": false,
@@ -10103,10 +10249,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10434
+        ],
+        [
           10435
         ]
       ],
       "registers": [
+        10434,
         10435
       ],
       "derived": false,
@@ -10539,10 +10689,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10472
+        ],
+        [
           10473
         ]
       ],
       "registers": [
+        10472,
         10473
       ],
       "derived": false,
@@ -10975,10 +11129,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10510
+        ],
+        [
           10511
         ]
       ],
       "registers": [
+        10510,
         10511
       ],
       "derived": false,
@@ -11411,10 +11569,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10548
+        ],
+        [
           10549
         ]
       ],
       "registers": [
+        10548,
         10549
       ],
       "derived": false,
@@ -11847,10 +12009,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10586
+        ],
+        [
           10587
         ]
       ],
       "registers": [
+        10586,
         10587
       ],
       "derived": false,
@@ -12283,10 +12449,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10624
+        ],
+        [
           10625
         ]
       ],
       "registers": [
+        10624,
         10625
       ],
       "derived": false,
@@ -12719,10 +12889,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10662
+        ],
+        [
           10663
         ]
       ],
       "registers": [
+        10662,
         10663
       ],
       "derived": false,
@@ -13155,10 +13329,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10700
+        ],
+        [
           10701
         ]
       ],
       "registers": [
+        10700,
         10701
       ],
       "derived": false,
@@ -13591,10 +13769,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10738
+        ],
+        [
           10739
         ]
       ],
       "registers": [
+        10738,
         10739
       ],
       "derived": false,
@@ -14027,10 +14209,14 @@
       "platform": "sensor",
       "register_sets": [
         [
+          10776
+        ],
+        [
           10777
         ]
       ],
       "registers": [
+        10776,
         10777
       ],
       "derived": false,
