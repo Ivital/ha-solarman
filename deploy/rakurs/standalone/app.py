@@ -254,8 +254,12 @@ def deye_modbus_snapshot():
         "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
         "AND m.quality='simulated' AND m.ingest_source=%s "
         "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s) "
+        "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
+        "FROM rakurs_modbus_field_samples AS ms "
+        "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
+        "AND ms.quality='simulated' AND ms.ingest_source=%s) "
         "ORDER BY f.id LIMIT 700",
-        (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY),
+        (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE),
     )
     for entry in result:
         addresses = json.loads(entry["registers_json"] or "[]")
@@ -518,13 +522,21 @@ def modbus_fields():
         sample_join = (
             "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
             "AND m.quality='simulated' AND m.ingest_source=%s "
-            "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s)"
+            "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s) "
+            "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
+            "FROM rakurs_modbus_field_samples AS ms "
+            "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
+            "AND ms.quality='simulated' AND ms.ingest_source=%s)"
         )
-        params = (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY)
+        params = (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
     else:
         sample_join = (
             "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
-            "AND m.quality<>'simulated'"
+            "AND m.quality<>'simulated' "
+            "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
+            "FROM rakurs_modbus_field_samples AS ms "
+            "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
+            "AND ms.quality<>'simulated')"
         )
         params = ()
     data = rows(
