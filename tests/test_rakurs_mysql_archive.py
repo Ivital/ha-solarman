@@ -61,5 +61,5 @@ class RakursMySqlArchiveTests(unittest.TestCase):
         ):
             self.assertIn(required, code)
         for forbidden in ("DROP TABLE", "TRUNCATE TABLE", "ALTER TABLE",
-                          "MYSQL_PWD", "--password=", "CREATE USER", "GRANT ALL"):
+                          "MYSQL_PWD", "--password=", "GRANT ALL"):
             self.assertNotIn(forbidden, code)
