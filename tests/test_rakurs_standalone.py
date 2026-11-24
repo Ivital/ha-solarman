@@ -178,7 +178,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertIn("Генерація PV", html)
         self.assertIn("5.1", html)
         self.assertIn("simulated", html)
-        self.assertIn("rakurs-primary-mysql-20261124-v2", html)
+        self.assertIn("rakurs-history-72h-v1", html)
 
         status = self.client.get("/api/v1/status").get_json()
         self.assertEqual(status["mode"], "simulation")
@@ -341,7 +341,7 @@ class AuthenticationTests(unittest.TestCase):
         html = (RAKURS / "standalone/templates/index.html").read_text()
         js = (RAKURS / "standalone/static/app.js").read_text()
         script = (RAKURS / "standalone/repair_dashboard_assets.sh").read_text()
-        self.assertIn('/static/app.js?v=rakurs-primary-mysql-20261124-v2', html)
+        self.assertIn('/static/app.js?v=rakurs-history-72h-v1', html)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
         self.assertIn("let DEMO_MODE = new URLSearchParams(", js)
         self.assertIn("sha256sum", script)
