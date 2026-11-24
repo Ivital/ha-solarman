@@ -192,6 +192,84 @@ class ArchiveTransactionTests(unittest.TestCase):
         self.assertTrue(all(not frame.get("request_hex") for frame in a["frames"]))
 
 
+class ParallelSchemaMigrationTests(unittest.TestCase):
+    """Regression for the first deploy failure: SQL comments contain ';'."""
+
+    def test_real_schema_contains_six_only_allowed_create_statements(self):
+        from seed_two_parallel_demo import SCHEMA, SCHEMA_TABLES, parse_schema_ddl
+        sql = SCHEMA.read_text(encoding="utf-8")
+        self.assertIn("tables; NO claims", sql)
+        statements = parse_schema_ddl(sql)
+        self.assertEqual(len(statements), 6)
+        for name, statement in zip(SCHEMA_TABLES, statements):
+            self.assertTrue(statement.startswith(
+                "CREATE TABLE IF NOT EXISTS " + name + " ("))
+            self.assertNotIn("--", statement)
+        self.assertTrue(statements[-1].endswith(
+            "COLLATE=utf8mb4_unicode_ci"))
+
+    def test_parser_ignores_semicolons_in_sql_comment_lines(self):
+        from seed_two_parallel_demo import SCHEMA, parse_schema_ddl
+        sql = SCHEMA.read_text(encoding="utf-8")
+        commented = "-- comment with ; separators ; DROP DATABASE rakurs;\n" + sql
+        self.assertEqual(parse_schema_ddl(commented), parse_schema_ddl(sql))
+
+    def test_invalid_schema_is_rejected_before_executing_first_table(self):
+        from unittest.mock import patch
+        from seed_two_parallel_demo import apply_schema, SCHEMA
+        text = SCHEMA.read_text(encoding="utf-8")
+        text += "\nDROP TABLE rakurs_devices;\n"
+
+        class CaptureCursor:
+            def __init__(self):
+                self.writes = []
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def execute(self, sql):
+                self.writes.append(sql)
+
+        class FakeDb:
+            def __init__(self):
+                self.cursor_instance = CaptureCursor()
+            def cursor(self):
+                return self.cursor_instance
+
+        db = FakeDb()
+        with patch("seed_two_parallel_demo.SCHEMA") as mock_schema:
+            mock_schema.read_text.return_value = text
+            with self.assertRaisesRegex(RuntimeError, "unsafe DDL"):
+                apply_schema(db)
+        self.assertEqual(db.cursor_instance.writes, [])
+
+    def test_all_six_tables_execute_in_dependency_order(self):
+        from seed_two_parallel_demo import apply_schema, SCHEMA_TABLES
+
+        class CaptureCursor:
+            def __init__(self):
+                self.writes = []
+            def __enter__(self):
+                return self
+            def __exit__(self, *_):
+                return False
+            def execute(self, sql):
+                self.writes.append(sql)
+
+        class FakeDb:
+            def __init__(self):
+                self.cursor_instance = CaptureCursor()
+            def cursor(self):
+                return self.cursor_instance
+
+        db = FakeDb()
+        apply_schema(db)
+        self.assertEqual(len(db.cursor_instance.writes), 6)
+        for name, statement in zip(SCHEMA_TABLES, db.cursor_instance.writes):
+            self.assertTrue(statement.startswith(
+                "CREATE TABLE IF NOT EXISTS " + name + " ("))
+
+
 class BackupTlsTests(unittest.TestCase):
     """Self-signed MySQL TLS must never be bypassed implicitly."""
 
