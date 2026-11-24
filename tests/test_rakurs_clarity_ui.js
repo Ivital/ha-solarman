@@ -116,6 +116,13 @@ function prepare(mode) {
       : url.includes("/auth") ? {authenticated: false}
       : url.includes("/parallel/simulation/latest") ?
         {simulation:true, device_key: "sim_deye20k_parallel_1", values: latest}
+      : url.includes("/parallel/simulation/fields") ?
+        {simulation:true,total:2,fields:[
+          {field_key:"p3_0001",field_name:"PV unit one",unit:"кВт",
+           value_decimal:"5.1",value_text:null,quality:"simulated"},
+          {field_key:"p3_0002",field_name:"Temperature",unit:"°C",
+           value_decimal:"32",value_text:null,quality:"simulated"}
+        ]}
       : url.includes("/parallel/simulation/raw") ?
         {simulation:true,total:2,raw_registers:[
           {function_code:3,register_address:100,raw_uint16:65535,quality:"simulated"},
@@ -277,11 +284,25 @@ async function run() {
 
   const seeded = prepare("seeded");
   await settle();
+  assert.equal(byClass(seeded.main, "parallel-home-device").length, 2,
+    "Homepage must show both MySQL-seeded Deye devices immediately");
+  assert.equal(byClass(seeded.main, "parallel-reading").length, 6);
+  assert(seeded.fetchCalls.some(x => x.includes(
+    "/parallel/simulation/latest?device=sim_deye20k_parallel_1")));
+  assert(seeded.fetchCalls.some(x => x.includes(
+    "/parallel/simulation/latest?device=sim_deye20k_parallel_2")));
+  console.log("PARALLEL_BOTH_INVERTERS_ON_HOMEPAGE=PASS");
+
   seeded.loc.hash = "#/parallel";
   await seeded.events.hashchange();
   assert.equal(byClass(seeded.main, "parallel-device").length, 4,
     "Two unconnected physical slots plus two separately marked simulations");
   assert.equal(byClass(seeded.main, "parallel-demo-counter").length, 6);
+  assert(byClass(seeded.main, "parallel-device")[0].textContent ||
+    byClass(seeded.main, "parallel-device")[0].childNodes.length);
+  const firstTwin = byClass(seeded.main, "parallel-device")[0];
+  assert(descendants(firstTwin).some(x => (x.textContent || "").includes("СИМУЛЯЦІЯ")),
+    "DB-populated simulated inverter must appear before unconnected physical slot");
   const seededText = descendants(seeded.main).map(x => x.textContent || "").join("|");
   assert(seededText.includes("815") && seededText.includes("624") && seededText.includes("316"));
   assert(seededText.includes("СИМУЛЯЦІЯ") && seededText.includes("SOC: —"));
@@ -290,6 +311,13 @@ async function run() {
     .find(x => x.tagName === "button");
   await rawButton.listeners.click();
   assert.equal(byClass(seeded.main, "parallel-raw-row").length, 2);
+  const decodedButton = byClass(seeded.main, "parallel-field-viewer")[0].childNodes
+    .find(x => x.tagName === "button");
+  await decodedButton.listeners.click();
+  assert.equal(byClass(seeded.main, "parallel-field-row").length, 2,
+    "Decoded Modbus records for inverter 1 must be browsable");
+  assert(seeded.fetchCalls.some(x =>
+    x.includes("/parallel/simulation/fields?device=sim_deye20k_parallel_1")));
   console.log("PARALLEL_DEMO_TWO_COMPLETE_ARCHIVES_PAGED=PASS");
 }
 run().catch(e => {console.error(e.stack);process.exitCode=1;});
