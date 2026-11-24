@@ -125,7 +125,7 @@ function updateConnection(connected) {
   node.className = "connection " + (connected ? "ok" : "error");
   node.replaceChildren();
   add(node, element("i", ""), document.createTextNode(connected ? "MySQL доступна" : "MySQL недоступна"));
-  document.getElementById("updated").textContent = "Оновлено: " + time(new Date().toISOString());
+  document.getElementById("updated").textContent = "З’єднання перевірено: " + time(new Date().toISOString());
 }
 function planCount() {
   return state.catalog ? state.catalog.all_metric_count : 0;
