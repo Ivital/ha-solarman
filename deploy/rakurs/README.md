@@ -1,3 +1,10 @@
+> **АРХІВНА ДОКУМЕНТАЦІЯ / LEGACY HOME ASSISTANT.** Наведені нижче
+> інструкції стосуються старого Docker/HA-розгортання і **не є чинним
+> посібником Rakurs**. Активна архітектура — незалежний Flask + MySQL у
+> `deploy/rakurs/standalone/`. Використовуйте
+> [актуальний журнал модернізації](./standalone/REMEDIATION_STATUS_2026-11-25.md).
+> Старі команди встановлення не запускати на робочому сервері.
+
 # Rakurs — HTTPS publication of Home Assistant via existing Debian Nginx
 
 ## Deployed HTTPS production acceptance (24.11.2026)
