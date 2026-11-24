@@ -60,6 +60,24 @@ async function api(path) {
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
 }
+function createLogout(auth) {
+  const actions = document.querySelector(".top-actions");
+  if (!actions || !auth || !auth.authenticated || !auth.csrf) return;
+  const form = document.createElement("form");
+  form.method = "post";
+  form.action = "/logout";
+  form.className = "logout-form";
+  const csrf = document.createElement("input");
+  csrf.type = "hidden";
+  csrf.name = "csrf";
+  csrf.value = auth.csrf;
+  const button = document.createElement("button");
+  button.type = "submit";
+  button.className = "logout-button";
+  button.textContent = "Вийти (" + auth.username + ")";
+  form.append(csrf, button);
+  actions.appendChild(form);
+}
 function activeRoute() {
   const name = location.hash.replace(/^#\/?/, "");
   return views.some(v => v[0] === name) ? name : "overview";
@@ -366,12 +384,13 @@ async function render() {
 }
 async function boot() {
   const results = await Promise.allSettled([
-    api("/catalog"), api("/status"), api("/signals")
+    api("/catalog"), api("/status"), api("/signals"), api("/auth")
   ]);
   state.catalog = results[0].status === "fulfilled" ? results[0].value : null;
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
   state.verified = results[2].status === "fulfilled" ? results[2].value.signals : [];
   updateConnection(state.status !== null);
+  if (results[3].status === "fulfilled") createLogout(results[3].value);
   await render();
 }
 window.addEventListener("hashchange", render);
