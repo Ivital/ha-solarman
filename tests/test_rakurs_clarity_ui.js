@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const root = path.join(__dirname, "../deploy/rakurs/standalone");
-const js = fs.readFileSync(path.join(root, "static/app-events-20261124.js"), "utf8");
+const js = fs.readFileSync(path.join(root, "static/app-parallel-20261124.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 
@@ -115,6 +115,18 @@ function prepare(mode) {
         {signals: [{signal_key: "pv_power", label_uk: "PV power", unit: "кВт"}]}
       : url.includes("/auth") ? {authenticated: false}
       : url.includes("/latest") ? {values: latest}
+      : url.includes("/parallel/latest") ? {device_key: "inverter_1", values:
+          {pv_power: {...latest.pv_power, quality: "good"}}}
+      : url.includes("/parallel/events") ? {events: []}
+      : url.includes("/parallel") ? {
+          expected_inverters: 2, registered_inverters: mode === "two" ? 2 : 0,
+          model: "SUN-20K-SG05LP3-EU-SM2", shared_battery: true,
+          aggregate_verified: false, battery_soc_percent: null,
+          devices: mode === "two" ? [
+            {device_key: "inverter_1", model: "SUN-20K-SG05LP3-EU-SM2"},
+            {device_key: "inverter_2", model: "SUN-20K-SG05LP3-EU-SM2"}
+          ] : []
+        }
       : url.includes("/history") ? {signal: {unit: "кВт"}, points: history}
       : url.includes("/modbus-fields") ?
         {count: fields.length, register_count: 815, fields}
@@ -144,7 +156,8 @@ async function settle() {
   await new Promise(resolve => setTimeout(resolve, 60));
 }
 async function run() {
-  assert(html.includes("/static/app-events-20261124.js"));
+  assert(html.includes("/static/app-parallel-20261124.js"));
+  assert(html.includes("/static/parallel-ui-20261124.css"));
   assert(html.includes("/static/events-ui-20261124.css"));
   assert(html.includes("/static/clarity-ui-20261124.css"));
   assert(html.includes('Показники Deye з бази даних'));
@@ -214,5 +227,27 @@ async function run() {
   assert(app.fetchCalls.some(x => x.includes("/api/v1/events")));
   assert(app.fetchCalls.some(x => x.includes("/api/v1/batches")));
   console.log("CLARITY_EVENTS_REAL_BATCHES_NO_FAKE_ALARMS=PASS");
+
+  app.loc.hash = "#/parallel";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main, "parallel-device").length, 2,
+    "Must show two expected slots, not invent registered devices");
+  assert.equal(byClass(app.main, "parallel-reading").length, 0,
+    "Do not fabricate readings while physical ports are unverified");
+  const parallelText = descendants(app.main).map(x => x.textContent || "").join("|");
+  assert(parallelText.includes("Поточна сумарна потужність: —"));
+  assert(parallelText.includes("SOC: —"));
+  assert(parallelText.includes("Не зареєстрований"));
+  console.log("PARALLEL_TOPOLOGY_UNVERIFIED_NO_FAKE_VALUES=PASS");
+
+  const two = prepare("two");
+  await settle();
+  two.loc.hash = "#/parallel";
+  await two.events.hashchange();
+  assert.equal(byClass(two.main, "parallel-device").length, 2);
+  assert.equal(byClass(two.main, "parallel-reading").length, 6);
+  assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_1")));
+  assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_2")));
+  console.log("PARALLEL_DISTINCT_DEVICE_ENDPOINTS=PASS");
 }
 run().catch(e => {console.error(e.stack);process.exitCode=1;});
