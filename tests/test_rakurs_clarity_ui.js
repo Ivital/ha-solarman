@@ -286,8 +286,9 @@ async function run() {
 
   const fallback = prepare("partial-seeded");
   await settle();
-  assert(fallback.main.childNodes.includes(fallback.ssr),
-    "Partial legacy API must preserve the server-rendered readings");
+  assert(fallback.main.childNodes.some(x => x.ssr &&
+    x.textContent === fallback.ssr.textContent),
+    "Partial legacy API must preserve a clone of the server-rendered readings");
   assert.equal(byClass(fallback.main, "parallel-home-device").length, 2,
     "Two simulated Deye cards must render even with partial legacy SSR API");
   assert(fallback.fetchCalls.some(x => x.includes("/parallel/simulation/latest?device=")));
