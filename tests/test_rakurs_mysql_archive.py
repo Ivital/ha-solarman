@@ -48,3 +48,18 @@ class RakursMySqlArchiveTests(unittest.TestCase):
             self.assertNotIn(forbidden, code)
         self.assertIn("UNTRUSTED CERTIFICATE", code)
         self.assertIn('HOST = "192.168.5.30"', code)
+
+
+    def test_schema_installer_guards_empty_db_and_never_stores_secret(self):
+        code = (R / "mysql_archive_apply_schema.sh").read_text(encoding="utf-8")
+        for required in (
+            "192.168.5.30", "DB_USER='Ivital'", "DATABASE='rakurs'",
+            "archive_mysql_schema.sql", "RAKURS_EMPTY_DATABASE_CONFIRMED",
+            "RAKURS_ABORT_NONEMPTY_OR_WRONG_DATABASE",
+            "RAKURS_SCHEMA_VERIFY_PASS", "--ssl-mode=DISABLED",
+            "--skip-ssl", "--password", "read -r -p", "--check", "--apply"
+        ):
+            self.assertIn(required, code)
+        for forbidden in ("DROP TABLE", "TRUNCATE TABLE", "ALTER TABLE",
+                          "MYSQL_PWD", "--password=", "CREATE USER", "GRANT ALL"):
+            self.assertNotIn(forbidden, code)
