@@ -100,8 +100,10 @@ function prepare(mode) {
   const fetchCalls = [];
   async function fetch(url) {
     fetchCalls.push(url);
-    if (mode === "fail" || (mode === "partial" && url.includes("/latest"))) {
-      if (mode === "partial" && url.includes("/latest"))
+    if (mode === "fail" ||
+        ((mode === "partial" || mode === "partial-seeded") &&
+         url.includes("/latest") && !url.includes("/parallel/"))) {
+      if (mode !== "fail" && url.includes("/latest"))
         return {ok: true, json: async () => ({values: {pv_power: latest.pv_power}})};
       throw Error("Unreachable");
     }
@@ -129,8 +131,8 @@ function prepare(mode) {
           {function_code:3,register_address:101,raw_uint16:0,quality:"simulated"}
         ]}
       : url.includes("/parallel/simulation") ?
-        {simulation:true,storage_ready:mode==="seeded",
-         devices:mode==="seeded" ? [
+        {simulation:true,storage_ready:["seeded","partial-seeded"].includes(mode),
+         devices:["seeded","partial-seeded"].includes(mode) ? [
            {slot_no:1,device_key:"sim_deye20k_parallel_1",
             raw_registers:815,decoded_fields:624,ui_fields:316},
            {slot_no:2,device_key:"sim_deye20k_parallel_2",
@@ -281,6 +283,15 @@ async function run() {
   assert(parallelValueText.includes("Поточна сумарна потужність: —"),
     "No fabricated combined power");
   console.log("PARALLEL_DISTINCT_DEVICE_ENDPOINTS=PASS");
+
+  const fallback = prepare("partial-seeded");
+  await settle();
+  assert(fallback.main.childNodes.includes(fallback.ssr),
+    "Partial legacy API must preserve the server-rendered readings");
+  assert.equal(byClass(fallback.main, "parallel-home-device").length, 2,
+    "Two simulated Deye cards must render even with partial legacy SSR API");
+  assert(fallback.fetchCalls.some(x => x.includes("/parallel/simulation/latest?device=")));
+  console.log("PARALLEL_BOTH_DEVICES_SURVIVE_PARTIAL_LEGACY_API=PASS");
 
   const seeded = prepare("seeded");
   await settle();
