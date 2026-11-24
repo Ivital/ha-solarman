@@ -1,6 +1,6 @@
-# RAKURS | dashboard v3 | UI-managed custom dashboard only
+# RAKURS | dashboard v4 | UI-managed custom dashboard only
 # Not configuration.yaml. All sensor.rakurs_* IDs are placeholders until Deye is verified.
-# 2026-11-24. Built-in Sections, Heading, Markdown and Picture cards.
+# 2026-11-24. Built-in Sections, Heading, Markdown, Picture and conditional history/statistics cards.
 views:
   - title: "Огляд"
     path: overview
@@ -164,6 +164,1288 @@ views:
             **Дані ще не надходять.** TCP-доступ Home Assistant → Teltonika підтверджено, але тип Modbus-шлюзу та карту регістрів Deye поки не перевірено.
             
             Усі показники **«—» означають відсутність вимірювання**, а не нульову генерацію чи споживання.
+  - title: "Сонце"
+    path: pv
+    icon: mdi:solar-power
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Сонячна генерація"
+          icon: mdi:weather-sunny
+        - type: markdown
+          grid_options:
+            columns: 24
+          text_only: true
+          content: |-
+            # ПОВНИЙ РЕЄСТР ВИМІРЮВАНЬ
+            
+            Підготовлено поля за джерельним профілем **Deye P3**, але сумісність із **SG05LP3** та відповідність регістрів ще не перевірені. Значення «—» означає **немає даних**, а не нуль.
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Поточна PV-генерація"
+          icon: mdi:solar-panel-large
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ Потужність PV**
+            
+            {% set a=states('sensor.rakurs_pv_power') %}
+            ## {{ (a ~ ' кВт') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ Виробіток за добу**
+            
+            {% set a=states('sensor.rakurs_pv_energy_today') %}
+            ## {{ (a ~ ' кВт·год') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+      - type: grid
+        cards:
+        - type: heading
+          heading: "PV1 та PV2"
+          icon: mdi:solar-panel
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **PV1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | PV1 — потужність | {{ value('pv1_power', 'кВт') }} |
+            | PV1 — напруга | {{ value('pv1_voltage', 'В') }} |
+            | PV1 — струм | {{ value('pv1_current', 'А') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **PV2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | PV2 — потужність | {{ value('pv2_power', 'кВт') }} |
+            | PV2 — напруга | {{ value('pv2_voltage', 'В') }} |
+            | PV2 — струм | {{ value('pv2_current', 'А') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Облік та температури"
+          icon: mdi:counter
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Накопичення та DC**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Сумарна потужність PV | {{ value('pv_power', 'кВт') }} |
+            | Виробіток за добу | {{ value('pv_energy_today', 'кВт·год') }} |
+            | Виробіток за весь час | {{ value('pv_energy_total', 'кВт·год') }} |
+            | Температура DC | {{ value('dc_temperature', '°C') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Підтвердження вимірів"
+          icon: mdi:information-outline
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            Трактування **PV1/PV2** як входів/стрінгів або MPPT потребує перевірки саме на Deye SG05LP3. Поки що жодне значення не генерується з інших сенсорів.
+  - title: "Акумулятор"
+    path: battery
+    icon: mdi:battery-high
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Основні показники АКБ"
+          icon: mdi:battery-charging
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🔋 SOC**
+            
+            {% set a=states('sensor.rakurs_battery_soc') %}
+            ## {{ (a ~ ' %') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **⚡ Потужність АКБ**
+            
+            {% set a=states('sensor.rakurs_battery_power') %}
+            ## {{ (a ~ ' кВт') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Електричні параметри"
+          icon: mdi:current-dc
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **АКБ: електричні й температурні**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Напруга АКБ | {{ value('battery_voltage', 'В') }} |
+            | Струм АКБ | {{ value('battery_current', 'А') }} |
+            | Потужність АКБ | {{ value('battery_power', 'кВт') }} |
+            | Температура АКБ | {{ value('battery_temperature', '°C') }} |
+            | Ємність АКБ | {{ value('battery_capacity', 'А·год') }} |
+            | Стан АКБ | {{ value('battery_state', '') }} |
+            | Уточнена ємність АКБ | {{ value('battery_corrected_capacity', 'А·год') }} |
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Енергія та цикли"
+          icon: mdi:counter
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Заряд, розряд і цикли**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Заряд за добу | {{ value('battery_charge_today', 'кВт·год') }} |
+            | Розряд за добу | {{ value('battery_discharge_today', 'кВт·год') }} |
+            | Сумарний заряд | {{ value('battery_charge_total', 'кВт·год') }} |
+            | Сумарний розряд | {{ value('battery_discharge_total', 'кВт·год') }} |
+            | Цикли за добу | {{ value('battery_cycles_today', '') }} |
+            | Загальна кількість циклів | {{ value('battery_cycles_total', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Дані BMS (за підтримки)"
+          icon: mdi:chip
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **BMS — телеметрія · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | BMS — SOC | {{ value('bms_soc', '%') }} |
+            | BMS — напруга | {{ value('bms_voltage', 'В') }} |
+            | BMS — струм | {{ value('bms_current', 'А') }} |
+            | Допустима напруга заряду | {{ value('bms_charge_voltage', 'В') }} |
+            | Допустима напруга розряду | {{ value('bms_discharge_voltage', 'В') }} |
+            | BMS — поточний струм заряду | {{ value('bms_charge_current', 'А') }} |
+            
+            _Дані з'являться лише за наявності відповідного обладнання._
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **BMS — телеметрія · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | BMS — поточний струм розряду | {{ value('bms_discharge_current', 'А') }} |
+            | BMS — макс. струм заряду | {{ value('bms_max_charge_current', 'А') }} |
+            | BMS — макс. струм розряду | {{ value('bms_max_discharge_current', 'А') }} |
+            | Тривога АКБ | {{ value('battery_alarm', '') }} |
+            | Помилка АКБ | {{ value('battery_fault', '') }} |
+            | Тип BMS | {{ value('battery_bms_type', '') }} |
+            
+            _Дані з'являться лише за наявності відповідного обладнання._
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "BMS: модулі 1–20"
+          icon: mdi:layers
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            **Опційна телеметрія батарейних модулів 1–20.** Ці групи присутні в референсному профілі, але їх фактичну наявність, кількість і тип BMS на об'єкті ще не підтверджено. Відсутні модулі не створюють аварії.
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 1"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 1: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 1: Напруга | {{ value('bms_1_voltage', 'В') }} |
+            | Модуль 1: Струм | {{ value('bms_1_current', 'А') }} |
+            | Модуль 1: Температура | {{ value('bms_1_temperature', '°C') }} |
+            | Модуль 1: SOH | {{ value('bms_1_soh', '%') }} |
+            | Модуль 1: Ємність | {{ value('bms_1_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 1: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 1: Тривога | {{ value('bms_1_alarm', '') }} |
+            | Модуль 1: Помилка | {{ value('bms_1_fault', '') }} |
+            | Модуль 1: Макс. напруга комірки | {{ value('bms_1_max_cell_voltage', 'В') }} |
+            | Модуль 1: Мін. напруга комірки | {{ value('bms_1_min_cell_voltage', 'В') }} |
+            | Модуль 1: Цикли | {{ value('bms_1_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 2"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 2: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 2: Напруга | {{ value('bms_2_voltage', 'В') }} |
+            | Модуль 2: Струм | {{ value('bms_2_current', 'А') }} |
+            | Модуль 2: Температура | {{ value('bms_2_temperature', '°C') }} |
+            | Модуль 2: SOH | {{ value('bms_2_soh', '%') }} |
+            | Модуль 2: Ємність | {{ value('bms_2_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 2: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 2: Тривога | {{ value('bms_2_alarm', '') }} |
+            | Модуль 2: Помилка | {{ value('bms_2_fault', '') }} |
+            | Модуль 2: Макс. напруга комірки | {{ value('bms_2_max_cell_voltage', 'В') }} |
+            | Модуль 2: Мін. напруга комірки | {{ value('bms_2_min_cell_voltage', 'В') }} |
+            | Модуль 2: Цикли | {{ value('bms_2_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 3"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 3: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 3: Напруга | {{ value('bms_3_voltage', 'В') }} |
+            | Модуль 3: Струм | {{ value('bms_3_current', 'А') }} |
+            | Модуль 3: Температура | {{ value('bms_3_temperature', '°C') }} |
+            | Модуль 3: SOH | {{ value('bms_3_soh', '%') }} |
+            | Модуль 3: Ємність | {{ value('bms_3_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 3: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 3: Тривога | {{ value('bms_3_alarm', '') }} |
+            | Модуль 3: Помилка | {{ value('bms_3_fault', '') }} |
+            | Модуль 3: Макс. напруга комірки | {{ value('bms_3_max_cell_voltage', 'В') }} |
+            | Модуль 3: Мін. напруга комірки | {{ value('bms_3_min_cell_voltage', 'В') }} |
+            | Модуль 3: Цикли | {{ value('bms_3_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 4"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 4: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 4: Напруга | {{ value('bms_4_voltage', 'В') }} |
+            | Модуль 4: Струм | {{ value('bms_4_current', 'А') }} |
+            | Модуль 4: Температура | {{ value('bms_4_temperature', '°C') }} |
+            | Модуль 4: SOH | {{ value('bms_4_soh', '%') }} |
+            | Модуль 4: Ємність | {{ value('bms_4_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 4: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 4: Тривога | {{ value('bms_4_alarm', '') }} |
+            | Модуль 4: Помилка | {{ value('bms_4_fault', '') }} |
+            | Модуль 4: Макс. напруга комірки | {{ value('bms_4_max_cell_voltage', 'В') }} |
+            | Модуль 4: Мін. напруга комірки | {{ value('bms_4_min_cell_voltage', 'В') }} |
+            | Модуль 4: Цикли | {{ value('bms_4_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 5"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 5: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 5: Напруга | {{ value('bms_5_voltage', 'В') }} |
+            | Модуль 5: Струм | {{ value('bms_5_current', 'А') }} |
+            | Модуль 5: Температура | {{ value('bms_5_temperature', '°C') }} |
+            | Модуль 5: SOH | {{ value('bms_5_soh', '%') }} |
+            | Модуль 5: Ємність | {{ value('bms_5_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 5: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 5: Тривога | {{ value('bms_5_alarm', '') }} |
+            | Модуль 5: Помилка | {{ value('bms_5_fault', '') }} |
+            | Модуль 5: Макс. напруга комірки | {{ value('bms_5_max_cell_voltage', 'В') }} |
+            | Модуль 5: Мін. напруга комірки | {{ value('bms_5_min_cell_voltage', 'В') }} |
+            | Модуль 5: Цикли | {{ value('bms_5_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 6"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 6: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 6: Напруга | {{ value('bms_6_voltage', 'В') }} |
+            | Модуль 6: Струм | {{ value('bms_6_current', 'А') }} |
+            | Модуль 6: Температура | {{ value('bms_6_temperature', '°C') }} |
+            | Модуль 6: SOH | {{ value('bms_6_soh', '%') }} |
+            | Модуль 6: Ємність | {{ value('bms_6_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 6: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 6: Тривога | {{ value('bms_6_alarm', '') }} |
+            | Модуль 6: Помилка | {{ value('bms_6_fault', '') }} |
+            | Модуль 6: Макс. напруга комірки | {{ value('bms_6_max_cell_voltage', 'В') }} |
+            | Модуль 6: Мін. напруга комірки | {{ value('bms_6_min_cell_voltage', 'В') }} |
+            | Модуль 6: Цикли | {{ value('bms_6_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 7"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 7: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 7: Напруга | {{ value('bms_7_voltage', 'В') }} |
+            | Модуль 7: Струм | {{ value('bms_7_current', 'А') }} |
+            | Модуль 7: Температура | {{ value('bms_7_temperature', '°C') }} |
+            | Модуль 7: SOH | {{ value('bms_7_soh', '%') }} |
+            | Модуль 7: Ємність | {{ value('bms_7_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 7: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 7: Тривога | {{ value('bms_7_alarm', '') }} |
+            | Модуль 7: Помилка | {{ value('bms_7_fault', '') }} |
+            | Модуль 7: Макс. напруга комірки | {{ value('bms_7_max_cell_voltage', 'В') }} |
+            | Модуль 7: Мін. напруга комірки | {{ value('bms_7_min_cell_voltage', 'В') }} |
+            | Модуль 7: Цикли | {{ value('bms_7_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 8"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 8: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 8: Напруга | {{ value('bms_8_voltage', 'В') }} |
+            | Модуль 8: Струм | {{ value('bms_8_current', 'А') }} |
+            | Модуль 8: Температура | {{ value('bms_8_temperature', '°C') }} |
+            | Модуль 8: SOH | {{ value('bms_8_soh', '%') }} |
+            | Модуль 8: Ємність | {{ value('bms_8_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 8: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 8: Тривога | {{ value('bms_8_alarm', '') }} |
+            | Модуль 8: Помилка | {{ value('bms_8_fault', '') }} |
+            | Модуль 8: Макс. напруга комірки | {{ value('bms_8_max_cell_voltage', 'В') }} |
+            | Модуль 8: Мін. напруга комірки | {{ value('bms_8_min_cell_voltage', 'В') }} |
+            | Модуль 8: Цикли | {{ value('bms_8_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 9"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 9: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 9: Напруга | {{ value('bms_9_voltage', 'В') }} |
+            | Модуль 9: Струм | {{ value('bms_9_current', 'А') }} |
+            | Модуль 9: Температура | {{ value('bms_9_temperature', '°C') }} |
+            | Модуль 9: SOH | {{ value('bms_9_soh', '%') }} |
+            | Модуль 9: Ємність | {{ value('bms_9_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 9: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 9: Тривога | {{ value('bms_9_alarm', '') }} |
+            | Модуль 9: Помилка | {{ value('bms_9_fault', '') }} |
+            | Модуль 9: Макс. напруга комірки | {{ value('bms_9_max_cell_voltage', 'В') }} |
+            | Модуль 9: Мін. напруга комірки | {{ value('bms_9_min_cell_voltage', 'В') }} |
+            | Модуль 9: Цикли | {{ value('bms_9_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 10"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 10: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 10: Напруга | {{ value('bms_10_voltage', 'В') }} |
+            | Модуль 10: Струм | {{ value('bms_10_current', 'А') }} |
+            | Модуль 10: Температура | {{ value('bms_10_temperature', '°C') }} |
+            | Модуль 10: SOH | {{ value('bms_10_soh', '%') }} |
+            | Модуль 10: Ємність | {{ value('bms_10_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 10: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 10: Тривога | {{ value('bms_10_alarm', '') }} |
+            | Модуль 10: Помилка | {{ value('bms_10_fault', '') }} |
+            | Модуль 10: Макс. напруга комірки | {{ value('bms_10_max_cell_voltage', 'В') }} |
+            | Модуль 10: Мін. напруга комірки | {{ value('bms_10_min_cell_voltage', 'В') }} |
+            | Модуль 10: Цикли | {{ value('bms_10_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 11"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 11: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 11: Напруга | {{ value('bms_11_voltage', 'В') }} |
+            | Модуль 11: Струм | {{ value('bms_11_current', 'А') }} |
+            | Модуль 11: Температура | {{ value('bms_11_temperature', '°C') }} |
+            | Модуль 11: SOH | {{ value('bms_11_soh', '%') }} |
+            | Модуль 11: Ємність | {{ value('bms_11_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 11: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 11: Тривога | {{ value('bms_11_alarm', '') }} |
+            | Модуль 11: Помилка | {{ value('bms_11_fault', '') }} |
+            | Модуль 11: Макс. напруга комірки | {{ value('bms_11_max_cell_voltage', 'В') }} |
+            | Модуль 11: Мін. напруга комірки | {{ value('bms_11_min_cell_voltage', 'В') }} |
+            | Модуль 11: Цикли | {{ value('bms_11_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 12"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 12: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 12: Напруга | {{ value('bms_12_voltage', 'В') }} |
+            | Модуль 12: Струм | {{ value('bms_12_current', 'А') }} |
+            | Модуль 12: Температура | {{ value('bms_12_temperature', '°C') }} |
+            | Модуль 12: SOH | {{ value('bms_12_soh', '%') }} |
+            | Модуль 12: Ємність | {{ value('bms_12_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 12: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 12: Тривога | {{ value('bms_12_alarm', '') }} |
+            | Модуль 12: Помилка | {{ value('bms_12_fault', '') }} |
+            | Модуль 12: Макс. напруга комірки | {{ value('bms_12_max_cell_voltage', 'В') }} |
+            | Модуль 12: Мін. напруга комірки | {{ value('bms_12_min_cell_voltage', 'В') }} |
+            | Модуль 12: Цикли | {{ value('bms_12_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 13"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 13: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 13: Напруга | {{ value('bms_13_voltage', 'В') }} |
+            | Модуль 13: Струм | {{ value('bms_13_current', 'А') }} |
+            | Модуль 13: Температура | {{ value('bms_13_temperature', '°C') }} |
+            | Модуль 13: SOH | {{ value('bms_13_soh', '%') }} |
+            | Модуль 13: Ємність | {{ value('bms_13_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 13: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 13: Тривога | {{ value('bms_13_alarm', '') }} |
+            | Модуль 13: Помилка | {{ value('bms_13_fault', '') }} |
+            | Модуль 13: Макс. напруга комірки | {{ value('bms_13_max_cell_voltage', 'В') }} |
+            | Модуль 13: Мін. напруга комірки | {{ value('bms_13_min_cell_voltage', 'В') }} |
+            | Модуль 13: Цикли | {{ value('bms_13_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 14"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 14: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 14: Напруга | {{ value('bms_14_voltage', 'В') }} |
+            | Модуль 14: Струм | {{ value('bms_14_current', 'А') }} |
+            | Модуль 14: Температура | {{ value('bms_14_temperature', '°C') }} |
+            | Модуль 14: SOH | {{ value('bms_14_soh', '%') }} |
+            | Модуль 14: Ємність | {{ value('bms_14_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 14: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 14: Тривога | {{ value('bms_14_alarm', '') }} |
+            | Модуль 14: Помилка | {{ value('bms_14_fault', '') }} |
+            | Модуль 14: Макс. напруга комірки | {{ value('bms_14_max_cell_voltage', 'В') }} |
+            | Модуль 14: Мін. напруга комірки | {{ value('bms_14_min_cell_voltage', 'В') }} |
+            | Модуль 14: Цикли | {{ value('bms_14_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 15"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 15: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 15: Напруга | {{ value('bms_15_voltage', 'В') }} |
+            | Модуль 15: Струм | {{ value('bms_15_current', 'А') }} |
+            | Модуль 15: Температура | {{ value('bms_15_temperature', '°C') }} |
+            | Модуль 15: SOH | {{ value('bms_15_soh', '%') }} |
+            | Модуль 15: Ємність | {{ value('bms_15_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 15: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 15: Тривога | {{ value('bms_15_alarm', '') }} |
+            | Модуль 15: Помилка | {{ value('bms_15_fault', '') }} |
+            | Модуль 15: Макс. напруга комірки | {{ value('bms_15_max_cell_voltage', 'В') }} |
+            | Модуль 15: Мін. напруга комірки | {{ value('bms_15_min_cell_voltage', 'В') }} |
+            | Модуль 15: Цикли | {{ value('bms_15_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 16"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 16: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 16: Напруга | {{ value('bms_16_voltage', 'В') }} |
+            | Модуль 16: Струм | {{ value('bms_16_current', 'А') }} |
+            | Модуль 16: Температура | {{ value('bms_16_temperature', '°C') }} |
+            | Модуль 16: SOH | {{ value('bms_16_soh', '%') }} |
+            | Модуль 16: Ємність | {{ value('bms_16_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 16: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 16: Тривога | {{ value('bms_16_alarm', '') }} |
+            | Модуль 16: Помилка | {{ value('bms_16_fault', '') }} |
+            | Модуль 16: Макс. напруга комірки | {{ value('bms_16_max_cell_voltage', 'В') }} |
+            | Модуль 16: Мін. напруга комірки | {{ value('bms_16_min_cell_voltage', 'В') }} |
+            | Модуль 16: Цикли | {{ value('bms_16_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 17"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 17: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 17: Напруга | {{ value('bms_17_voltage', 'В') }} |
+            | Модуль 17: Струм | {{ value('bms_17_current', 'А') }} |
+            | Модуль 17: Температура | {{ value('bms_17_temperature', '°C') }} |
+            | Модуль 17: SOH | {{ value('bms_17_soh', '%') }} |
+            | Модуль 17: Ємність | {{ value('bms_17_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 17: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 17: Тривога | {{ value('bms_17_alarm', '') }} |
+            | Модуль 17: Помилка | {{ value('bms_17_fault', '') }} |
+            | Модуль 17: Макс. напруга комірки | {{ value('bms_17_max_cell_voltage', 'В') }} |
+            | Модуль 17: Мін. напруга комірки | {{ value('bms_17_min_cell_voltage', 'В') }} |
+            | Модуль 17: Цикли | {{ value('bms_17_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 18"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 18: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 18: Напруга | {{ value('bms_18_voltage', 'В') }} |
+            | Модуль 18: Струм | {{ value('bms_18_current', 'А') }} |
+            | Модуль 18: Температура | {{ value('bms_18_temperature', '°C') }} |
+            | Модуль 18: SOH | {{ value('bms_18_soh', '%') }} |
+            | Модуль 18: Ємність | {{ value('bms_18_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 18: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 18: Тривога | {{ value('bms_18_alarm', '') }} |
+            | Модуль 18: Помилка | {{ value('bms_18_fault', '') }} |
+            | Модуль 18: Макс. напруга комірки | {{ value('bms_18_max_cell_voltage', 'В') }} |
+            | Модуль 18: Мін. напруга комірки | {{ value('bms_18_min_cell_voltage', 'В') }} |
+            | Модуль 18: Цикли | {{ value('bms_18_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 19"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 19: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 19: Напруга | {{ value('bms_19_voltage', 'В') }} |
+            | Модуль 19: Струм | {{ value('bms_19_current', 'А') }} |
+            | Модуль 19: Температура | {{ value('bms_19_temperature', '°C') }} |
+            | Модуль 19: SOH | {{ value('bms_19_soh', '%') }} |
+            | Модуль 19: Ємність | {{ value('bms_19_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 19: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 19: Тривога | {{ value('bms_19_alarm', '') }} |
+            | Модуль 19: Помилка | {{ value('bms_19_fault', '') }} |
+            | Модуль 19: Макс. напруга комірки | {{ value('bms_19_max_cell_voltage', 'В') }} |
+            | Модуль 19: Мін. напруга комірки | {{ value('bms_19_min_cell_voltage', 'В') }} |
+            | Модуль 19: Цикли | {{ value('bms_19_cycles', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Модуль BMS 20"
+          icon: mdi:battery-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 20: електричні параметри**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 20: Напруга | {{ value('bms_20_voltage', 'В') }} |
+            | Модуль 20: Струм | {{ value('bms_20_current', 'А') }} |
+            | Модуль 20: Температура | {{ value('bms_20_temperature', '°C') }} |
+            | Модуль 20: SOH | {{ value('bms_20_soh', '%') }} |
+            | Модуль 20: Ємність | {{ value('bms_20_capacity', 'А·год') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Модуль 20: діагностика**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Модуль 20: Тривога | {{ value('bms_20_alarm', '') }} |
+            | Модуль 20: Помилка | {{ value('bms_20_fault', '') }} |
+            | Модуль 20: Макс. напруга комірки | {{ value('bms_20_max_cell_voltage', 'В') }} |
+            | Модуль 20: Мін. напруга комірки | {{ value('bms_20_min_cell_voltage', 'В') }} |
+            | Модуль 20: Цикли | {{ value('bms_20_cycles', '') }} |
+  - title: "Мережа"
+    path: grid
+    icon: mdi:transmission-tower
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Стан електромережі"
+          icon: mdi:transmission-tower
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🌐 Потужність мережі**
+            
+            {% set a=states('sensor.rakurs_grid_power') %}
+            ## {{ (a ~ ' кВт') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **⚡ Частота**
+            
+            {% set a=states('sensor.rakurs_grid_frequency') %}
+            ## {{ (a ~ ' Гц') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Фази та мережеві параметри"
+          icon: mdi:sine-wave
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Напруги, фазні потужності**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Коефіцієнт потужності | {{ value('grid_power_factor', '') }} |
+            | Мережа L1 — напруга | {{ value('grid_l1_voltage', 'В') }} |
+            | Мережа L2 — напруга | {{ value('grid_l2_voltage', 'В') }} |
+            | Мережа L3 — напруга | {{ value('grid_l3_voltage', 'В') }} |
+            | Мережа L1 — потужність | {{ value('grid_l1_power', 'кВт') }} |
+            | Мережа L2 — потужність | {{ value('grid_l2_power', 'кВт') }} |
+            | Мережа L3 — потужність | {{ value('grid_l3_power', 'кВт') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Трансформатори струму CT"
+          icon: mdi:current-ac
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Внутрішні та зовнішні CT · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Внутрішній CT1 — струм | {{ value('ct1_current', 'А') }} |
+            | Внутрішній CT2 — струм | {{ value('ct2_current', 'А') }} |
+            | Внутрішній CT3 — струм | {{ value('ct3_current', 'А') }} |
+            | Внутрішній CT1 — потужність | {{ value('ct1_power', 'кВт') }} |
+            | Внутрішній CT2 — потужність | {{ value('ct2_power', 'кВт') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Внутрішні та зовнішні CT · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Внутрішній CT3 — потужність | {{ value('ct3_power', 'кВт') }} |
+            | Зовнішній CT1 — потужність | {{ value('external_ct1_power', 'кВт') }} |
+            | Зовнішній CT2 — потужність | {{ value('external_ct2_power', 'кВт') }} |
+            | Зовнішній CT3 — потужність | {{ value('external_ct3_power', 'кВт') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Лічильники імпорту / експорту"
+          icon: mdi:counter
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Обмін електроенергією**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Імпорт із мережі за добу | {{ value('grid_import_today', 'кВт·год') }} |
+            | Експорт у мережу за добу | {{ value('grid_export_today', 'кВт·год') }} |
+            | Імпорт із мережі, сумарний | {{ value('grid_import_total', 'кВт·год') }} |
+            | Експорт у мережу, сумарний | {{ value('grid_export_total', 'кВт·год') }} |
+            | Стан мережі | {{ value('grid_status', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Напрям енергообміну"
+          icon: mdi:swap-horizontal
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            **Імпорт/експорт мережі:** знак миттєвої потужності та схема підключення CT потребують підтвердження. Не вважаємо знак числа доказом напряму без перевірки на реальному об'єкті.
+  - title: "Навантаження"
+    path: load
+    icon: mdi:home-lightning-bolt
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Споживання об'єкта"
+          icon: mdi:home-lightning-bolt
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🏠 Потужність споживачів**
+            
+            {% set a=states('sensor.rakurs_load_power') %}
+            ## {{ (a ~ ' кВт') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🏠 Добове споживання**
+            
+            {% set a=states('sensor.rakurs_load_energy_today') %}
+            ## {{ (a ~ ' кВт·год') if a not in ['unknown','unavailable','none',''] else '—' }}
+            
+            _Лише реальні вимірювання_
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Трифазне навантаження"
+          icon: mdi:sine-wave
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Фазна напруга та потужність · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Навантаження L1 — напруга | {{ value('load_l1_voltage', 'В') }} |
+            | Навантаження L2 — напруга | {{ value('load_l2_voltage', 'В') }} |
+            | Навантаження L3 — напруга | {{ value('load_l3_voltage', 'В') }} |
+            | Навантаження L1 — потужність | {{ value('load_l1_power', 'кВт') }} |
+            | Навантаження L2 — потужність | {{ value('load_l2_power', 'кВт') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Фазна напруга та потужність · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Навантаження L3 — потужність | {{ value('load_l3_power', 'кВт') }} |
+            | Споживання L1 — потужність | {{ value('load_consumption_l1_power', 'кВт') }} |
+            | Споживання L2 — потужність | {{ value('load_consumption_l2_power', 'кВт') }} |
+            | Споживання L3 — потужність | {{ value('load_consumption_l3_power', 'кВт') }} |
+            | Споживання — розрахункова потужність | {{ value('load_consumption_power', 'кВт') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Показники UPS / EPS"
+          icon: mdi:power-plug
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **UPS, частота і накопичення**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Частота навантаження | {{ value('load_frequency', 'Гц') }} |
+            | Споживання за добу | {{ value('load_energy_today', 'кВт·год') }} |
+            | Споживання за весь час | {{ value('load_energy_total', 'кВт·год') }} |
+            | UPS L1 — потужність | {{ value('ups_l1_power', 'кВт') }} |
+            | UPS L2 — потужність | {{ value('ups_l2_power', 'кВт') }} |
+            | UPS L3 — потужність | {{ value('ups_l3_power', 'кВт') }} |
+            | UPS — сумарна потужність | {{ value('ups_power', 'кВт') }} |
+            
+            _Дані з'являться лише за наявності відповідного обладнання._
   - title: "Інвертор"
     path: inverter
     icon: mdi:current-ac
@@ -309,6 +1591,55 @@ views:
             Підтримувані групи: 3 фази, 2 MPPT, акумулятор, мережа, навантаження.
             
             _Точні регістри й коефіцієнти перерахунку ще не підтверджені. Жодних команд керування немає._
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Генератор / SmartLoad (за наявності)"
+          icon: mdi:engine
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            **Додатковий вхід генератора / SmartLoad.** Показники відображатимуться лише якщо обладнання фізично під'єднане, а відповідний режим і регістри підтверджені.
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Генератор · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Стан генератора | {{ value('generator_status', '') }} |
+            | Генератор L1 — напруга | {{ value('generator_l1_voltage', 'В') }} |
+            | Генератор L2 — напруга | {{ value('generator_l2_voltage', 'В') }} |
+            | Генератор L3 — напруга | {{ value('generator_l3_voltage', 'В') }} |
+            | Генератор L1 — потужність | {{ value('generator_l1_power', 'кВт') }} |
+            
+            _Дані з'являться лише за наявності відповідного обладнання._
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Генератор · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Генератор L2 — потужність | {{ value('generator_l2_power', 'кВт') }} |
+            | Генератор L3 — потужність | {{ value('generator_l3_power', 'кВт') }} |
+            | Генератор — загальна потужність | {{ value('generator_power', 'кВт') }} |
+            | Генератор — енергія за добу | {{ value('generator_energy_today', 'кВт·год') }} |
+            | Генератор — накопичена енергія | {{ value('generator_energy_total', 'кВт·год') }} |
+            
+            _Дані з'являться лише за наявності відповідного обладнання._
   - title: "Історія"
     path: history
     icon: mdi:chart-line
@@ -388,6 +1719,198 @@ views:
             **Архів:** зберігання реальної телеметрії Home Assistant.
             
             _Статистичні підсумки поки не формуються._
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Реальні графіки (з'являться після підключення)"
+          icon: mdi:chart-line
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.rakurs_pv_power
+              state_not: unknown
+            - condition: state
+              entity: sensor.rakurs_pv_power
+              state_not: unavailable
+          card:
+            type: history-graph
+            title: "Потужності: PV, мережа, навантаження"
+            hours_to_show: 24
+            entities:
+                - sensor.rakurs_pv_power
+                - sensor.rakurs_grid_power
+                - sensor.rakurs_load_power
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.rakurs_battery_soc
+              state_not: unknown
+            - condition: state
+              entity: sensor.rakurs_battery_soc
+              state_not: unavailable
+          card:
+            type: history-graph
+            title: "Заряд і електричні параметри АКБ"
+            hours_to_show: 24
+            entities:
+                - sensor.rakurs_battery_soc
+                - sensor.rakurs_battery_voltage
+        - type: conditional
+          conditions:
+            - condition: state
+              entity: sensor.rakurs_inverter_temperature
+              state_not: unknown
+            - condition: state
+              entity: sensor.rakurs_inverter_temperature
+              state_not: unavailable
+          card:
+            type: history-graph
+            title: "Температура інвертора та батареї"
+            hours_to_show: 24
+            entities:
+                - sensor.rakurs_inverter_temperature
+                - sensor.rakurs_battery_temperature
+  - title: "Події"
+    path: events
+    icon: mdi:alert-outline
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Поточний стан і тривоги"
+          icon: mdi:alert-circle
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Інвертор: стани**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Стан інвертора | {{ value('inverter_status', '') }} |
+            | Тривога інвертора | {{ value('inverter_alarm', '') }} |
+            | Помилка інвертора | {{ value('inverter_fault', '') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Акумулятор і BMS: тривоги**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Тривога АКБ | {{ value('battery_alarm', '') }} |
+            | Помилка АКБ | {{ value('battery_fault', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Якість каналу зв'язку"
+          icon: mdi:lan-check
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            ✅ Вебінтерфейс Home Assistant та HTTPS — раніше перевірені.
+            
+            ⏳ Teltonika TRB145 зараз працює з **ІТМ**, перенесення до **Deye заплановано**.
+            
+            ⏳ Протокол обміну, достовірність регістрів, останній успішний замір і частка втрачених опитувань — **ще не підтверджені**.
+            
+            *Підключення до ІТМ не змінювати до фізичного перенесення.*
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Майбутній журнал подій"
+          icon: mdi:history
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            **Журнал аварій та відновлень** буде побудований із справжніх станів і подій Home Assistant після налаштування обладнання. Не створюємо синтетичних тривог і не позначаємо відсутні сенсори як поломку.
+  - title: "Архів"
+    path: archive
+    icon: mdi:database
+    show_icon_and_title: true
+    type: sections
+    max_columns: 2
+    dense_section_placement: true
+    sections:
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Зберігання вимірювань"
+          icon: mdi:database
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            ### Оперативна база
+            
+            **Recorder Home Assistant · SQLite (за замовчуванням)**
+            
+            `/config/home-assistant_v2.db`
+            
+            На Debian: `/home/ivital/deye-monitoring-src/deploy/data/home-assistant_v2.db`
+            
+            **10 діб:** повна історія станів за стандартної конфігурації.
+            
+            **5 хвилин:** короткострокова статистика (протягом строку зберігання).
+            
+            **1 година:** довгострокова статистика сенсорів зі `state_class` — без автоматичного очищення.
+            
+            *Це типова схема Home Assistant; поточні налаштування перевіряються аудитом.*
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Довготривале зберігання"
+          icon: mdi:archive-check
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            ### Архів усіх вимірів
+            
+            Для багаторічного збереження **кожного окремого вимірювання**, а не тільки погодинних агрегатів, підготуємо окрему архівну БД та механізм експорту з контрольованою схемою і резервними копіями.
+            
+            **Статус: архів повних вибірок ще не розгорнуто**. Рішення про окремий накопичувач прийматимемо після аудиту дискового простору й вимог до інтервалу опитування.
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            ### Резервне копіювання
+            
+            Потрібен щонайменше один **відокремлений носій/система**, а не лише той самий диск Debian. Зберігатимемо конфігурацію, історичну БД, каталог відповідності сенсорів і журнал змін.
+            
+            **Статус: зовнішнє резервування Rakurs ще не підтверджено.** Перевірка резервної копії відновленням є обов'язковою.
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Дискова безпека"
+          icon: mdi:shield-check
+        - type: markdown
+          grid_options:
+            columns: 24
+          content: |-
+            **Ніяких необмежених журналів у робочій БД.** Не вимикаємо автоочищення Recorder і не збільшуємо `purge_keep_days` без оцінки зростання бази та запасу місця для SQLite.
+            
+            Для перевірки на Debian: `bash deploy/rakurs/audit_storage.sh`. Скрипт нічого не змінює і не виводить паролів чи вмісту сенсорів.
   - title: "Система"
     path: system
     icon: mdi:cog-outline
