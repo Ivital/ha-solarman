@@ -128,6 +128,42 @@ def check_source():
     return fields, metrics, addresses
 
 
+def mysql_dump_tls_flags(tool: str, mode: str, ca_file: str | None = None) -> list[str]:
+    """Select secure TLS or explicitly acknowledged LAN-only plaintext.
+
+    The existing Rakurs PyMySQL client already has ssl_disabled=True, but
+    mysqldump uses its own TLS defaults. Do not silently downgrade transport
+    on a certificate error. Fail on unknown client family/option support.
+    """
+    if mode not in {"VERIFY_TLS", "LAN_PLAINTEXT_ACK"}:
+        raise RuntimeError("STOP: unknown RAKURS_MYSQL_BACKUP_TRANSPORT")
+    result = subprocess.run([tool, "--version"], capture_output=True, timeout=10,
+                            check=False)
+    version = (result.stdout + b" " + result.stderr).decode(
+        "utf-8", errors="replace").lower()
+    if result.returncode != 0:
+        raise RuntimeError("STOP: cannot identify MySQL backup client")
+    is_mariadb = "mariadb" in version
+    is_mysql = not is_mariadb and ("mysql" in version or "mysqldump" in version)
+    if not (is_mariadb or is_mysql):
+        raise RuntimeError("STOP: unsupported database dump client")
+    if mode == "LAN_PLAINTEXT_ACK":
+        # Scope exception to this pre-existing private-LAN MySQL endpoint.
+        if HOST != "192.168.5.30":
+            raise RuntimeError("STOP: LAN plaintext exception not valid for host")
+        return ["--skip-ssl"] if is_mariadb else ["--ssl-mode=DISABLED"]
+    if ca_file is not None:
+        ca = Path(ca_file)
+        if not ca.is_file() or ca.stat().st_mode & 0o022:
+            raise RuntimeError("STOP: trusted MySQL CA file missing or writable")
+        return (["--ssl", "--ssl-ca=" + str(ca), "--ssl-verify-server-cert"]
+                if is_mariadb else
+                ["--ssl-mode=VERIFY_IDENTITY", "--ssl-ca=" + str(ca)])
+    # Strict verification is never replaced by a silent --ssl-mode=PREFERRED.
+    return (["--ssl", "--ssl-verify-server-cert"] if is_mariadb
+            else ["--ssl-mode=VERIFY_IDENTITY"])
+
+
 def backup_database(password: str) -> Path:
     tool = shutil.which("mysqldump") or shutil.which("mariadb-dump")
     if not tool:
@@ -135,6 +171,15 @@ def backup_database(password: str) -> Path:
             "STOP: mysqldump/mariadb-dump unavailable. Install client and retry; "
             "no database writes attempted."
         )
+    transport = os.environ.get("RAKURS_MYSQL_BACKUP_TRANSPORT", "VERIFY_TLS")
+    ca_file = os.environ.get("RAKURS_MYSQL_BACKUP_CA_FILE") or None
+    tls_flags = mysql_dump_tls_flags(tool, transport, ca_file)
+    if transport == "LAN_PLAINTEXT_ACK":
+        print("MYSQL_BACKUP_TRANSPORT=LAN_PLAINTEXT_EXPLICITLY_ACKNOWLEDGED")
+        print("WARNING: MySQL credentials and database traverse the trusted LAN "
+              "without TLS, matching the existing PyMySQL connection mode.")
+    else:
+        print("MYSQL_BACKUP_TRANSPORT=TLS_VERIFIED")
     home = Path("/var/backups")
     if not home.is_dir() or not os.access(home, os.W_OK):
         raise RuntimeError("STOP: /var/backups must be writable by administrator")
@@ -149,27 +194,43 @@ def backup_database(password: str) -> Path:
         '"\nhost=' + HOST + "\n", encoding="utf-8")
     conf.chmod(0o600)
     dump = folder / "rakurs-before-two-deye.sql.gz"
+    temporary = folder / "rakurs-before-two-deye.sql.gz.partial"
     try:
         args = [tool, "--defaults-extra-file=" + str(conf),
                 "--single-transaction", "--quick", "--skip-lock-tables",
-                "--no-tablespaces", "--hex-blob", DATABASE]
-        with gzip.open(dump, "wb", compresslevel=6) as sink:
+                "--no-tablespaces", "--hex-blob", *tls_flags, DATABASE]
+        # A partial gzip is NEVER presented as a successful backup.
+        with gzip.open(temporary, "wb", compresslevel=6) as sink:
             done = subprocess.run(args, stdout=sink, stderr=subprocess.PIPE,
                                   timeout=1800, check=False)
-        if done.returncode != 0 or not dump.is_file() or dump.stat().st_size < 100:
-            raise RuntimeError("STOP: backup failed: " +
+        if done.returncode != 0 or not temporary.is_file() or temporary.stat().st_size < 100:
+            raise RuntimeError("STOP: backup failed BEFORE any MySQL writes: " +
                                done.stderr.decode(errors="replace")[-500:])
+        # Verify that the entire compressed stream can be read.
+        decompressed_bytes = 0
+        with gzip.open(temporary, "rb") as source:
+            while True:
+                block = source.read(1024 * 1024)
+                if not block:
+                    break
+                decompressed_bytes += len(block)
+        if decompressed_bytes < 100:
+            raise RuntimeError("STOP: MySQL dump is empty or incomplete")
+        temporary.rename(dump)
+        dump.chmod(0o600)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
     finally:
         conf.unlink(missing_ok=True)
-    dump.chmod(0o600)
     print("MYSQL_BACKUP_PATH=" + str(dump))
     digest = hashlib.sha256()
     with dump.open("rb") as source:
         for block in iter(lambda: source.read(1024 * 1024), b""):
             digest.update(block)
     print("MYSQL_BACKUP_SHA256=" + digest.hexdigest())
+    print("MYSQL_BACKUP_GZIP_VERIFIED=PASS")
     return dump
-
 
 def apply_schema(db):
     statements = SCHEMA.read_text(encoding="utf-8").split(";")
