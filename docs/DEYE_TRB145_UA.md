@@ -41,16 +41,53 @@ Deye Modbus RJ45 RS485 → Teltonika (Modbus TCP ⇄ RTU)
 ## Розгортання
 
 Потрібні Docker Engine, Docker Compose Plugin та окремий Linux-хост.
-Перед запуском перевірте вміст файлу Compose:
+
+### Важливо: сервер ergodata-lnx (Debian 13, 4 GiB, Odoo 18)
+
+Аудит 24.11.2026 виявив ~1,2 GiB MemAvailable, шість процесів
+`odoo18.service` (разом ~1,54 GiB PSS) та відсутність активного
+swap-in/swap-out. Наразі **не запускайте** Home Assistant на цьому сервері
+без збільшення запасу оперативної пам'яті або окремої VM: роботу Odoo
+зупиняти або оптимізувати без окремого плану не можна.
+
+Стандартний Compose містить безпечні для ПРОБНОГО запуску обмеження
+`mem_limit=768m`, `memswap_limit=768m`, `cpus=1.0`, `pids_limit=160`,
+`restart=no` та ротацію журналів. Обмеження контейнера **не гарантує**
+відсутності впливу на інші служби, а 768 MiB може виявитися замало для
+самого Home Assistant: у цьому разі контейнер зупиниться. Не змінюйте
+`restart` на `unless-stopped` до стабільного випробування.
+
+### Перевірка без запуску
+
+```bash
+python3 deploy/preflight_capacity.py
+docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
+```
+
+Порогове значення preflight — 1536 MiB `MemAvailable`, це мінімум
+для **оцінки** пробного запуску, а не підтвердження безпеки. Для
+постійної експлуатації рекомендовано 8 GiB ОЗП на наявному сервері
+або окрема VM з 4 GiB ОЗП.
+
+### Контрольований пробний запуск після позитивного preflight
 
 ```bash
 cd deploy
-cp .env.example .env
+cp -n .env.example .env
 mkdir -p data
-docker compose config
-docker compose up -d
+docker compose config --quiet
+docker compose pull homeassistant
+docker compose up -d --no-deps homeassistant
+docker compose ps
+docker stats --no-stream deye-homeassistant
 docker compose logs --tail=100 homeassistant
 ```
+
+Якщо Odoo деградує, зростає PSI, починається swap-in/out чи HA
+виходить за ліміт, негайно виконайте `cd deploy && docker compose down`.
+Не використовуйте `docker system prune` або видалення томів Odoo.
+Ресурси фіксуйте до/після запуску: `free -h`, `vmstat 1 5`,
+`cat /proc/pressure/memory`, `docker stats --no-stream`.
 
 Локальний доступ через SSH: `ssh -L 8123:127.0.0.1:8123 USER@SERVER`
 і `http://127.0.0.1:8123` у браузері.

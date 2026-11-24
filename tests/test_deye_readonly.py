@@ -77,6 +77,23 @@ class ReadOnlyPolicyTest(unittest.TestCase):
         self.assertTrue(any(x.endswith(":/config/custom_components/solarman:ro")
                             for x in ha["volumes"]))
 
+    def test_shared_host_resource_limits(self):
+        cfg = yaml.safe_load((ROOT / "deploy" / "compose.yaml").read_text(encoding="utf-8"))
+        ha = cfg["services"]["homeassistant"]
+        self.assertEqual(ha["restart"], "no")
+        self.assertEqual(ha["mem_limit"], "${HA_MEMORY_LIMIT:-768m}")
+        self.assertEqual(ha["memswap_limit"], "${HA_MEMSWAP_LIMIT:-768m}")
+        self.assertEqual(ha["cpus"], "${HA_CPU_LIMIT:-1.0}")
+        self.assertEqual(ha["pids_limit"], 160)
+        self.assertEqual(ha["logging"]["options"]["max-file"], "3")
+        self.assertTrue((ROOT / "deploy" / "preflight_capacity.py").is_file())
+
+    def test_capacity_threshold(self):
+        script = runpy.run_path(str(ROOT / "deploy" / "preflight_capacity.py"))
+        permitted = script["capacity_allows_probe"]
+        self.assertFalse(permitted(1200 * 1024, 1536))
+        self.assertTrue(permitted(2048 * 1024, 1536))
+
     def test_deye_profile_yaml(self):
         profile = yaml.safe_load((PKG / "inverter_definitions" / "deye_p3.yaml").read_text(encoding="utf-8"))
         self.assertIn("parameters", profile)
