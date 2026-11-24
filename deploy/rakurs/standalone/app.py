@@ -16,6 +16,7 @@ from pathlib import Path
 
 import pymysql
 from flask import Flask, abort, g, jsonify, render_template, request
+from .parallel_support import MODEL as PARALLEL_MODEL, SIGNAL_KEYS as PARALLEL_SIGNAL_KEYS, describe_topology
 
 ROOT = Path(__file__).resolve().parents[1]
 CATALOG_FILE = ROOT / "signal_catalog.json"
@@ -515,6 +516,84 @@ def batches():
     )
     return jsonify({"data_source": "mysql", "simulation": demo_mode(),
                     "batches": serialize(result)})
+
+# Parallel group: observation only. Do not infer physical wiring from Modbus
+# addresses, and do not sum values across devices until provenance is verified.
+def parallel_registered_devices():
+    return rows(
+        "SELECT d.id, d.device_key, d.kind, d.model, d.serial_number "
+        "FROM rakurs_devices AS d "
+        "WHERE d.device_key<>%s AND d.model LIKE %s "
+        "ORDER BY d.device_key LIMIT 20",
+        (DEMO_DEVICE_KEY, "%" + PARALLEL_MODEL + "%"),
+    )
+
+
+@app.get("/api/v1/parallel")
+def parallel_topology():
+    devices = parallel_registered_devices()
+    return jsonify({
+        "data_source": "mysql",
+        "profile": "deye_sun20k_sg05lp3_eu_sm2_parallel2_shared_battery",
+        **describe_topology(devices),
+    })
+
+
+def parallel_selected_device():
+    key = request.args.get("device", "")
+    if not KEY_RE.fullmatch(key):
+        abort(400, description="Оберіть зареєстрований інвертор")
+    devices = parallel_registered_devices()
+    found = next((item for item in devices if item["device_key"] == key), None)
+    if found is None:
+        abort(404, description="Інвертор не зареєстровано у профілі")
+    return found
+
+
+@app.get("/api/v1/parallel/latest")
+def parallel_device_latest():
+    selected = parallel_selected_device()
+    placeholders = ",".join("%s" for _ in PARALLEL_SIGNAL_KEYS)
+    samples = rows(
+        "SELECT s.signal_key, s.label_uk, s.unit, m.value_decimal, "
+        "m.quality, m.observed_at_utc, d.device_key "
+        "FROM rakurs_samples AS m "
+        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+        "JOIN rakurs_devices AS d ON d.id=m.device_id "
+        "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
+        "AND s.verified=1 AND m.quality<>'simulated' "
+        "ORDER BY m.observed_at_utc DESC LIMIT 2000",
+        (selected["id"],) + PARALLEL_SIGNAL_KEYS,
+    )
+    latest = {}
+    for sample in samples:
+        latest.setdefault(sample["signal_key"], sample)
+    return jsonify({
+        "data_source": "mysql", "simulation": False,
+        "device_key": selected["device_key"],
+        "values": serialize(latest),
+        "total_values": None,
+        "shared_battery_soc": None,
+        "aggregation_verified": False,
+    })
+
+
+@app.get("/api/v1/parallel/events")
+def parallel_device_events():
+    selected = parallel_selected_device()
+    entries = rows(
+        "SELECT e.observed_at_utc, e.severity, e.event_code, e.message, "
+        "e.source, d.device_key "
+        "FROM rakurs_device_events AS e "
+        "JOIN rakurs_devices AS d ON d.id=e.device_id "
+        "WHERE e.device_id=%s ORDER BY e.observed_at_utc DESC LIMIT 50",
+        (selected["id"],),
+    )
+    return jsonify({
+        "data_source": "mysql", "device_key": selected["device_key"],
+        "events": serialize(entries),
+    })
+
 
 @app.get("/api/v1/modbus-fields")
 def modbus_fields():
