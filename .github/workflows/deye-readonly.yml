@@ -37,7 +37,7 @@ jobs:
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
       - name: RAKURS dashboard YAML and zero-fabrication tests
         run: python -m unittest discover -s tests -p 'test_rakurs_dashboard.py' -v
-      - name: RAKURS remote archive schema and TLS security tests
+      - name: RAKURS LAN archive schema and transport-policy tests
         run: python -m unittest discover -s tests -p 'test_rakurs_mysql_archive.py' -v
       - name: Read-only integration tests
         run: python -m unittest discover -s tests -p 'test_deye*.py' -v

@@ -1,4 +1,4 @@
-"""Validate secure MySQL archive preflight and MySQL-specific DDL offline."""
+"""Validate LAN MySQL archive preflight and MySQL-specific DDL offline."""
 from pathlib import Path
 import unittest
 
@@ -16,10 +16,14 @@ class RakursMySqlArchiveTests(unittest.TestCase):
         for forbidden in ("PRAGMA foreign_keys", "DROP TABLE", "INSERT INTO"):
             self.assertNotIn(forbidden, content)
 
-    def test_no_stored_password_and_verified_tls(self):
+    def test_no_stored_password_and_explicit_plain_lan_transport(self):
         content = (R / "mysql_archive_preflight.sh").read_text(encoding="utf-8")
-        self.assertIn("VERIFY_IDENTITY", content)
-        self.assertIn("--ssl-verify-server-cert", content)
+        self.assertIn("--ssl-mode=DISABLED", content)
+        self.assertIn("--skip-ssl", content)
+        self.assertIn("Ssl_cipher", content)
+        self.assertIn("NO TLS", content)
+        self.assertNotIn("VERIFY_IDENTITY", content)
+        self.assertNotIn("--ssl-verify-server-cert", content)
         self.assertIn("--password", content)
         self.assertIn("SELECT CONCAT", content)
         self.assertIn("--network", content)
