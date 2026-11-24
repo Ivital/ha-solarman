@@ -8,8 +8,8 @@
 set -Eeuo pipefail
 umask 077
 MODE="${1:---check}"
-[[ "$MODE" == "--check" || "$MODE" == "--apply" ]] || {
-  echo 'Usage: deploy_full_modbus_archive.sh [--check|--apply]' >&2
+[[ "$MODE" == "--check" || "$MODE" == "--apply" || "$MODE" == "--resume" ]] || {
+  echo 'Usage: deploy_full_modbus_archive.sh [--check|--apply|--resume]' >&2
   exit 2
 }
 HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
@@ -37,40 +37,52 @@ sudo -v
 sudo test -x /var/lib/rakurs/.venv/bin/python || {
   echo 'STOP: Rakurs Python venv missing' >&2; exit 2
 }
-command -v mysqldump >/dev/null || command -v mariadb-dump >/dev/null || {
-  echo 'STOP: MySQL backup client unavailable; no database changes' >&2; exit 2
-}
+if [[ "$MODE" == "--apply" ]]; then
+  command -v mysqldump >/dev/null || command -v mariadb-dump >/dev/null || {
+    echo 'STOP: MySQL backup client unavailable; no database changes' >&2; exit 2
+  }
+fi
 systemctl is-active --quiet rakurs-standalone.service || {
   echo 'STOP: current Rakurs service must be healthy before applying' >&2; exit 2
 }
 
-echo '=== MANDATORY MYSQL BACKUP AND ATOMIC SYNTHETIC TWIN ARCHIVE ==='
-echo 'Real inverters will NOT be registered. This step writes simulated test data.'
-BACKUP_TRANSPORT="${RAKURS_MYSQL_BACKUP_TRANSPORT:-VERIFY_TLS}"
-[[ "$BACKUP_TRANSPORT" == "VERIFY_TLS" ||
-   "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]] || {
-  echo 'STOP: use VERIFY_TLS or explicit LAN_PLAINTEXT_ACK' >&2
-  exit 2
-}
-if [[ "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]]; then
-  echo 'WARNING: backup traffic and MySQL credentials will be UNENCRYPTED within the LAN.'
-  echo 'This mode must only be used on the trusted 192.168.5.30 segment.'
+if [[ "$MODE" == "--apply" ]]; then
+  echo '=== MANDATORY MYSQL BACKUP AND ATOMIC SYNTHETIC TWIN ARCHIVE ==='
+  echo 'Real inverters will NOT be registered. This step writes simulated test data.'
+  BACKUP_TRANSPORT="${RAKURS_MYSQL_BACKUP_TRANSPORT:-VERIFY_TLS}"
+  [[ "$BACKUP_TRANSPORT" == "VERIFY_TLS" ||
+     "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]] || {
+    echo 'STOP: use VERIFY_TLS or explicit LAN_PLAINTEXT_ACK' >&2
+    exit 2
+  }
+  if [[ "$BACKUP_TRANSPORT" == "LAN_PLAINTEXT_ACK" ]]; then
+    echo 'WARNING: backup traffic and MySQL credentials will be UNENCRYPTED within the LAN.'
+    echo 'This mode must only be used on the trusted 192.168.5.30 segment.'
+  else
+    echo 'MYSQL_BACKUP_TLS_VERIFICATION=REQUIRED'
+  fi
+  # sudo normally discards shell environment. Forward ONLY these approved switches.
+  sudo env \
+    "RAKURS_MYSQL_BACKUP_TRANSPORT=$BACKUP_TRANSPORT" \
+    "RAKURS_MYSQL_BACKUP_CA_FILE=${RAKURS_MYSQL_BACKUP_CA_FILE:-}" \
+    /var/lib/rakurs/.venv/bin/python "$HERE/seed_two_parallel_demo.py" --execute </dev/tty
+  echo 'SYNTHETIC_DATABASE_COMMITTED=PASS'
 else
-  echo 'MYSQL_BACKUP_TLS_VERIFICATION=REQUIRED'
+  # Seed already committed on the prior attempt. Never ask for owner password
+  # or repeat any DDL/DML; verify both devices before touching the website.
+  echo 'RESUME=SKIP_SEED_AND_BACKUP'
+  echo 'RESUME_DB_WRITES=0'
 fi
-# sudo normally discards shell environment. Forward ONLY these approved switches.
-sudo env \
-  "RAKURS_MYSQL_BACKUP_TRANSPORT=$BACKUP_TRANSPORT" \
-  "RAKURS_MYSQL_BACKUP_CA_FILE=${RAKURS_MYSQL_BACKUP_CA_FILE:-}" \
-  /var/lib/rakurs/.venv/bin/python "$HERE/seed_two_parallel_demo.py" --execute </dev/tty
-echo 'SYNTHETIC_DATABASE_COMMITTED=PASS'
 
 echo '=== VERIFY EXACT TWO-INVERTER DB COUNTS (READ-ONLY ACCOUNT) ==='
-sudo -u rakurs env \
+# The rakurs service account cannot traverse /home/ivital. Supply the
+# audited, non-secret Python source over stdin; do NOT chmod private folders.
+cat "$HERE/audit_two_inverters_mysql.py" | sudo -u rakurs env \
   RAKURS_DB_USER=rakurs_web \
   RAKURS_DB_PASSWORD_FILE=/etc/rakurs/mysql_password \
-  /var/lib/rakurs/.venv/bin/python "$HERE/audit_two_inverters_mysql.py"
+  /var/lib/rakurs/.venv/bin/python -
 
+echo 'TWIN_DATABASE_AUDIT_BEFORE_DEPLOY=PASS'
 echo '=== DEPLOY NEW WEB API AND UNIQUE VERSIONED ASSETS ==='
 bash "$HERE/deploy_parallel_ui.sh" --apply
 
@@ -127,5 +139,8 @@ for index, device in enumerate(data["devices"], 1):
 print("TWIN_PARALLEL_WEB_ARCHIVE=PASS")
 PY
 echo 'FULL_DEYE_MODBUS_DATABASE_AND_WEB=PASS'
+if [[ "$MODE" == "--resume" ]]; then
+  echo 'TWO_DEYE_RESUME=PASS MYSQL_WRITES=0'
+fi
 echo 'MODBUS_COMMANDS=0 PHYSICAL_DEVICES_CREATED=0'
 echo 'OPEN=https://rakurs.zakryttya.org.ua/#/parallel'
