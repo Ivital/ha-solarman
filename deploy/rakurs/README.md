@@ -118,6 +118,39 @@ warnings. **No private key contents** are printed or modified.
 TLS validation remains enabled. If it still fails, it rolls back.
 Do not guess `listen` parameters or enable `curl -k` as a fix.
 
+## Root cause of the 2nd HTTPS attempt: Home Assistant HTTP 400
+
+On the second activation (24.11.2026), HTTPS `www` consistently returned
+301 and the canonical hostname returned 400 for attempts 2–20.
+The on-server TLS diagnosis confirmed the **correct Rakurs certificate**
+for both names, both `127.0.0.1:443` and `192.168.5.31:443`.
+`nginx -t`, Nginx and Odoo were healthy. So **TLS is fixed**; the
+remaining failure is downstream HTTP 400, probably HA's proxy trust
+policy (confirm in Home Assistant logs). HTTPS activation again
+rolled back only the new Rakurs site, leaving its certificate.
+
+To avoid touching Nginx until HA proxy trust is truly configured,
+`activate_https.sh` now invokes a *read-only trust preflight*:
+
+```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+bash deploy/rakurs/preflight_proxy_trust.sh
+```
+
+The script makes one synthetic `X-Forwarded-For` HTTP request to
+`127.0.0.1:8123`; accepts redirects/success, rejects 400 and
+shows only pertinent recent proxy errors to identify the actual
+source address (e.g. Docker bridge gateway `172.18.0.1`).
+It neither edits HA settings nor sends Modbus requests.
+
+In HA UI over the *private SSH tunnel*, go to
+`Settings → System → Network → HTTP server`, enable
+`Trust X-Forwarded-For`, add **only** the source IP shown in
+the HA log to `Trusted proxies` (avoid broad network CIDRs),
+save, and **confirm within 5 minutes after restart**.
+Verify the preflight PASS before activating HTTPS again.
+
 ## Home Assistant behind reverse proxy (2026+)
 
 In Home Assistant UI: **Settings → System → Network → HTTP server**: enable **Trust X-Forwarded-For** and configure **Trusted proxies** with the *actual source IP observed inside Home Assistant* from the host proxy's Docker connection; the Docker bridge gateway printed by preflight is a candidate, not confirmed. Use a precise address, not an overly broad Docker subnet. Saving these settings causes an HA restart/verification. Complete this over the SSH tunnel first so lockouts do not affect public access. Set the external URL to `https://rakurs.zakryttya.org.ua` in the HA Network settings.

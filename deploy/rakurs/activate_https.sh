@@ -36,6 +36,9 @@ if not owners:
 print("HA owner exists: YES (no identities displayed)")
 '
 
+echo '=== PRECHECK HOME ASSISTANT REVERSE-PROXY TRUST ==='
+bash deploy/rakurs/preflight_proxy_trust.sh
+
 # Settings > System > Network: Trust X-Forwarded-For and actual Nginx
 # source address (often Docker gateway 172.18.0.1) must be configured
 # BEFORE publishing to avoid HTTP 400.

@@ -12,6 +12,17 @@ class RakursProxyTest(unittest.TestCase):
         self.assertIn("https://rakurs.zakryttya.org.ua$request_uri", s)
         self.assertNotIn("proxy_pass", s)
 
+    def test_proxy_preflight_before_exposure(self):
+        s = (ROOT / "activate_https.sh").read_text()
+        preflight = (ROOT / "preflight_proxy_trust.sh").read_text()
+        self.assertLess(s.index("preflight_proxy_trust.sh"),
+                        s.index("=== INSTALL ONLY RAKURS HTTPS SITE"))
+        self.assertIn("X-Forwarded-For: 192.0.2.123", preflight)
+        self.assertIn("http://127.0.0.1:8123/", preflight)
+        self.assertIn("response=000", preflight)
+        self.assertNotIn("--insecure", preflight)
+        self.assertNotIn("docker compose up", preflight)
+
     def test_activation_retains_strict_tls_and_rollback(self):
         text = (ROOT / "activate_https.sh").read_text()
         self.assertIn("seq 1 20", text)
