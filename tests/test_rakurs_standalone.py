@@ -99,8 +99,10 @@ class StandaloneMySqlTests(unittest.TestCase):
             "raw_value": 2500, "quality": "good",
             "observed_at_utc": datetime(2026, 11, 24, 14, 30),
         }
-        self.data_one = lambda sql, _params: ({"n": 0}
-            if "WHERE kind='inverter' AND model LIKE" in sql else val)
+        self.data_one = lambda sql, _params: (
+            {"n": 0} if "WHERE kind='inverter' AND model LIKE" in sql
+            else None if "quality='simulated' AND ingest_source=%s" in sql
+            else val)
         res = self.client.get("/api/v1/latest?keys=pv_power")
         self.assertEqual(res.status_code, 200)
         obj = res.get_json()["values"]["pv_power"]
