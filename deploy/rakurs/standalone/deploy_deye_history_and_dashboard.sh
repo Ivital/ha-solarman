@@ -25,7 +25,7 @@ done
 test -s "$HISTORY" || { echo 'STOP: history script missing' >&2; exit 2; }
 python3 -m py_compile "$HERE/app.py" "$HISTORY"
 python3 "$HISTORY"
-grep -Fq "app-events-20261124.js" "$HERE/templates/index.html"
+grep -Fq "app-parallel-20261124.js" "$HERE/templates/index.html"
 grep -Fq "style.css?v=$VERSION" "$HERE/templates/index.html"
 grep -Fq 'Динаміка за 24 години' "$HERE/static/app.js"
 grep -Fq 'SELECT MAX(ms.observed_at_utc)' "$HERE/app.py"
