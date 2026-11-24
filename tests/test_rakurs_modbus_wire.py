@@ -100,5 +100,55 @@ class WireSafetyTests(unittest.TestCase):
             normalize({**p, "frames":[{**p["frames"][0],"words":[1,65534]}]})
 
 
+class ReplayFingerprintTests(unittest.TestCase):
+    def test_same_uid_requires_identical_payload_sha256(self):
+        from modbus_archive import persist
+        payload = {
+            "device_key": "deye_physical_1",
+            "poll_uid": "real_poll_20261125_01",
+            "quality": "good",
+            "ingest_source": "verified_gateway",
+            "transport": "rs485", "slave_id": 1,
+            "observed_at_utc": "2026-11-25T00:00:00Z",
+            "frames": [{"function_code":3,"start_address":1234,
+                        "requested_count":2,"status":"ok",
+                        "words":[1,65535],
+                        "request_hex":rtu("010304d20002").hex(),
+                        "response_hex":rtu("0103040001ffff").hex()}],
+        }
+        canonical = payload_fingerprint(normalize(payload))
+
+        class Fake:
+            def __init__(self, saved_hash):
+                self.saved_hash = saved_hash
+                self.sql = ""
+                self.rolled_back = 0
+            def begin(self): pass
+            def rollback(self): self.rolled_back += 1
+            def cursor(self): return self
+            def __enter__(self): return self
+            def __exit__(self, *args): return False
+            def execute(self, sql, _params=()): self.sql = sql
+            def fetchone(self):
+                if "FROM rakurs_devices" in self.sql:
+                    return (1, "inverter")
+                if "FROM rakurs_parallel_members" in self.sql:
+                    return (1,)
+                if "FROM rakurs_modbus_poll_runs" in self.sql:
+                    return (77, 1)
+                if "FROM rakurs_modbus_poll_fingerprints" in self.sql:
+                    return ((self.saved_hash,) if self.saved_hash else None)
+                raise AssertionError(self.sql)
+        equal = Fake(canonical)
+        result = persist(equal, payload)
+        self.assertEqual(result, {"status":"already_saved","poll_id":77})
+        self.assertEqual(equal.rolled_back, 1)
+        for digest in ("0"*64, None):
+            mismatch = Fake(digest)
+            with self.assertRaises(PayloadError):
+                persist(mismatch, payload)
+            self.assertEqual(mismatch.rolled_back, 1)
+
+
 if __name__ == "__main__":
     unittest.main()
