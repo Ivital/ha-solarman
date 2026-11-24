@@ -3,7 +3,7 @@
 
 Uses OpenSSL STARTTLS mysql, sends NO password or SQL, changes no files.
 DO NOT import a captured peer certificate as a CA unless separately
-verified against the hosting provider's authenticated support channel.
+verified against the locally administered MySQL server over a trusted channel.
 """
 from __future__ import annotations
 import re
@@ -14,12 +14,12 @@ PORT = 3306
 
 
 def main() -> int:
-    print("RAKURS REMOTE MYSQL TLS PEER INSPECTION (NOT YET TRUSTED)")
+    print("RAKURS LAN MYSQL TLS PEER INSPECTION (NOT YET TRUSTED)")
     print("Target:", HOST, PORT)
     cmd = [
         "openssl", "s_client", "-starttls", "mysql",
         "-connect", "%s:%d" % (HOST, PORT),
-        "-servername", HOST, "-verify_hostname", HOST, "-showcerts",
+        "-verify_ip", HOST, "-showcerts",
     ]
     try:
         result = subprocess.run(
@@ -72,7 +72,7 @@ def main() -> int:
     if not verify_lines:
         print("No verification result returned (inspect TLS mode with provider).")
     print("Only untrusted certificate metadata shown. No login/SQL performed.")
-    print("Never trust or install these certificates without provider confirmation.")
+    print("Never trust or install these certificates without server administrator verification.")
     return 0 if certs else 2
 
 
