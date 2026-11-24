@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const root = path.join(__dirname, "../deploy/rakurs/standalone");
-const js = fs.readFileSync(path.join(root, "static/app-clarity-20261124.js"), "utf8");
+const js = fs.readFileSync(path.join(root, "static/app-events-20261124.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 
@@ -118,6 +118,16 @@ function prepare(mode) {
       : url.includes("/history") ? {signal: {unit: "кВт"}, points: history}
       : url.includes("/modbus-fields") ?
         {count: fields.length, register_count: 815, fields}
+      : url.includes("/batches") ? {batches: [
+          {started_at_utc:"2026-11-24T19:00:00Z",
+           finished_at_utc:"2026-11-24T19:00:00Z",
+           received_count:135936,accepted_count:135936,rejected_count:0,
+           status:"simulated",error_code:"DEYE_HISTORY_72H_V1"},
+          {started_at_utc:"2026-11-24T17:53:54Z",
+           finished_at_utc:"2026-11-24T17:53:54Z",
+           received_count:624,accepted_count:624,rejected_count:0,
+           status:"simulated",error_code:null}
+        ]}
       : {devices: [], events: [], batches: []};
     return {ok: true, json: async () => data};
   }
@@ -127,14 +137,15 @@ function prepare(mode) {
     URLSearchParams, Number, Date, String, Array, Set, Math,
     encodeURIComponent, console: {warn() {}}
   };
-  vm.runInNewContext(js, sandbox, {filename: "app-clarity-20261124.js"});
+  vm.runInNewContext(js, sandbox, {filename: "app-events-20261124.js"});
   return {main, nav, events, loc, fetchCalls, ssr};
 }
 async function settle() {
   await new Promise(resolve => setTimeout(resolve, 60));
 }
 async function run() {
-  assert(html.includes("/static/app-clarity-20261124.js"));
+  assert(html.includes("/static/app-events-20261124.js"));
+  assert(html.includes("/static/events-ui-20261124.css"));
   assert(html.includes("/static/clarity-ui-20261124.css"));
   assert(html.includes('Показники Deye з бази даних'));
   assert(css.includes(".energy-diagram"));
@@ -189,5 +200,19 @@ async function run() {
   assert.equal(byClass(app.main, "history-workspace").length, 1);
   assert.equal(byClass(app.main, "history-summary").length, 1);
   console.log("CLARITY_HISTORY=PASS");
+
+  app.loc.hash = "#/events";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main, "event-row").length, 2, "Existing DB ingestion batches");
+  assert.equal(byClass(app.main, "event-count-card").length, 2,
+    "Separate device event and DB load counters");
+  const labels = descendants(app.main).map(x => x.textContent || "").join("|");
+  assert(labels.includes("Подій обладнання поки немає"));
+  assert(labels.includes("Додано історію вимірювань за 72 години"));
+  assert(labels.includes("Завантажено початковий тестовий набір"));
+  assert(labels.includes("135936") && labels.includes("624"));
+  assert(app.fetchCalls.some(x => x.includes("/api/v1/events")));
+  assert(app.fetchCalls.some(x => x.includes("/api/v1/batches")));
+  console.log("CLARITY_EVENTS_REAL_BATCHES_NO_FAKE_ALARMS=PASS");
 }
 run().catch(e => {console.error(e.stack);process.exitCode=1;});
