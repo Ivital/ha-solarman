@@ -17,6 +17,7 @@ import gzip
 import hashlib
 import json
 import os
+import re
 import selectors
 import time
 from pathlib import Path
@@ -38,6 +39,14 @@ DEVICE_KEYS = ("sim_deye20k_parallel_1", "sim_deye20k_parallel_2")
 POLL_UIDS = ("simdeye20k_parallel_1_v1", "simdeye20k_parallel_2_v1")
 SCHEMA = Path(__file__).with_name("parallel_raw_modbus_schema.sql")
 EXPECTED = {"register_words": 815, "fields": 624, "signals": 316}
+SCHEMA_TABLES = (
+    "rakurs_parallel_groups",
+    "rakurs_parallel_members",
+    "rakurs_modbus_poll_runs",
+    "rakurs_modbus_frames",
+    "rakurs_modbus_register_samples",
+    "rakurs_modbus_bit_samples",
+)
 
 
 def rawword(slot: int, address: int) -> int:
@@ -112,12 +121,8 @@ def check_source():
         raise RuntimeError("Incomplete raw source register inventory")
     if len(fields) != EXPECTED["fields"] or len(metrics) != EXPECTED["signals"]:
         raise RuntimeError("Unexpected decoded catalog")
-    ddl = SCHEMA.read_text(encoding="utf-8")
-    for table in ("rakurs_parallel_groups", "rakurs_parallel_members",
-                  "rakurs_modbus_poll_runs", "rakurs_modbus_frames",
-                  "rakurs_modbus_register_samples", "rakurs_modbus_bit_samples"):
-        if f"CREATE TABLE IF NOT EXISTS {table}" not in ddl:
-            raise RuntimeError("Missing DDL: " + table)
+    # Validate the entire SQL migration during --check, before any backup/write.
+    parse_schema_ddl(SCHEMA.read_text(encoding="utf-8"))
     observed = datetime.now(timezone.utc)
     for slot in (1, 2):
         p = build_payload(slot, fields, metrics, addresses, observed)
@@ -278,18 +283,48 @@ def backup_database(password: str) -> Path:
     print("MYSQL_BACKUP_GZIP_VERIFIED=PASS")
     return dump
 
+def parse_schema_ddl(sql: str) -> list[str]:
+    """Parse only the six explicitly expected CREATE TABLE statements.
+
+    Comments must be removed BEFORE splitting on semicolons: a comment in
+    this schema contains a semicolon, which previously triggered unsafe DDL.
+    Fail the entire migration before running ANY SQL if content differs.
+    """
+    uncommented = "\n".join(
+        line for line in sql.splitlines()
+        if line.strip() and not line.lstrip().startswith("--")
+    )
+    statements = [part.strip() for part in uncommented.split(";") if part.strip()]
+    actual = []
+    for statement in statements:
+        match = re.fullmatch(
+            r"CREATE\\s+TABLE\\s+IF\\s+NOT\\s+EXISTS\\s+"
+            r"(rakurs_[a-z0-9_]+)\\s*\\([\\s\\S]+\\)\\s+"
+            r"ENGINE=InnoDB\\s+DEFAULT\\s+CHARSET=utf8mb4\\s+"
+            r"COLLATE=utf8mb4_unicode_ci",
+            statement,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            raise RuntimeError("STOP: unsafe DDL: unexpected SQL statement")
+        actual.append(match.group(1).lower())
+    if tuple(actual) != SCHEMA_TABLES:
+        raise RuntimeError(
+            "STOP: unsafe DDL: expected exactly six known tables in order; "
+            f"found {actual}"
+        )
+    return statements
+
+
 def apply_schema(db):
-    statements = SCHEMA.read_text(encoding="utf-8").split(";")
+    # Evaluate and validate EVERY statement before executing even the first.
+    statements = parse_schema_ddl(SCHEMA.read_text(encoding="utf-8"))
     with db.cursor() as cur:
         for statement in statements:
-            clean = "\n".join(
-                line for line in statement.splitlines()
-                if line.strip() and not line.strip().startswith("--")
-            ).strip()
-            if clean:
-                if not clean.startswith("CREATE TABLE IF NOT EXISTS rakurs_"):
-                    raise RuntimeError("STOP: unsafe DDL")
-                cur.execute(clean)
+            cur.execute(statement)
+    print("PARALLEL_SCHEMA_TABLES=6")
+    print("PARALLEL_SCHEMA_DDL=PASS")
+
 
 
 def preexisting_devices(db):
