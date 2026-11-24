@@ -24,7 +24,7 @@ for item in "${FILES[@]}"; do
     echo "STOP: missing source $item" >&2; exit 2
   }
 done
-grep -Eq 'src="/static/app-(events|parallel)-20261124.js"' "$HERE/templates/index.html"
+grep -Eq 'src="/static/app-(events|parallel(-archive)?)-20261124.js"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/events-ui-20261124.css"' "$HERE/templates/index.html"
 grep -Fq 'function renderEvents(cycle)' "$HERE/static/app-events-20261124.js" ||
   grep -Fq 'async function renderEvents(cycle)' "$HERE/static/app-events-20261124.js"
