@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>Rakurs — Енергомоніторинг</title>
   <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
-  <script defer src="/static/app.js?v=rakurs-history-72h-v1"></script>
+  <script defer src="/static/app-stable-20261124.js"></script>
 </head>
 <body>
   <div class="layout">
@@ -35,7 +35,7 @@
           <span id="connection" class="connection pending"><i></i> Перевірка MySQL</span>
         </div>
       </header>
-      <main id="content" class="content">
+      <main id="content" class="content" data-initial-mode="{{ 'simulation' if initial_simulated else 'real' }}">
         <div class="section-header">
           <h2>Оперативні показники</h2>
           <span class="subtle">Джерело: MySQL rakurs</span>
