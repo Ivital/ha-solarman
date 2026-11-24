@@ -161,7 +161,12 @@ def normalize(payload):
             not isinstance(error_code, str) or len(error_code) > 80
         ):
             raise PayloadError("Invalid error code")
+        captured = (utc_time(frame["captured_at_utc"])
+                    if frame.get("captured_at_utc") else observed)
+        if abs((captured - observed).total_seconds()) > 3600:
+            raise PayloadError("Frame timestamp is more than 1 hour from poll timestamp")
         normalized.append({
+            "captured": captured,
             "sequence_no": seq, "function_code": fc, "start_address": addr,
             "requested_count": count, "status": status, "words": words, "bits": bits,
             "request_bytes": request, "response_bytes": response,
@@ -281,7 +286,8 @@ def persist(db, payload, *, manage_transaction=True):
                 "slave_id,status,quality,ingest_source,request_count,response_count,"
                 "exception_count,created_at_utc) "
                 "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                (device_id, item["poll_uid"], item["observed"], item["observed"],
+                (device_id, item["poll_uid"], item["observed"],
+                 max(x["captured"] for x in frames),
                  item["transport"], item["slave_id"],
                  ("simulated" if item["quality"] == "simulated"
                   else "complete" if exceptions == 0 else "partial"),
@@ -298,14 +304,14 @@ def persist(db, payload, *, manage_transaction=True):
                     "start_address,requested_count,status,exception_code,error_code,"
                     "request_bytes,response_bytes) "
                     "VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (poll_id, device_id, frame["sequence_no"], item["observed"],
+                    (poll_id, device_id, frame["sequence_no"], frame["captured"],
                      frame["function_code"], frame["start_address"],
                      frame["requested_count"], frame["status"],
                      frame["exception_code"], frame["error_code"],
                      frame["request_bytes"], frame["response_bytes"]),
                 )
                 frame_id = cur.lastrowid
-                common = (poll_id, frame_id, device_id, item["observed"],
+                common = (poll_id, frame_id, device_id, frame["captured"],
                           frame["function_code"])
                 if frame["words"]:
                     cur.executemany(
