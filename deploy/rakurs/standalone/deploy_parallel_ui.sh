@@ -14,7 +14,8 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
-  app.py parallel_support.py modbus_archive.py templates/index.html
+  app.py parallel_support.py modbus_archive.py modbus_wire.py
+  mysql_transport.py templates/index.html
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
 )
 cd "$ROOT"
@@ -33,7 +34,8 @@ if command -v node >/dev/null 2>&1; then
   node tests/test_rakurs_clarity_ui.js
 fi
 bash -n "$HERE/audit_parallel_host_readonly.sh"
-python3 -m py_compile "$HERE/app.py" "$HERE/parallel_support.py" "$HERE/modbus_archive.py"
+python3 -m py_compile "$HERE/app.py" "$HERE/parallel_support.py" \
+  "$HERE/modbus_archive.py" "$HERE/modbus_wire.py" "$HERE/mysql_transport.py"
 echo 'PARALLEL_UI_PREFLIGHT=PASS'
 echo 'INVERTER_WRITES=0 MODBUS_COMMANDS=0 MYSQL_WRITES=0'
 if [[ "$MODE" == "--check" ]]; then
