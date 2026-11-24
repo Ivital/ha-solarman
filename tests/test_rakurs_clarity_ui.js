@@ -5,7 +5,7 @@ const path = require("node:path");
 const vm = require("node:vm");
 const assert = require("node:assert/strict");
 const root = path.join(__dirname, "../deploy/rakurs/standalone");
-const js = fs.readFileSync(path.join(root, "static/app-parallel-archive-20261124.js"), "utf8");
+const js = fs.readFileSync(path.join(root, "static/app-parallel-twin-20261125.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 
@@ -173,8 +173,8 @@ async function settle() {
   await new Promise(resolve => setTimeout(resolve, 60));
 }
 async function run() {
-  assert(html.includes("/static/app-parallel-archive-20261124.js"));
-  assert(html.includes("/static/parallel-archive-20261124.css"));
+  assert(html.includes("/static/app-parallel-twin-20261125.js"));
+  assert(html.includes("/static/parallel-twin-20261125.css"));
   assert(html.includes("/static/events-ui-20261124.css"));
   assert(html.includes("/static/clarity-ui-20261124.css"));
   assert(html.includes('Показники Deye з бази даних'));
