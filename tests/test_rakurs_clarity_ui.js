@@ -114,6 +114,21 @@ function prepare(mode) {
       : url.includes("/signals") ?
         {signals: [{signal_key: "pv_power", label_uk: "PV power", unit: "кВт"}]}
       : url.includes("/auth") ? {authenticated: false}
+      : url.includes("/parallel/simulation/latest") ?
+        {simulation:true, device_key: "sim_deye20k_parallel_1", values: latest}
+      : url.includes("/parallel/simulation/raw") ?
+        {simulation:true,total:2,raw_registers:[
+          {function_code:3,register_address:100,raw_uint16:65535,quality:"simulated"},
+          {function_code:3,register_address:101,raw_uint16:0,quality:"simulated"}
+        ]}
+      : url.includes("/parallel/simulation") ?
+        {simulation:true,storage_ready:mode==="seeded",
+         devices:mode==="seeded" ? [
+           {slot_no:1,device_key:"sim_deye20k_parallel_1",
+            raw_registers:815,decoded_fields:624,ui_fields:316},
+           {slot_no:2,device_key:"sim_deye20k_parallel_2",
+            raw_registers:815,decoded_fields:624,ui_fields:316}
+         ]:[]}
       : url.includes("/parallel/latest") ? {device_key: "inverter_1", values:
           {pv_power: {...latest.pv_power, quality: "good"}}}
       : url.includes("/latest") ? {values: latest}
@@ -259,5 +274,22 @@ async function run() {
   assert(parallelValueText.includes("Поточна сумарна потужність: —"),
     "No fabricated combined power");
   console.log("PARALLEL_DISTINCT_DEVICE_ENDPOINTS=PASS");
+
+  const seeded = prepare("seeded");
+  await settle();
+  seeded.loc.hash = "#/parallel";
+  await seeded.events.hashchange();
+  assert.equal(byClass(seeded.main, "parallel-device").length, 4,
+    "Two unconnected physical slots plus two separately marked simulations");
+  assert.equal(byClass(seeded.main, "parallel-demo-counter").length, 6);
+  const seededText = descendants(seeded.main).map(x => x.textContent || "").join("|");
+  assert(seededText.includes("815") && seededText.includes("624") && seededText.includes("316"));
+  assert(seededText.includes("СИМУЛЯЦІЯ") && seededText.includes("SOC: —"));
+  assert(!seededText.includes("Поточна сумарна потужність: 10"));
+  const rawButton = byClass(seeded.main, "parallel-raw-viewer")[0].childNodes
+    .find(x => x.tagName === "button");
+  await rawButton.listeners.click();
+  assert.equal(byClass(seeded.main, "parallel-raw-row").length, 2);
+  console.log("PARALLEL_DEMO_TWO_COMPLETE_ARCHIVES_PAGED=PASS");
 }
 run().catch(e => {console.error(e.stack);process.exitCode=1;});
