@@ -17,6 +17,8 @@ import gzip
 import hashlib
 import json
 import os
+import selectors
+import time
 from pathlib import Path
 import shutil
 import subprocess
@@ -164,6 +166,52 @@ def mysql_dump_tls_flags(tool: str, mode: str, ca_file: str | None = None) -> li
             else ["--ssl-mode=VERIFY_IDENTITY"])
 
 
+def stream_dump_to_gzip(args: list[str], destination: Path,
+                        timeout_seconds: int = 1800) -> tuple[int, str]:
+    """Actually gzip a subprocess stdout stream, with bounded wait and no RAM dump.
+
+    subprocess.run(stdout=gzip.GzipFile) does NOT work: Popen uses fileno()
+    and skips GzipFile.write(), producing a corrupt mixed gzip/plain file.
+    """
+    errors = destination.with_name(destination.name + ".stderr")
+    deadline = time.monotonic() + timeout_seconds
+    process = None
+    try:
+        with errors.open("wb") as stderr_file, gzip.open(
+            destination, "wb", compresslevel=6
+        ) as archive:
+            process = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=stderr_file
+            )
+            try:
+                if process.stdout is None:
+                    raise RuntimeError("STOP: cannot capture mysqldump output")
+                with selectors.DefaultSelector() as reader:
+                    reader.register(process.stdout, selectors.EVENT_READ)
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise subprocess.TimeoutExpired(args, timeout_seconds)
+                        if not reader.select(remaining):
+                            raise subprocess.TimeoutExpired(args, timeout_seconds)
+                        chunk = os.read(process.stdout.fileno(), 1024 * 1024)
+                        if not chunk:
+                            break
+                        archive.write(chunk)
+                rc = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+            except Exception:
+                process.kill()
+                process.wait(timeout=10)
+                raise
+            finally:
+                if process.stdout is not None:
+                    process.stdout.close()
+        stderr_text = errors.read_text(encoding="utf-8", errors="replace")[-500:]
+        return rc, stderr_text
+    finally:
+        errors.unlink(missing_ok=True)
+
+
 def backup_database(password: str) -> Path:
     tool = shutil.which("mysqldump") or shutil.which("mariadb-dump")
     if not tool:
@@ -200,12 +248,10 @@ def backup_database(password: str) -> Path:
                 "--single-transaction", "--quick", "--skip-lock-tables",
                 "--no-tablespaces", "--hex-blob", *tls_flags, DATABASE]
         # A partial gzip is NEVER presented as a successful backup.
-        with gzip.open(temporary, "wb", compresslevel=6) as sink:
-            done = subprocess.run(args, stdout=sink, stderr=subprocess.PIPE,
-                                  timeout=1800, check=False)
-        if done.returncode != 0 or not temporary.is_file() or temporary.stat().st_size < 100:
+        exit_code, dump_error = stream_dump_to_gzip(args, temporary)
+        if exit_code != 0 or not temporary.is_file() or temporary.stat().st_size < 100:
             raise RuntimeError("STOP: backup failed BEFORE any MySQL writes: " +
-                               done.stderr.decode(errors="replace")[-500:])
+                               dump_error)
         # Verify that the entire compressed stream can be read.
         decompressed_bytes = 0
         with gzip.open(temporary, "rb") as source:
