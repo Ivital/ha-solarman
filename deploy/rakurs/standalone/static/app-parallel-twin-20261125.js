@@ -1251,6 +1251,13 @@ async function render() {
         // Preserve server-rendered readings, and do not switch the page to —.
         restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API incomplete");
+        // The independent twin archive is not dependent on the legacy single
+        // inverter SSR values. Keep existing SSR and append twin cards only
+        // when verified twin simulation endpoints respond.
+        if (!state.twinFallbackCycle || state.twinFallbackCycle !== cycle) {
+          state.twinFallbackCycle = cycle;
+          await renderTwinSummary(cycle);
+        }
         return;
       }
       primedValues = values;
@@ -1261,11 +1268,14 @@ async function render() {
       if (current(cycle)) {
         restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API failed");
+        state.twinFallbackCycle = cycle;
+        await renderTwinSummary(cycle);
       }
       return;
     }
   }
   if (!current(cycle)) return;
+  state.twinFallbackCycle = null;
   clear(main);
   switch (state.route) {
     case "overview": await renderOverview(cycle, primedValues); break;
