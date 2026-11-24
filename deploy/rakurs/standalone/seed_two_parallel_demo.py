@@ -141,9 +141,12 @@ def backup_database(password: str) -> Path:
     folder = Path(tempfile.mkdtemp(prefix="rakurs-two-deye-", dir=str(home)))
     folder.chmod(0o700)
     conf = folder / "mysql.cnf"
-    conf.write_text("[client]\nuser=" + ADMIN_USER +
-                    "\npassword=" + password.replace("\\", "\\\\").replace('"', '\\"') +
-                    "\nhost=" + HOST + "\n", encoding="utf-8")
+    if "\\n" in password or "\\r" in password:
+        raise RuntimeError("STOP: newline in MySQL password is unsupported")
+    secret = password.replace("\\\\", "\\\\\\\\").replace('"', '\\\\"')
+    conf.write_text(
+        "[client]\\nuser=" + ADMIN_USER + '\\npassword="' + secret +
+        '"\\nhost=' + HOST + "\\n", encoding="utf-8")
     conf.chmod(0o600)
     dump = folder / "rakurs-before-two-deye.sql.gz"
     try:
@@ -160,7 +163,11 @@ def backup_database(password: str) -> Path:
         conf.unlink(missing_ok=True)
     dump.chmod(0o600)
     print("MYSQL_BACKUP_PATH=" + str(dump))
-    print("MYSQL_BACKUP_SHA256=" + hashlib.sha256(dump.read_bytes()).hexdigest())
+    digest = hashlib.sha256()
+    with dump.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    print("MYSQL_BACKUP_SHA256=" + digest.hexdigest())
     return dump
 
 
