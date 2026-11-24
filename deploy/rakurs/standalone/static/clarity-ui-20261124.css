@@ -38,6 +38,7 @@ body{background:var(--bg);color:var(--ink)}
 .logout-button{border-radius:30px;padding:8px 13px;background:#1e4c43}
 .content{padding:clamp(20px,2.4vw,38px) clamp(18px,3vw,48px) 65px;
   max-width:1650px}
+.ssr-simulation-note{margin-top:16px}
 .dashboard-intro{margin-bottom:25px}.dashboard-intro h2{
   font-size:clamp(24px,2.2vw,33px);line-height:1.12;letter-spacing:-.04em;margin:8px 0}
 .dashboard-intro p{color:var(--muted);font-size:13px;margin:0}
