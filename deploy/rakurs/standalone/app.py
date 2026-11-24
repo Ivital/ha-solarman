@@ -134,9 +134,63 @@ def database_error(error):
     return jsonify({"data_source": "mysql", "error": "База Rakurs недоступна"}), 503
 
 
+# Primary Rakurs page contains server-rendered MySQL readings as well as
+# the existing JavaScript dashboard. It is never a separate demo page.
+HOME_METRICS = (
+    ("pv_power", "Генерація PV", "☀"),
+    ("load_power", "Навантаження", "⌂"),
+    ("grid_power", "Потужність мережі", "⌁"),
+    ("battery_soc", "Заряд АКБ", "▣"),
+    ("battery_power", "Потужність АКБ", "↯"),
+    ("inverter_temperature", "Температура інвертора", "♨"),
+    ("pv_energy_today", "Виробіток за добу", "◉"),
+    ("load_energy_today", "Споживання за добу", "▥"),
+)
+
+
 @app.get("/")
 def index():
-    return render_template("index.html")
+    keys = tuple(key for key, _, _ in HOME_METRICS)
+    placeholders = ",".join(["%s"] * len(keys))
+    simulated = demo_mode()
+    if simulated:
+        readings = rows(
+            "SELECT s.signal_key, s.unit, m.value_decimal, m.quality "
+            "FROM rakurs_signals AS s "
+            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+            "JOIN rakurs_devices AS d ON d.id=m.device_id "
+            "WHERE s.signal_key IN (" + placeholders + ") "
+            "AND d.device_key=%s AND m.quality='simulated' "
+            "AND m.ingest_source=%s "
+            "ORDER BY m.observed_at_utc DESC",
+            keys + (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE),
+        )
+    else:
+        readings = rows(
+            "SELECT s.signal_key, s.unit, m.value_decimal, m.quality "
+            "FROM rakurs_signals AS s "
+            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+            "WHERE s.signal_key IN (" + placeholders + ") "
+            "AND s.verified=1 AND m.quality<>'simulated' "
+            "ORDER BY m.observed_at_utc DESC",
+            keys,
+        )
+    latest = {}
+    for reading in readings:
+        latest.setdefault(reading["signal_key"], reading)
+    cards = []
+    for key, label, icon in HOME_METRICS:
+        item = latest.get(key)
+        cards.append({
+            "label": label, "icon": icon,
+            "value": _display_decimal(item["value_decimal"])
+            if item and item["value_decimal"] is not None else "—",
+            "unit": (item["unit"] or "") if item else "",
+            "quality": item["quality"] if item else None,
+        })
+    return render_template(
+        "index.html", initial_cards=cards, initial_simulated=simulated,
+    )
 
 
 # Server-rendered Deye snapshot, independent of all browser JavaScript and
