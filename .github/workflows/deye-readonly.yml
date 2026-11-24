@@ -37,6 +37,8 @@ jobs:
           bash -n deploy/rakurs/standalone/install_full_modbus_demo.sh
           bash -n deploy/rakurs/standalone/fix_demo_visibility.sh
           bash -n deploy/rakurs/standalone/repair_dashboard_assets.sh
+          bash -n deploy/rakurs/standalone/deploy_deye_server_view.sh
+          bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
           bash deploy/rakurs/standalone/fix_demo_visibility.sh --check
           python -m py_compile deploy/rakurs/standalone/simulate_deye_once.py
