@@ -25,7 +25,7 @@ done
 cmp -s "$HERE/static/app.js" "$HERE/static/app-stable-20261124.js" || {
   echo 'STOP: cached and stable JS diverged' >&2; exit 2
 }
-grep -Fq 'src="/static/app-stable-20261124.js"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-clarity-20261124.js"' "$HERE/templates/index.html"
 grep -Fq 'data-initial-mode=' "$HERE/templates/index.html"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app.js"
 grep -Fq 'client API incomplete' "$HERE/static/app.js"
@@ -35,6 +35,10 @@ if command -v node >/dev/null; then
 fi
 echo 'STABLE_DASHBOARD_PREFLIGHT=PASS'
 
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-clarity-20261124.js' "$HERE/templates/index.html"; then
+  echo 'STOP: legacy installer would overwrite Clarity UI. Use deploy_clarity_ui.sh --apply instead.' >&2
+  exit 2
+fi
 if [[ "$MODE" == "--check" ]]; then
   echo 'DRY_RUN=PASS MYSQL_WRITES=0'
   exit 0
