@@ -1640,6 +1640,94 @@ views:
             | Генератор — накопичена енергія | {{ value('generator_energy_total', 'кВт·год') }} |
             
             _Дані з'являться лише за наявності відповідного обладнання._
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Інвертор — стан і паспорт"
+          icon: mdi:chip
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Інвертор — стан і паспорт · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Стан інвертора | {{ value('inverter_status', '') }} |
+            | Тривога інвертора | {{ value('inverter_alarm', '') }} |
+            | Помилка інвертора | {{ value('inverter_fault', '') }} |
+            | Температура інвертора | {{ value('inverter_temperature', '°C') }} |
+            | Серійний номер | {{ value('inverter_serial', '') }} |
+            | Тип інвертора | {{ value('inverter_type', '') }} |
+            | Адреса Modbus | {{ value('inverter_address', '') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Інвертор — стан і паспорт · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Версія протоколу | {{ value('inverter_protocol', '') }} |
+            | Прошивка плати керування | {{ value('inverter_control_fw', '') }} |
+            | Прошивка плати зв'язку | {{ value('inverter_comm_fw', '') }} |
+            | Номінальна потужність | {{ value('inverter_power_rated', 'кВт') }} |
+            | Кількість MPPT | {{ value('inverter_mppts', '') }} |
+            | Кількість фаз | {{ value('inverter_phases', '') }} |
+            | Стан реле | {{ value('inverter_relay', '') }} |
+      - type: grid
+        column_span: 2
+        cards:
+        - type: heading
+          heading: "Вихід інвертора — повна трифазна телеметрія"
+          icon: mdi:current-ac
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Вихід інвертора — повна трифазна телеметрія · 1**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Вихід L1 — напруга | {{ value('output_l1_voltage', 'В') }} |
+            | Вихід L2 — напруга | {{ value('output_l2_voltage', 'В') }} |
+            | Вихід L3 — напруга | {{ value('output_l3_voltage', 'В') }} |
+            | Вихід L1 — струм | {{ value('output_l1_current', 'А') }} |
+            | Вихід L2 — струм | {{ value('output_l2_current', 'А') }} |
+            | Вихід L3 — струм | {{ value('output_l3_current', 'А') }} |
+            | Вихід L1 — потужність | {{ value('output_l1_power', 'кВт') }} |
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            {% macro value(id,unit='') -%}
+            {%- set raw=states('sensor.rakurs_' ~ id) -%}
+            {{ raw ~ (' ' ~ unit if unit else '') if raw not in ['unknown','unavailable','none',''] else '—' }}
+            {%- endmacro %}
+            **Вихід інвертора — повна трифазна телеметрія · 2**
+            
+            | Показник | Значення |
+            |:--|--:|
+            | Вихід L2 — потужність | {{ value('output_l2_power', 'кВт') }} |
+            | Вихід L3 — потужність | {{ value('output_l3_power', 'кВт') }} |
+            | Вихідна потужність інвертора | {{ value('output_power', 'кВт') }} |
+            | Вихідна частота | {{ value('output_frequency', 'Гц') }} |
+            | Втрати потужності | {{ value('power_losses', 'кВт') }} |
+            | Втрати за добу | {{ value('total_losses_today', 'кВт·год') }} |
+            | Загальні втрати | {{ value('total_losses', 'кВт·год') }} |
   - title: "Історія"
     path: history
     icon: mdi:chart-line

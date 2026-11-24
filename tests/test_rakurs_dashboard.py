@@ -35,15 +35,32 @@ class RakursDashboardTest(unittest.TestCase):
         self.assertGreaterEqual(len(items),300)
         self.assertEqual(len(items),len({x["entity_id"] for x in items}))
         self.assertTrue(all(x["status"] in {"planned_unverified","optional_unverified"} for x in items))
-        self.assertTrue(all(x["entity_id"] in self.dashboard for x in items if not x["key"].startswith("bms_")))
+        # Templates use string concatenation ("sensor.rakurs_" ~ key)
+        # instead of hard-coded full entity IDs; check keys exactly.
+        self.assertTrue(all("'" + x["key"] + "'" in self.dashboard for x in items))
         self.assertTrue(all(x["source_profile"] for x in items))
         self.assertTrue(self.catalog["read_only"])
 
     def test_reference_profile_names_are_exact(self):
         profile=(ROOT/"custom_components"/"solarman"/"inverter_definitions"/"deye_p3.yaml").read_text(encoding="utf-8")
         sources={x["source_profile"] for g in self.catalog["groups"].values() for x in g}
-        for name in sources:
-            self.assertIn("name: "+name,profile)
+        import re
+        # Profile names can be double/single-quoted; parse their literal values.
+        declared = {
+            m.group(1).strip().strip('"').strip("'")
+            for m in re.finditer(r'^\s*- name:\s*(.+)
+
+    def test_storage_audit_is_read_only_and_svg_preserved(self):
+        s=(R/"audit_storage.sh").read_text(encoding="utf-8")
+        for term in ("docker inspect","mode=ro","home-assistant_v2.db","systemctl is-active"):
+            self.assertIn(term,s)
+        for forbidden in ("rm -rf","docker compose down","recorder.purge","chown -R","sqlite3.connect('/config/"):
+            self.assertNotIn(forbidden,s)
+        self.assertTrue((R/"assets"/"energy-flow.svg").exists())
+        self.assertTrue((R/"dashboard-rakurs-v3.yaml").exists())
+, profile, re.MULTILINE)
+        }
+        self.assertEqual(sources - declared, set())
 
     def test_storage_audit_is_read_only_and_svg_preserved(self):
         s=(R/"audit_storage.sh").read_text(encoding="utf-8")
