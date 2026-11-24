@@ -57,7 +57,11 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertEqual(self.client.get("/").status_code, 200)
         self.assertIn("RAKURS", self.client.get("/").get_data(as_text=True))
         for path in ("/static/style.css", "/static/app.js"):
-            self.assertEqual(self.client.get(path).status_code, 200)
+            response = self.client.get(path)
+            try:
+                self.assertEqual(response.status_code, 200)
+            finally:
+                response.close()
         js = (RAKURS / "standalone/static/app.js").read_text()
         self.assertIn('"/api/v1"', js)
         self.assertNotIn("/api/states", js)

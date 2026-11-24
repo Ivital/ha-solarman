@@ -78,6 +78,9 @@ def verified_pv_sum(readings: list[dict], *, independently_measured: bool,
         return None
     if now_utc.tzinfo is None:
         raise ValueError("now_utc must include a timezone")
+    if (max_age_seconds <= 0 or max_skew_seconds < 0
+            or max_skew_seconds > max_age_seconds):
+        raise ValueError("Invalid freshness thresholds")
     timestamps = []
     values = []
     device_keys = set()
@@ -86,11 +89,14 @@ def verified_pv_sum(readings: list[dict], *, independently_measured: bool,
             return None
         if sample.get("unit") not in {"кВт", "kW"}:
             return None
-        if sample.get("quality") in {None, "", "simulated"}:
+        if sample.get("quality") != "good":
             return None
-        if sample.get("device_key") in device_keys:
+        device_key = sample.get("device_key")
+        if not isinstance(device_key, str) or not device_key.strip():
             return None
-        device_keys.add(sample.get("device_key"))
+        if device_key in device_keys:
+            return None
+        device_keys.add(device_key)
         try:
             value = Decimal(str(sample["value_decimal"]))
         except (ValueError, TypeError, ArithmeticError):
