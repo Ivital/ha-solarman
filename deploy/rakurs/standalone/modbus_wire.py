@@ -41,7 +41,8 @@ def _tcp_pdu(packet: bytes, slave: int):
 
 def verify_read(*, transport: str, slave: int, fc: int, address: int,
                 count: int, status: str, request: bytes, response: bytes | None,
-                words: list[int], bits: list[int], wire_format: str | None = None):
+                words: list[int], bits: list[int], wire_format: str | None = None,
+                exception_code: int | None = None):
     """Verify request and full successful reply against retained raw values.
 
     For errored/time-out requests, verify the request only. Exceptions with
@@ -86,8 +87,9 @@ def verify_read(*, transport: str, slave: int, fc: int, address: int,
             raise InvalidModbusFrame("Response bytes differ from recorded words/bits")
     elif status == "exception":
         if (response_pdu is None or len(response_pdu) != 2 or
-                response_pdu[0] != (fc | 0x80)):
-            raise InvalidModbusFrame("Malformed Modbus exception ADU")
+                response_pdu[0] != (fc | 0x80) or
+                exception_code is None or response_pdu[1] != exception_code):
+            raise InvalidModbusFrame("Malformed or mismatched Modbus exception ADU")
     elif response_pdu is not None:
         # Never accept a success-looking response for an error/timeout row.
         if response_pdu and response_pdu[0] == fc:
