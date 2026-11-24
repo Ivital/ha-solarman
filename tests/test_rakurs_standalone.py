@@ -89,7 +89,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertEqual(
             self.client.get("/api/v1/latest?keys=pv_power,battery_soc").get_json()["values"], {}
         )
-        self.assertEqual(len(self.data_calls), 4)
+        self.assertEqual(len(self.data_calls), 5)
         self.assertEqual(self.data_calls[-1][-1], ("battery_soc",))
 
     def test_latest_returns_only_verified_measurements(self):
@@ -99,7 +99,8 @@ class StandaloneMySqlTests(unittest.TestCase):
             "raw_value": 2500, "quality": "good",
             "observed_at_utc": datetime(2026, 11, 24, 14, 30),
         }
-        self.data_one = lambda _sql, _params: val
+        self.data_one = lambda sql, _params: ({"n": 0}
+            if "WHERE kind='inverter' AND model LIKE" in sql else val)
         res = self.client.get("/api/v1/latest?keys=pv_power")
         self.assertEqual(res.status_code, 200)
         obj = res.get_json()["values"]["pv_power"]
@@ -115,7 +116,8 @@ class StandaloneMySqlTests(unittest.TestCase):
             "quality": "simulated",
             "observed_at_utc": datetime(2026, 11, 24, 17, 0),
         }]
-        self.data_one = lambda sql, params: {"n": 815}
+        self.data_one = lambda sql, params: ({"n": 0}
+            if "WHERE kind='inverter' AND model LIKE" in sql else {"n": 815})
         response = self.client.get("/api/v1/modbus-fields?demo=1")
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
@@ -141,7 +143,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         r = self.client.get("/api/v1/history?key=pv_power&hours=24")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["points"], [])
-        self.assertEqual(len(self.data_calls), 3)
+        self.assertEqual(len(self.data_calls), 4)
         for value in ("0", "169", "abc"):
             self.assertEqual(
                 self.client.get("/api/v1/history?key=pv_power&hours="+value).status_code, 400
