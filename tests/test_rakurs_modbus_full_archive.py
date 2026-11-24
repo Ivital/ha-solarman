@@ -351,5 +351,47 @@ class BackupTlsTests(unittest.TestCase):
                                      "/nonexistent/mysql-ca-do-not-trust.pem")
 
 
+class ResumeAfterSuccessfulTwinSeedTests(unittest.TestCase):
+    """Regress private-home audit permission and duplicate writes on resume."""
+
+    def test_resume_skips_all_mysql_ddl_dml_and_owner_password(self):
+        source = (ROOT / "deploy/rakurs/standalone/"
+                  "deploy_full_modbus_archive.sh").read_text()
+        self.assertIn('MODE="${1:---check}"', source)
+        self.assertIn('"$MODE" == "--resume"', source)
+        self.assertIn('if [[ "$MODE" == "--apply" ]]; then', source)
+        self.assertIn("RESUME=SKIP_SEED_AND_BACKUP", source)
+        self.assertIn("RESUME_DB_WRITES=0", source)
+        # Under --resume the conditional backup/seed is bypassed.
+        i = source.index('if [[ "$MODE" == "--apply" ]]; then\n  echo')
+        j = source.index("else\n  # Seed already committed", i)
+        seed = source.index("seed_two_parallel_demo.py\" --execute", i)
+        self.assertLess(seed, j)
+        self.assertFalse("seed_two_parallel_demo.py\" --execute" in source[j:])
+
+    def test_private_checkout_read_via_stdin_not_by_restricted_user(self):
+        source = (ROOT / "deploy/rakurs/standalone/"
+                  "deploy_full_modbus_archive.sh").read_text()
+        self.assertIn(
+            'cat "$HERE/audit_two_inverters_mysql.py" | sudo -u rakurs env',
+            source,
+        )
+        self.assertIn('/var/lib/rakurs/.venv/bin/python -', source)
+        self.assertNotIn(
+            '/var/lib/rakurs/.venv/bin/python "$HERE/audit_two_inverters_mysql.py"',
+            source,
+        )
+        self.assertNotIn("chmod 755 /home/ivital", source)
+        self.assertLess(
+            source.index("TWIN_DATABASE_AUDIT_BEFORE_DEPLOY=PASS"),
+            source.index('bash "$HERE/deploy_parallel_ui.sh" --apply'),
+        )
+
+    def test_shell_script_parses(self):
+        import subprocess
+        script = ROOT / "deploy/rakurs/standalone/deploy_full_modbus_archive.sh"
+        subprocess.run(["bash", "-n", str(script)], check=True)
+
+
 if __name__ == "__main__":
     unittest.main()
