@@ -341,7 +341,11 @@ class AuthenticationTests(unittest.TestCase):
         html = (RAKURS / "standalone/templates/index.html").read_text()
         js = (RAKURS / "standalone/static/app.js").read_text()
         script = (RAKURS / "standalone/repair_dashboard_assets.sh").read_text()
-        self.assertIn('/static/app.js?v=rakurs-history-72h-v1', html)
+        self.assertIn('/static/app-stable-20261124.js', html)
+        self.assertIn('data-initial-mode=', html)
+        stable = (RAKURS / "standalone/static/app-stable-20261124.js").read_text()
+        self.assertEqual(stable, js)
+        self.assertIn('restoreServerReadings()', stable)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
         self.assertIn("let DEMO_MODE = new URLSearchParams(", js)
         self.assertIn("sha256sum", script)
@@ -354,7 +358,9 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_primary_dashboard_displays_existing_samples_without_demo_url(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('DEMO_MODE = Boolean(state.status && state.status.mode === "simulation")', js)
+        self.assertIn('DEMO_MODE = state.status ? state.status.mode === "simulation"', js)
+        self.assertIn('restoreServerReadings();', js)
+        self.assertIn('critical.every(key => values[key]', js)
         self.assertIn('const FORCE_REAL_MODE =', js)
         self.assertIn('const selection = FORCE_REAL_MODE ? "real=1"', js)
         self.assertNotIn('window.location.replace(', js)
