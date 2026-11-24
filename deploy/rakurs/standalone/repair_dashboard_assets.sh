@@ -15,7 +15,7 @@ cd "$ROOT"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 ASSET_PATH='/static/app.js?v=rakurs-primary-mysql-20261124-v2'
-SCRIPT_MARKER='const DEMO_MODE = new URLSearchParams(window.location.search)'
+SCRIPT_MARKER='let DEMO_MODE = new URLSearchParams(window.location.search)'
 MODBUS_MARKER='["modbus", "Modbus", "▤"]'
 CHECK_JS="$HERE/static/app.js"
 CHECK_HTML="$HERE/templates/index.html"
