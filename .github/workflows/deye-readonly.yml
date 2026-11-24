@@ -38,6 +38,8 @@ jobs:
           bash -n deploy/rakurs/standalone/fix_demo_visibility.sh
           bash -n deploy/rakurs/standalone/repair_dashboard_assets.sh
           bash -n deploy/rakurs/standalone/deploy_deye_server_view.sh
+          bash -n deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh
+          bash deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh --check
           bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
           bash deploy/rakurs/standalone/fix_demo_visibility.sh --check
