@@ -40,7 +40,13 @@ def server_blocks(config_dump):
             return re.findall(pattern, content, flags=re.MULTILINE)
         listens = get(r"^[ \t]*listen[ \t]+([^;\r\n]+);")
         names = get(r"^[ \t]*server_name[ \t]+([^;\r\n]+);")
-        proxies = get(r"^[ \t]*proxy_pass[ \t]+([^;\r\n]+);")
+        proxy_values = get(r"^[ \t]*proxy_pass[ \t]+([^;\r\n]+);")
+        # Never print credentials or private upstream URLs from unrelated sites.
+        proxies = [
+            "HA_LOCAL_8123" if p == "http://127.0.0.1:8123" else
+            "RAKURS_LOCAL_8765" if p == "http://127.0.0.1:8765" else
+            "OTHER_REDACTED" for p in proxy_values
+        ]
         returns = get(r"^[ \t]*return[ \t]+([0-9]{3})\b")
         marker = "RAKURS_MAINTENANCE_UPGRADING" in content
         if not any(re.search(r"(?<!\d)443(?!\d)", x) for x in listens):

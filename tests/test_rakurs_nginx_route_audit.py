@@ -29,7 +29,7 @@ server {
         blocks = audit.server_blocks(data)
         self.assertEqual(len(blocks), 2)
         self.assertEqual(blocks[0]["listen"], ["127.0.0.1:443 ssl"])
-        self.assertEqual(blocks[0]["proxy_pass"], ["http://127.0.0.1:8123"])
+        self.assertEqual(blocks[0]["proxy_pass"], ["HA_LOCAL_8123"])
         self.assertEqual(blocks[1]["server_name"], ["rakurs.zakryttya.org.ua"])
         self.assertTrue(blocks[1]["maintenance_marker"])
         self.assertNotIn("SUPER_PRIVATE_KEY_PATH", str(blocks))
