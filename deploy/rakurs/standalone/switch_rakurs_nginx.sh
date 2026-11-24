@@ -57,11 +57,38 @@ sudo nginx -t
 sudo systemctl reload nginx
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
-CODE="$(curl --noproxy '*' --silent --show-error --max-time 12 --resolve "$SITE:443:127.0.0.1" \
-  --output "$TMP" --write-out '%{http_code}' "https://$SITE/login")"
-[[ "$CODE" == 200 ]] && grep -Fq 'Вхід — RAKURS' "$TMP" || {
-  echo "STOP: HTTPS login check failed (HTTP=$CODE)" >&2; false
-}
+# A graceful Nginx reload may briefly leave old workers handling fresh
+# connections. The old Home Assistant does not serve the Rakurs /login page.
+# Verify an unmistakable standalone page AND protected API, never status alone.
+CODE=000
+MATCH=NO
+for attempt in $(seq 1 20); do
+  : > "$TMP"
+  CODE="$(curl --noproxy '*' --silent --max-time 8 \
+    --resolve "$SITE:443:127.0.0.1" --output "$TMP" \
+    --write-out '%{http_code}' "https://$SITE/login")" || CODE=000
+  MATCH=NO
+  if [[ "$CODE" == 200 ]] && grep -Fq 'Вхід — RAKURS' "$TMP"; then
+    MATCH=YES
+    break
+  fi
+  echo "HTTPS_SWITCH_ATTEMPT=$attempt HTTP=$CODE STANDALONE_PAGE=$MATCH"
+  sleep 1
+done
+if [[ "$CODE" != 200 || "$MATCH" != YES ]]; then
+  echo "STOP: Rakurs standalone HTTPS login not confirmed (HTTP=$CODE, marker=$MATCH)" >&2
+  false
+fi
+echo "RAKURS_HTTPS_LOGIN=PASS"
+API="$(curl --noproxy '*' --silent --max-time 8 \
+  --resolve "$SITE:443:127.0.0.1" \
+  --output /dev/null --write-out '%{http_code}' \
+  "https://$SITE/api/v1/status")" || API=000
+if [[ "$API" != 401 ]]; then
+  echo "STOP: new HTTPS anonymous API must deny access (HTTP=$API)" >&2
+  false
+fi
+echo "RAKURS_HTTPS_UNAUTHORIZED_API=401"
 trap - ERR
 echo "RAKURS_HTTPS_STANDALONE=PASS; PRIOR_PROXY_BACKUP=$BACKUP_DIR"
 echo 'Do not delete the old HA container until independent login and API tests pass.'
