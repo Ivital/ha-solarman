@@ -19,6 +19,11 @@ const views = [
 const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0 };
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
+// Root HTML contains authoritative MySQL readings. Never erase those readings
+// until the browser has fetched the same readings successfully.
+const SSR_MODE = main ? main.dataset.initialMode : "";
+const SSR_PRESENT = Boolean(main && main.querySelector(
+  '.cards[aria-label="Показники Deye з бази даних"]'));
 
 function element(tag, className, content) {
   const item = document.createElement(tag);
@@ -148,7 +153,7 @@ function panel(title, description) {
   return p;
 }
 function current(cycle) { return cycle === state.cycle; }
-async function renderOverview(cycle) {
+async function renderOverview(cycle, primedValues = null) {
   addStatusMessage();
   const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
     "battery_power", "inverter_temperature", "pv_energy_today", "load_energy_today"];
@@ -161,11 +166,10 @@ async function renderOverview(cycle) {
                                                     "Фактичні показники MySQL");
   const deck = element("div", "cards");
   main.appendChild(deck);
-  let values = {};
-  if (state.status && (DEMO_MODE ? state.status.simulated_signals > 0 :
-                                       state.status.verified_signals > 0)) {
+  let values = primedValues || {};
+  if (!primedValues) {
     try {
-      values = (await api("/latest?keys=" + encodeURIComponent(keys.join(",")))).values;
+      values = (await api("/latest?keys=" + encodeURIComponent(keys.join(",")))).values || {};
     } catch (_error) {
       if (current(cycle)) message("Показники недоступні", "Не вдалося прочитати останні вимірювання з MySQL.", true);
     }
@@ -485,9 +489,35 @@ async function render() {
   state.route = activeRoute();
   buildNav();
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
+  let primedValues = null;
+  if (state.route === "overview" && SSR_PRESENT &&
+      main.querySelector('.cards[aria-label="Показники Deye з бази даних"]')) {
+    // This is the key guard: a failed/stale client API must not replace the
+    // successful server-rendered database values with placeholders.
+    const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
+      "battery_power", "inverter_temperature", "pv_energy_today", "load_energy_today"];
+    try {
+      const latest = await api("/latest?keys=" + encodeURIComponent(keys.join(",")));
+      if (!current(cycle)) return;
+      const values = latest.values || {};
+      const critical = ["pv_power", "load_power", "battery_soc"];
+      if (!critical.every(key => values[key] && values[key].value_decimal !== null)) {
+        // Preserve server-rendered readings, and do not switch the page to —.
+        console.warn("Rakurs: keeping original MySQL readings; client API incomplete");
+        return;
+      }
+      primedValues = values;
+    } catch (_error) {
+      if (current(cycle)) {
+        console.warn("Rakurs: keeping original MySQL readings; client API failed");
+      }
+      return;
+    }
+  }
+  if (!current(cycle)) return;
   clear(main);
   switch (state.route) {
-    case "overview": await renderOverview(cycle); break;
+    case "overview": await renderOverview(cycle, primedValues); break;
     case "pv": await renderGroup(["pv"], "Сонячна генерація", cycle); break;
     case "battery": await renderGroup(
       ["battery", "bms"].concat(Array.from({length: 20}, (_, i) => "bms_module_" + (i + 1))),
@@ -513,7 +543,8 @@ async function boot() {
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
   state.verified = results[2].status === "fulfilled" ? results[2].value.signals : [];
   // The API is the source of truth: never label synthetic values as verified.
-  DEMO_MODE = Boolean(state.status && state.status.mode === "simulation");
+  DEMO_MODE = state.status ? state.status.mode === "simulation" :
+    (SSR_MODE === "simulation" && !FORCE_REAL_MODE);
 
   const switcher = element("a", "tag",
       FORCE_REAL_MODE ? "Показати наявні дані" :
