@@ -158,6 +158,33 @@ print("SIMULATED_DEVICE_NOT_TREATED_AS_REAL=PASS")
 events = c.get("/api/v1/events", base_url="https://localhost")
 assert events.status_code == 200
 print("EXISTING_EVENTS=PASS")
+demo_response = c.get("/api/v1/parallel/simulation", base_url="https://localhost")
+assert demo_response.status_code == 200, demo_response.status_code
+demo = demo_response.get_json()
+assert demo["simulation"] is True
+assert demo["storage_ready"] is True, "Two-inverter MySQL archive schema missing"
+assert len(demo["devices"]) == 2, "Both simulated inverter records must exist"
+for device in demo["devices"]:
+    key = device["device_key"]
+    assert (device["raw_registers"],device["decoded_fields"],device["ui_fields"]) == (
+        815, 624, 316), "Missing complete twin archive: " + key
+    latest = c.get("/api/v1/parallel/simulation/latest?device=" + key,
+                   base_url="https://localhost")
+    assert latest.status_code == 200 and latest.get_json()["simulation"] is True
+    values = latest.get_json()["values"]
+    assert "pv_power" in values and values["pv_power"]["quality"] == "simulated"
+    decoded = c.get("/api/v1/parallel/simulation/fields?device=" + key +
+                    "&limit=80", base_url="https://localhost")
+    assert decoded.status_code == 200
+    assert decoded.get_json()["total"] == 624
+    assert decoded.get_json()["simulation"] is True
+    raw = c.get("/api/v1/parallel/simulation/raw?device=" + key + "&limit=200",
+                base_url="https://localhost")
+    assert raw.status_code == 200
+    assert raw.get_json()["total"] == 815
+    assert raw.get_json()["simulation"] is True
+print("TWO_SIMULATED_INVERTERS_VISIBLE_API=PASS")
+print("MYSQL_READ_ONLY=PASS")
 PY
 
 echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
