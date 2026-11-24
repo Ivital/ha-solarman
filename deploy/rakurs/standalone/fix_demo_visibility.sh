@@ -19,7 +19,7 @@ python3 -m py_compile "$HERE/auth.py"
 if command -v node >/dev/null; then
   node --check "$HERE/static/app.js"
 fi
-grep -Fq 'window.location.replace(target.pathname + target.search + target.hash)' \
+grep -Fq 'DEMO_MODE = Boolean(state.status && state.status.mode === "simulation")' \
   "$HERE/static/app.js"
 grep -Fq 'name="demo" value="1"' "$HERE/templates/login.html"
 echo 'RAKURS_DEMO_DISPLAY_SOURCES=PASS'
@@ -98,7 +98,7 @@ JS_TMP="$(mktemp)"
 trap 'rm -f "$JS_TMP"' EXIT
 curl --noproxy '*' -fsS --max-time 8 \
   -o "$JS_TMP" http://127.0.0.1:8765/static/app.js
-grep -Fq 'window.location.replace(target.pathname + target.search + target.hash)' "$JS_TMP"
+grep -Fq 'DEMO_MODE = Boolean(state.status && state.status.mode === "simulation")' "$JS_TMP"
 echo 'DEMO_REDIRECT_AND_JS=PASS'
 
 echo '=== VERIFY REAL MYSQL DATASET WITHOUT ALTERATION ==='
