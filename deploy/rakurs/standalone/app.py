@@ -170,7 +170,11 @@ def index():
     keys = tuple(key for key, _, _ in HOME_METRICS)
     placeholders = ",".join(["%s"] * len(keys))
     simulated = demo_mode()
-    if simulated:
+    blocked = not simulated and parallel_aggregate_requires_device_selection()
+    if blocked:
+        # No unapproved aggregate is exposed; do not scan the history table.
+        readings = []
+    elif simulated:
         readings = rows(
             "SELECT s.signal_key, s.unit, m.value_decimal, m.quality "
             "FROM rakurs_signals AS s "
@@ -179,7 +183,7 @@ def index():
             "WHERE s.signal_key IN (" + placeholders + ") "
             "AND d.device_key=%s AND m.quality='simulated' "
             "AND m.ingest_source=%s "
-            "ORDER BY m.observed_at_utc DESC",
+            "ORDER BY m.observed_at_utc DESC LIMIT 16",
             keys + (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE),
         )
     else:
@@ -189,13 +193,12 @@ def index():
             "JOIN rakurs_samples AS m ON m.signal_id=s.id "
             "WHERE s.signal_key IN (" + placeholders + ") "
             "AND s.verified=1 AND m.quality<>'simulated' "
-            "ORDER BY m.observed_at_utc DESC",
+            "AND m.observed_at_utc=("
+            "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
+            "WHERE mx.signal_id=m.signal_id AND mx.quality<>'simulated') "
+            "ORDER BY m.observed_at_utc DESC LIMIT 16",
             keys,
         )
-    if not simulated and parallel_aggregate_requires_device_selection():
-        # There is no verified group CT/BMS aggregation yet. Hide potentially
-        # misleading values instead of showing one inverter as both.
-        readings = []
     latest = {}
     for reading in readings:
         latest.setdefault(reading["signal_key"], reading)
@@ -553,11 +556,17 @@ def batches():
 # addresses, and do not sum values across devices until provenance is verified.
 def parallel_registered_devices():
     return rows(
-        "SELECT d.id, d.device_key, d.kind, d.model, d.serial_number "
+        "SELECT d.id,d.device_key,d.kind,d.model,d.serial_number,"
+        "pm.slot_no,pm.parallel_role,pm.modbus_address,"
+        "pm.member_verified,pm.transport_verified "
         "FROM rakurs_devices AS d "
+        "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
+        "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
         "WHERE d.device_key<>%s AND d.kind='inverter' AND d.model LIKE %s "
-        "ORDER BY d.device_key LIMIT 20",
-        (DEMO_DEVICE_KEY, "%" + PARALLEL_MODEL + "%"),
+        "AND pm.member_kind='physical' AND pg.group_key=%s "
+        "ORDER BY pm.slot_no LIMIT 20",
+        (DEMO_DEVICE_KEY, "%" + PARALLEL_MODEL + "%",
+         "deye_sun20k_parallel_shared_battery"),
     )
 
 
@@ -763,12 +772,30 @@ def parallel_device_latest():
         "JOIN rakurs_devices AS d ON d.id=m.device_id "
         "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
         "AND s.verified=1 AND m.quality<>'simulated' "
-        "ORDER BY m.observed_at_utc DESC LIMIT 2000",
+        "AND m.observed_at_utc=("
+        "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
+        "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id "
+        "AND mx.quality<>'simulated') "
+        "ORDER BY s.signal_key LIMIT 32",
         (selected["id"],) + PARALLEL_SIGNAL_KEYS,
     )
     latest = {}
     for sample in samples:
         latest.setdefault(sample["signal_key"], sample)
+    now_utc = datetime.now(timezone.utc).replace(tzinfo=None)
+    for sample in latest.values():
+        stamp = sample.get("observed_at_utc")
+        if isinstance(stamp, datetime):
+            age = (now_utc - stamp).total_seconds()
+            sample["age_seconds"] = max(0, int(age))
+            sample["freshness_state"] = (
+                "invalid_time" if age < -60 else
+                "online" if age <= 120 else
+                "warning" if age <= 600 else "offline"
+            )
+        else:
+            sample["age_seconds"] = None
+            sample["freshness_state"] = "unknown"
     return jsonify({
         "data_source": "mysql", "simulation": False,
         "device_key": selected["device_key"],
