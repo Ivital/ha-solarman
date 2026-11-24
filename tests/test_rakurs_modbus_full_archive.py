@@ -8,6 +8,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "deploy" / "rakurs" / "standalone"))
 from modbus_archive import PayloadError, normalize, persist
 from seed_two_parallel_demo import check_source, build_payload, DEVICE_KEYS
+from modbus_wire import crc16
+
+
+def rtu(hex_data):
+    raw = bytes.fromhex(hex_data)
+    return (raw + crc16(raw).to_bytes(2, "little")).hex()
+
 
 
 class ProtocolValidationTests(unittest.TestCase):
@@ -21,10 +28,10 @@ class ProtocolValidationTests(unittest.TestCase):
             "frames": [
                 {"function_code": 3, "start_address": 65000, "requested_count": 2,
                  "words": [0, 65535], "status": "ok",
-                 "request_hex": "0103fde80002", "response_hex": "0103040000ffff"},
+                 "request_hex": rtu("0103fde80002"), "response_hex": rtu("0103040000ffff")},
                 {"function_code": 2, "start_address": 100, "requested_count": 3,
                  "bits": [1, 0, 1], "status": "ok",
-                 "request_hex": "010200640003", "response_hex": "01020105"},
+                 "request_hex": rtu("010200640003"), "response_hex": rtu("01020105")},
             ],
         }
 
@@ -33,7 +40,7 @@ class ProtocolValidationTests(unittest.TestCase):
         self.assertEqual(parsed["frames"][0]["start_address"], 65000)
         self.assertEqual(parsed["frames"][0]["words"], [0, 65535])
         self.assertEqual(parsed["frames"][1]["bits"], [1, 0, 1])
-        self.assertEqual(parsed["frames"][0]["response_bytes"], bytes.fromhex("0103040000ffff"))
+        self.assertEqual(parsed["frames"][0]["response_bytes"], bytes.fromhex(rtu("0103040000ffff")))
 
     def test_modbus_writes_are_not_accepted(self):
         for fc in [5, 6, 15, 16]:
@@ -60,7 +67,7 @@ class ProtocolValidationTests(unittest.TestCase):
         p["frames"] = [
             {"function_code": 3, "start_address": 33, "requested_count": 30,
              "status": "timeout", "words": [], "error_code": "READ_TIMEOUT",
-             "request_hex": "01030021001e"},
+             "request_hex": rtu("01030021001e")},
         ]
         self.assertEqual(normalize(p)["frames"][0]["status"], "timeout")
         p["frames"][0]["words"] = [10] * 30
@@ -170,8 +177,8 @@ class ArchiveTransactionTests(unittest.TestCase):
             "observed_at_utc": "2026-11-24T21:00:00Z",
             "frames": [{"function_code": 3, "start_address": 800,
                         "requested_count": 1, "words": [190],
-                        "request_hex": "010303200001",
-                        "response_hex": "01030200be"}],
+                        "request_hex": rtu("010303200001"),
+                        "response_hex": rtu("01030200be")}],
         }
         with self.assertRaises(PayloadError):
             persist(db, template)
