@@ -166,7 +166,7 @@ function metricCard(label, icon, key, values, tone = "neutral", subtitle = "") {
   const card = element("article", "card kpi kpi-" + tone);
   const head = element("div", "kpi-head");
   add(head, element("span", "kpi-icon", icon), element("span", "kpi-state",
-    value === null ? "Немає даних" : DEMO_MODE ? "Тестові дані" : "З MySQL"));
+    value === null ? "Немає даних" : "Є запис"));
   card.appendChild(head);
   card.appendChild(element("h3", "", label));
   const numberRow = element("div", "kpi-reading");
@@ -174,15 +174,10 @@ function metricCard(label, icon, key, values, tone = "neutral", subtitle = "") {
     element("span", "unit", value !== null ? (data.unit || "") : ""));
   card.appendChild(numberRow);
   if (key === "battery_soc" && value !== null) {
-    const meter = element("div", "soc-meter");
-    meter.setAttribute("role", "meter");
+    const meter = element("progress", "soc-meter");
     meter.setAttribute("aria-label", "Рівень заряду акумулятора");
-    meter.setAttribute("aria-valuemin", "0");
-    meter.setAttribute("aria-valuemax", "100");
-    meter.setAttribute("aria-valuenow", String(value));
-    const fill = element("div", "soc-fill");
-    fill.style.width = Math.min(100, Math.max(0, value)) + "%";
-    meter.appendChild(fill);
+    meter.max = 100;
+    meter.value = Math.min(100, Math.max(0, value));
     card.appendChild(meter);
   }
   const description = key === "grid_power" && value !== null ?
@@ -289,7 +284,7 @@ async function renderOverview(cycle, primedValues = null) {
     element("h2", "", "Енергія під контролем"),
     element("p", "", "Основні показники, напрямки потоків та зміни за часом — на одному екрані."));
   main.appendChild(intro);
-  section("Зараз", "Останні збережені показники · час Київ");
+  section("Збережений зріз", "Останні показники з MySQL · час Київ");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
   deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
