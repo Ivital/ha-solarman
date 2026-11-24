@@ -264,4 +264,4 @@ def batches():
 
 # Register MySQL-backed authorization only after all read-only routes exist.
 from .auth import init_auth
-init_auth(app, one, conn)
+init_auth(app, lambda sql, params=(): one(sql, params), lambda: conn())

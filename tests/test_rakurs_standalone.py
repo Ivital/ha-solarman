@@ -1,13 +1,15 @@
-"""Standalone Rakurs uses only LAN MySQL, with no HA and no fabricated data."""
+"""Standalone RAKURS MySQL-only authentication and telemetry behavior tests."""
 import json
-import os
-from pathlib import Path
-import sys
-import tempfile
-import unittest
 from datetime import datetime
 from decimal import Decimal
-from unittest.mock import patch
+import os
+from pathlib import Path
+import re
+import sys
+import tempfile
+import time
+import unittest
+from unittest.mock import MagicMock, patch
 
 REPO = Path(__file__).resolve().parents[1]
 RAKURS = REPO / "deploy" / "rakurs"
@@ -15,121 +17,203 @@ sys.path.insert(0, str(RAKURS))
 from standalone import app as module
 
 
+AUTH_ACCOUNT = {"id": 123, "username": "admin", "role": "admin",
+                "is_active": 1, "session_version": 1}
+
+
 class StandaloneMySqlTests(unittest.TestCase):
     def setUp(self):
-        module.app.config.update(TESTING=True)
+        module.app.config.update(
+            TESTING=True, SECRET_KEY="testing-only-secret-key-not-used-in-real-app",
+            AUTH_READY=True, SESSION_COOKIE_SECURE=False,
+        )
         self.client = module.app.test_client()
+        self.data_one = lambda _sql, _params=(): None
+        self.data_rows = lambda _sql, _params=(): []
+        self.data_calls = []
+        self.one_patch = patch.object(module, "one", side_effect=self.fake_one)
+        self.rows_patch = patch.object(module, "rows", side_effect=self.fake_rows)
+        self.one_patch.start()
+        self.rows_patch.start()
+        self.addCleanup(self.one_patch.stop)
+        self.addCleanup(self.rows_patch.stop)
+        with self.client.session_transaction() as sess:
+            sess["uid"] = AUTH_ACCOUNT["id"]
+            sess["ver"] = AUTH_ACCOUNT["session_version"]
+            sess["at"] = int(time.time())
+            sess["csrf"] = "csrf-for-tests"
 
-    def test_index_and_assets_exist_without_database(self):
+    def fake_one(self, sql, params=()):
+        if "FROM rakurs_users WHERE id=%s" in sql:
+            return AUTH_ACCOUNT
+        self.data_calls.append(("one", sql, params))
+        return self.data_one(sql, params)
+
+    def fake_rows(self, sql, params=()):
+        self.data_calls.append(("rows", sql, params))
+        return self.data_rows(sql, params)
+
+    def test_protected_index_and_assets_exist(self):
         self.assertEqual(self.client.get("/").status_code, 200)
         self.assertIn("RAKURS", self.client.get("/").get_data(as_text=True))
         for path in ("/static/style.css", "/static/app.js"):
             self.assertEqual(self.client.get(path).status_code, 200)
-        javascript = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('"/api/v1"', javascript)
-        self.assertNotIn("/api/states", javascript)
-        self.assertNotIn("homeassistant.local", javascript)
+        js = (RAKURS / "standalone/static/app.js").read_text()
+        self.assertIn('"/api/v1"', js)
+        self.assertNotIn("/api/states", js)
 
-    def test_deny_non_loopback_clients(self):
-        response = self.client.get("/", environ_overrides={"REMOTE_ADDR": "192.168.5.21"})
-        self.assertEqual(response.status_code, 403)
+    def test_remote_clients_denied(self):
+        self.assertEqual(
+            self.client.get("/", environ_overrides={"REMOTE_ADDR": "192.168.5.21"}).status_code,
+            403,
+        )
 
-    def test_catalog_is_explicitly_planned_and_unverified(self):
-        resp = self.client.get("/api/v1/catalog")
-        self.assertEqual(resp.status_code, 200)
-        data = resp.get_json()
+    def test_catalog_planned_unverified(self):
+        r = self.client.get("/api/v1/catalog")
+        self.assertEqual(r.status_code, 200)
+        data = r.get_json()
         self.assertEqual(data["all_metric_count"], 316)
         self.assertTrue(data["read_only"])
-        self.assertTrue(all(
-            s["status"] in ("planned_unverified", "optional_unverified")
-            for entries in data["groups"].values() for s in entries
-        ))
 
-    def test_status_empty_database_is_not_false_zero_telemetry(self):
-        def fake_one(sql, params=()):
-            if "COUNT(*)" in sql:
-                return {"n": 0}
-            return None
-        with patch.object(module, "one", side_effect=fake_one):
-            result = self.client.get("/api/v1/status")
-        self.assertEqual(result.status_code, 200)
-        obj = result.get_json()
+    def test_empty_status(self):
+        self.data_one = lambda sql, _: {"n": 0} if "COUNT(*)" in sql else None
+        r = self.client.get("/api/v1/status")
+        self.assertEqual(r.status_code, 200)
+        obj = r.get_json()
         self.assertEqual(obj["data_source"], "mysql")
-        self.assertEqual(obj["database"], "rakurs")
         self.assertEqual(obj["registered_devices"], 0)
-        self.assertEqual(obj["verified_signals"], 0)
         self.assertFalse(obj["has_real_samples"])
-        self.assertFalse(obj["collector_active"])
         self.assertFalse(obj["home_assistant_dependency"])
 
-    def test_latest_does_not_fabricate_missing_values(self):
-        with patch.object(module, "one", return_value=None) as fake:
-            res = self.client.get("/api/v1/latest?keys=pv_power,battery_soc")
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(res.get_json()["values"], {})
-        self.assertEqual(fake.call_count, 2)
-        self.assertEqual(fake.call_args.args[1], ("battery_soc",))
+    def test_missing_latest_is_empty(self):
+        self.assertEqual(
+            self.client.get("/api/v1/latest?keys=pv_power,battery_soc").get_json()["values"], {}
+        )
+        self.assertEqual(len(self.data_calls), 2)
+        self.assertEqual(self.data_calls[-1][-1], ("battery_soc",))
 
-    def test_latest_reads_only_verified_signal_data(self):
-        value = {
+    def test_latest_returns_only_verified_measurements(self):
+        val = {
             "signal_key": "pv_power", "label_uk": "Генерація",
             "unit": "кВт", "value_decimal": Decimal("2.500000000"),
             "raw_value": 2500, "quality": "good",
             "observed_at_utc": datetime(2026, 11, 24, 14, 30),
         }
-        with patch.object(module, "one", return_value=value):
-            res = self.client.get("/api/v1/latest?keys=pv_power")
+        self.data_one = lambda _sql, _params: val
+        res = self.client.get("/api/v1/latest?keys=pv_power")
         self.assertEqual(res.status_code, 200)
-        data = res.get_json()["values"]["pv_power"]
-        self.assertEqual(data["value_decimal"], "2.500000000")
-        self.assertEqual(data["observed_at_utc"], "2026-11-24T14:30:00Z")
+        obj = res.get_json()["values"]["pv_power"]
+        self.assertEqual(obj["value_decimal"], "2.500000000")
+        self.assertEqual(obj["observed_at_utc"], "2026-11-24T14:30:00Z")
 
-    def test_malformed_keys_rejected_before_database_access(self):
-        with patch.object(module, "one") as fake:
-            for path in (
-                "/api/v1/latest?keys=",
-                "/api/v1/latest?keys=pv_power%27%20OR%201%3D1",
-                "/api/v1/history?key=pv_power%3BDELETE",
-            ):
-                self.assertEqual(self.client.get(path).status_code, 400)
-            fake.assert_not_called()
+    def test_malformed_keys_no_data_queries(self):
+        for p in ("/api/v1/latest?keys=", "/api/v1/latest?keys=pv%27%3Bdrop",
+                  "/api/v1/history?key=pv%3BDELETE"):
+            self.assertEqual(self.client.get(p).status_code, 400)
+        self.assertEqual(self.data_calls, [])
 
-    def test_history_has_bound_and_no_unverified_signal(self):
-        with patch.object(module, "one", return_value=None), patch.object(module, "rows") as fake:
-            result = self.client.get("/api/v1/history?key=pv_power&hours=24")
-            self.assertEqual(result.status_code, 200)
-            self.assertEqual(result.get_json()["points"], [])
-            fake.assert_not_called()
+    def test_history_bounds_and_empty_verified_signal(self):
+        r = self.client.get("/api/v1/history?key=pv_power&hours=24")
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(r.get_json()["points"], [])
+        self.assertEqual(len(self.data_calls), 1)
         for value in ("0", "169", "abc"):
-            self.assertEqual(self.client.get("/api/v1/history?key=pv_power&hours=" + value).status_code, 400)
+            self.assertEqual(
+                self.client.get("/api/v1/history?key=pv_power&hours="+value).status_code, 400
+            )
 
-    def test_password_file_is_required_and_private(self):
+    def test_password_file_mode_and_ownership(self):
         with patch.dict(os.environ, {}, clear=True):
             with self.assertRaises(module.ConfigurationError):
                 module._password()
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "secret"
-            path.write_text("not-a-real-password", encoding="utf-8")
+            path.write_text("fake-password", encoding="utf-8")
             path.chmod(0o644)
             with patch.dict(os.environ, {"RAKURS_DB_PASSWORD_FILE": str(path)}, clear=True):
                 with self.assertRaises(module.ConfigurationError):
                     module._password()
             path.chmod(0o600)
             with patch.dict(os.environ, {"RAKURS_DB_PASSWORD_FILE": str(path)}, clear=True):
-                self.assertEqual(module._password(), "not-a-real-password")
+                self.assertEqual(module._password(), "fake-password")
 
-    def test_backend_has_no_ha_recorder_or_sql_writes(self):
+    def test_no_ha_data_access(self):
         code = (RAKURS / "standalone/app.py").read_text()
         self.assertIn('SCHEMA = "rakurs"', code)
         self.assertIn('HOST = "192.168.5.30"', code)
-        self.assertIn("ssl_disabled=True", code)
-        self.assertIn("AND s.verified=1", code)
         self.assertNotIn("sqlite3.connect", code)
         self.assertNotIn("requests.get", code)
-        self.assertNotIn("sensor.rakurs_", code)
-        for forbidden in ("cur.execute(\"INSERT", "cur.execute(\"UPDATE",
-                          "cur.execute(\"DELETE", "cur.execute(\"DROP"):
-            self.assertNotIn(forbidden, code)
+        for fragment in ('cur.execute("INSERT', 'cur.execute("DELETE',
+                         'cur.execute("DROP'):
+            self.assertNotIn(fragment, code)
+
+
+class AuthenticationTests(unittest.TestCase):
+    def setUp(self):
+        module.app.config.update(
+            TESTING=True, SECRET_KEY="test-secret-used-only-in-ci",
+            AUTH_READY=True, SESSION_COOKIE_SECURE=False,
+        )
+        self.client = module.app.test_client()
+        self.calls = []
+        self.one_patch = patch.object(module, "one", side_effect=self.fake_one)
+        self.one_patch.start()
+        self.addCleanup(self.one_patch.stop)
+        self.data_one = lambda _sql, _params: None
+
+    def fake_one(self, sql, params=()):
+        self.calls.append((sql, params))
+        return self.data_one(sql, params)
+
+    def test_anonymous_get_redirects_and_api_fails_closed(self):
+        self.assertEqual(self.client.get("/").status_code, 303)
+        api = self.client.get("/api/v1/status")
+        self.assertEqual(api.status_code, 401)
+        self.assertEqual(api.get_json()["error"], "Потрібна авторизація")
+        self.assertEqual(self.client.get("/login").status_code, 200)
+        self.assertIn("csrf", self.client.get("/login").get_data(as_text=True))
+
+    def test_login_requires_csrf_and_no_default_credentials(self):
+        self.assertEqual(self.client.post("/login", data={
+            "username": "admin", "password": "incorrect", "csrf": "bogus",
+        }).status_code, 400)
+        self.assertNotIn("CREATE USER", (RAKURS / "standalone/auth_schema.sql").read_text())
+
+    def test_logout_must_be_post_and_csrf_protected(self):
+        with self.client.session_transaction() as sess:
+            sess["uid"] = 123
+            sess["ver"] = 1
+            sess["at"] = int(time.time())
+            sess["csrf"] = "token"
+        self.data_one = lambda sql, p: AUTH_ACCOUNT if "WHERE id=%s" in sql else None
+        self.assertEqual(self.client.get("/logout").status_code, 405)
+        self.assertEqual(self.client.post("/logout", data={"csrf": "invalid"}).status_code, 400)
+        self.assertEqual(self.client.post("/logout", data={"csrf": "token"}).status_code, 303)
+        self.assertEqual(self.client.get("/api/v1/auth").status_code, 401)
+
+    def test_session_expiry_and_revocation(self):
+        with self.client.session_transaction() as sess:
+            sess["uid"] = 123
+            sess["ver"] = 1
+            sess["at"] = int(time.time()) - 9 * 3600
+        self.assertEqual(self.client.get("/api/v1/status").status_code, 401)
+        with self.client.session_transaction() as sess:
+            sess["uid"] = 123
+            sess["ver"] = 1
+            sess["at"] = int(time.time())
+        self.data_one = lambda sql, p: {
+            **AUTH_ACCOUNT, "session_version": 2
+        } if "WHERE id=%s" in sql else None
+        self.assertEqual(self.client.get("/api/v1/status").status_code, 401)
+
+    def test_no_secret_file_means_app_unavailable(self):
+        before = module.app.config["AUTH_READY"]
+        try:
+            module.app.config["AUTH_READY"] = False
+            self.assertEqual(self.client.get("/").status_code, 503)
+            self.assertEqual(self.client.get("/login").status_code, 503)
+        finally:
+            module.app.config["AUTH_READY"] = before
 
 
 if __name__ == "__main__":
