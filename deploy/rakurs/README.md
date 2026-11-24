@@ -50,6 +50,46 @@ sudo nginx -t && sudo systemctl reload nginx
 
 If either `nginx -t` fails, **do not reload**; remove only the newly created rakurs symlink and correct that site's configuration. Never remove or rewrite existing Odoo/Ergodata Nginx sites.
 
+## Certificate issuance and actual HTTP validation (24.11.2026)
+
+Local ACME challenge returned HTTP 200 and `rakurs-acme-ok` for BOTH
+domain names. Certbot completed successful HTTP-01 issuance; certificate
+SANs contain `rakurs.zakryttya.org.ua` and
+`www.rakurs.zakryttya.org.ua`. Validity: 24.11.2026–22.02.2027
+(exact `notAfter`: 2027-02-22 09:59:07 UTC). Renewal scheduling was
+reported by Certbot. **HTTPS Nginx site has not yet been activated**.
+
+After the HA owner exists and reverse proxy trust is set in the UI,
+activate HTTPS with the guarded script:
+
+```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+bash deploy/rakurs/activate_https.sh
+```
+
+The script does not install the site if an active HA owner cannot be
+verified from `/config/.storage/auth`, or if the existing Rakurs
+HTTPS Nginx site already exists. It rolls back just the new Rakurs
+HTTPS site on Nginx validation, reload or local HTTPS check failure.
+If HA returns 400, configure **Settings → System → Network → HTTP server**
+to trust the actual Nginx proxy IP (Docker gateway candidate
+`172.18.0.1`) before repeating. Do NOT change `configuration.yaml`
+for this setting on HA 2026.8+.
+
+After successfully activating HTTPS, install the renewal reload hook so
+that a renewed certificate is actually picked up by running Nginx:
+
+```bash
+sudo install -m 0755 deploy/rakurs/renewal-nginx-reload.sh \
+  /etc/letsencrypt/renewal-hooks/deploy/rakurs-nginx-reload.sh
+sudo certbot renew --dry-run
+```
+
+The hook only reloads Nginx after renewal of the Rakurs certificate.
+Verify from an external network that both HTTPS names terminate at the
+intended Nginx rather than an upstream/misrouted server.
+
 ## Home Assistant behind reverse proxy (2026+)
 
 In Home Assistant UI: **Settings → System → Network → HTTP server**: enable **Trust X-Forwarded-For** and configure **Trusted proxies** with the *actual source IP observed inside Home Assistant* from the host proxy's Docker connection; the Docker bridge gateway printed by preflight is a candidate, not confirmed. Use a precise address, not an overly broad Docker subnet. Saving these settings causes an HA restart/verification. Complete this over the SSH tunnel first so lockouts do not affect public access. Set the external URL to `https://rakurs.zakryttya.org.ua` in the HA Network settings.

@@ -24,6 +24,8 @@ jobs:
       - name: Validate Rakurs preflight script and proxy templates
         run: |
           bash -n deploy/rakurs/preflight.sh
+          bash -n deploy/rakurs/activate_https.sh
+          sh -n deploy/rakurs/renewal-nginx-reload.sh
           python -m unittest discover -s tests -p 'test_rakurs_proxy.py' -v
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
