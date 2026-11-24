@@ -114,9 +114,9 @@ function prepare(mode) {
       : url.includes("/signals") ?
         {signals: [{signal_key: "pv_power", label_uk: "PV power", unit: "кВт"}]}
       : url.includes("/auth") ? {authenticated: false}
-      : url.includes("/latest") ? {values: latest}
       : url.includes("/parallel/latest") ? {device_key: "inverter_1", values:
           {pv_power: {...latest.pv_power, quality: "good"}}}
+      : url.includes("/latest") ? {values: latest}
       : url.includes("/parallel/events") ? {events: []}
       : url.includes("/parallel") ? {
           expected_inverters: 2, registered_inverters: mode === "two" ? 2 : 0,
@@ -248,6 +248,11 @@ async function run() {
   assert.equal(byClass(two.main, "parallel-reading").length, 6);
   assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_1")));
   assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_2")));
+  const parallelValueText = descendants(two.main).map(x => x.textContent || "").join("|");
+  assert(parallelValueText.includes("5,1"), "Verified per-device reading visible");
+  assert(parallelValueText.includes("SOC: —"), "Shared BMS SOC remains unknown");
+  assert(parallelValueText.includes("Поточна сумарна потужність: —"),
+    "No fabricated combined power");
   console.log("PARALLEL_DISTINCT_DEVICE_ENDPOINTS=PASS");
 }
 run().catch(e => {console.error(e.stack);process.exitCode=1;});
