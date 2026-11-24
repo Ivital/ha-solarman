@@ -192,6 +192,72 @@ class ParallelApiTests(unittest.TestCase):
         self.assertIn("f.verified=1", sql)
         self.assertIn("m.quality<>'simulated'", sql)
 
+    def test_simulated_two_device_archive_only_exposes_simulated_data(self):
+        queries = []
+        def fake_one(sql, params=()):
+            queries.append((sql, params))
+            if "FROM rakurs_users WHERE id=%s" in sql:
+                return {"id":123,"username":"tester","role":"admin",
+                        "is_active":1,"session_version":1}
+            if "FROM information_schema.tables" in sql:
+                return {"n":3}
+            if "FROM rakurs_devices AS d" in sql and "pm.member_kind='simulation'" in sql:
+                return {"id":55,"device_key":"sim_deye20k_parallel_1","slot_no":1}
+            if "FROM rakurs_modbus_poll_runs" in sql:
+                return {"id":77,"observed_at_utc":datetime(2026,11,24,20,0)}
+            if "COUNT(*) AS n FROM rakurs_modbus_register_samples" in sql:
+                return {"n":815}
+            return None
+
+        def fake_rows(sql, params=()):
+            queries.append((sql, params))
+            if "FROM rakurs_parallel_members AS pm" in sql:
+                return [
+                    {"slot_no":1,"device_key":"sim_deye20k_parallel_1",
+                     "model":MODEL,"raw_registers":815,"decoded_fields":624,
+                     "ui_fields":316},
+                    {"slot_no":2,"device_key":"sim_deye20k_parallel_2",
+                     "model":MODEL,"raw_registers":815,"decoded_fields":624,
+                     "ui_fields":316},
+                ]
+            if "FROM rakurs_samples AS m" in sql:
+                return [{
+                    "signal_key":"pv_power","label_uk":"Сонце","unit":"кВт",
+                    "value_decimal":Decimal("5.1"),"quality":"simulated",
+                    "observed_at_utc":datetime(2026,11,24,20,0),
+                }]
+            if "FROM rakurs_modbus_register_samples" in sql:
+                return [{"function_code":3,"register_address":1234,
+                         "raw_uint16":54321,"quality":"simulated",
+                         "observed_at_utc":datetime(2026,11,24,20,0)}]
+            return []
+
+        with patch.object(module, "one", side_effect=fake_one), \
+             patch.object(module, "rows", side_effect=fake_rows):
+            overview = self.client.get("/api/v1/parallel/simulation")
+            self.assertEqual(overview.status_code, 200)
+            self.assertTrue(overview.get_json()["simulation"])
+            self.assertEqual(len(overview.get_json()["devices"]), 2)
+            value = self.client.get(
+                "/api/v1/parallel/simulation/latest?device=sim_deye20k_parallel_1")
+            self.assertEqual(value.status_code, 200)
+            self.assertTrue(value.get_json()["simulation"])
+            self.assertEqual(value.get_json()["values"]["pv_power"]["quality"],
+                             "simulated")
+            raw = self.client.get(
+                "/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1"
+                "&offset=0&limit=200")
+            self.assertEqual(raw.status_code, 200)
+            self.assertEqual(raw.get_json()["total"], 815)
+            self.assertEqual(raw.get_json()["raw_registers"][0]["raw_uint16"], 54321)
+            self.assertEqual(self.client.get(
+                "/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1"
+                "&offset=0&limit=501").status_code, 400)
+            self.assertEqual(self.client.get(
+                "/api/v1/parallel/simulation/latest?device=deye_real_one").status_code,
+                             404)
+        self.assertTrue(all("INSERT " not in q and "UPDATE " not in q for q, _ in queries))
+
     def test_requires_authenticated_access(self):
         module.app.config.update(SECRET_KEY="parallel-testing-key")
         guest = module.app.test_client()
