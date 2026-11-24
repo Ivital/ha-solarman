@@ -79,7 +79,7 @@ CREATE TABLE IF NOT EXISTS rakurs_modbus_frames (
 
 CREATE TABLE IF NOT EXISTS rakurs_modbus_register_samples (
   poll_id BIGINT UNSIGNED NOT NULL,
-  frame_id BIGINT UNSIGNED NULL,
+  frame_id BIGINT UNSIGNED NOT NULL,
   device_id BIGINT UNSIGNED NOT NULL,
   observed_at_utc DATETIME(6) NOT NULL,
   function_code TINYINT UNSIGNED NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS rakurs_modbus_register_samples (
   raw_uint16 SMALLINT UNSIGNED NOT NULL,
   quality VARCHAR(24) NOT NULL,
   ingest_source VARCHAR(80) NOT NULL,
-  PRIMARY KEY (poll_id, function_code, register_address),
+  PRIMARY KEY (poll_id, frame_id, register_address),
   KEY ix_raw_register_device_time
     (device_id, function_code, register_address, observed_at_utc),
   CONSTRAINT fk_raw_register_poll FOREIGN KEY (poll_id)
@@ -95,5 +95,26 @@ CREATE TABLE IF NOT EXISTS rakurs_modbus_register_samples (
   CONSTRAINT fk_raw_register_frame FOREIGN KEY (frame_id)
     REFERENCES rakurs_modbus_frames(id),
   CONSTRAINT fk_raw_register_device FOREIGN KEY (device_id)
+    REFERENCES rakurs_devices(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Function 01/02 bit responses also retain each returned bit, not only the frame.
+CREATE TABLE IF NOT EXISTS rakurs_modbus_bit_samples (
+  poll_id BIGINT UNSIGNED NOT NULL,
+  frame_id BIGINT UNSIGNED NOT NULL,
+  device_id BIGINT UNSIGNED NOT NULL,
+  observed_at_utc DATETIME(6) NOT NULL,
+  function_code TINYINT UNSIGNED NOT NULL,
+  bit_address INT UNSIGNED NOT NULL,
+  bit_value TINYINT UNSIGNED NOT NULL,
+  quality VARCHAR(24) NOT NULL,
+  ingest_source VARCHAR(80) NOT NULL,
+  PRIMARY KEY (poll_id, frame_id, bit_address),
+  KEY ix_modbus_bit_device_time (device_id, function_code, bit_address, observed_at_utc),
+  CONSTRAINT fk_modbus_bit_poll FOREIGN KEY (poll_id)
+    REFERENCES rakurs_modbus_poll_runs(id),
+  CONSTRAINT fk_modbus_bit_frame FOREIGN KEY (frame_id)
+    REFERENCES rakurs_modbus_frames(id),
+  CONSTRAINT fk_modbus_bit_device FOREIGN KEY (device_id)
     REFERENCES rakurs_devices(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
