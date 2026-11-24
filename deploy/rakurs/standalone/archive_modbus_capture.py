@@ -17,6 +17,7 @@ import stat
 import sys
 
 from modbus_archive import normalize, persist
+from mysql_transport import mysql_tls_options
 
 HOST = "192.168.5.30"
 SCHEMA = "rakurs"
@@ -63,10 +64,12 @@ def main():
     if meta.st_uid != os.geteuid():
         raise RuntimeError("STOP: secret owner does not match collector UID")
     import pymysql
+    # Live data and ingest credentials must not cross the LAN in clear text.
+    tls = mysql_tls_options(require_verified=True)
     db = pymysql.connect(
         host=HOST, port=3306, database=SCHEMA, user=name,
         password=path.read_text(encoding="utf-8").rstrip("\r\n"),
-        ssl_disabled=True, autocommit=False, charset="utf8mb4",
+        autocommit=False, charset="utf8mb4", **tls,
         connect_timeout=6, read_timeout=30, write_timeout=30,
     )
     try:
