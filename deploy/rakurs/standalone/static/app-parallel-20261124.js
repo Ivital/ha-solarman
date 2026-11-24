@@ -766,6 +766,120 @@ async function renderParallel(cycle) {
     detail.appendChild(createEmpty("Не вдалося перевірити облік двох інверторів",
       "Джерело даних недоступне. Схема та значення не припускаються."));
   }
+  if (current(cycle)) await renderParallelDemo(cycle);
+}
+
+async function renderParallelDemo(cycle) {
+  section("Тестова база двох інверторів",
+    "Окремий навчальний набір · не є зчитуванням із фізичного обладнання");
+  const scope = panel("Симульовані вимірювання",
+    "Перевірка повноти архіву для кожного з двох тестових Deye.");
+  scope.className += "parallel-demo-panel";
+  const intro = element("p", "parallel-warning",
+    "УСІ наведені нижче значення синтетичні. Їх не можна використовувати " +
+    "для керування живленням, розрахунків енергії чи діагностики аварій.");
+  scope.appendChild(intro);
+  main.appendChild(scope);
+  const cards = element("div", "parallel-devices");
+  scope.appendChild(cards);
+  let payload;
+  try {
+    payload = await api("/parallel/simulation");
+  } catch (_error) {
+    if (current(cycle)) cards.appendChild(createEmpty("Тестовий архів недоступний",
+      "Перевірте наявність таблиць MySQL для збереження Modbus."));
+    return;
+  }
+  if (!current(cycle)) return;
+  const devices = payload.devices || [];
+  if (!payload.storage_ready || devices.length !== 2) {
+    cards.appendChild(createEmpty("Два тестові інвертори ще не заповнені",
+      "Потрібна окрема одноразова операція створення демонстраційних записів " +
+      "із резервною копією MySQL. Реальних вимірювань вона не додає."));
+    return;
+  }
+  for (const device of devices) {
+    const card = element("article", "parallel-device");
+    const title = element("div", "parallel-device-head");
+    add(title, element("strong", "parallel-device-name",
+      "Тестовий інвертор №" + device.slot_no),
+      element("span", "parallel-state", "СИМУЛЯЦІЯ"));
+    card.appendChild(title);
+    card.appendChild(element("p", "parallel-device-model",
+      "SUN-20K-SG05LP3-EU-SM2 · без фізичного підключення"));
+    const summary = element("div", "parallel-demo-counters");
+    for (const [name, count] of [
+      ["Сирі регістри", device.raw_registers],
+      ["Поля Modbus", device.decoded_fields],
+      ["Показники", device.ui_fields]
+    ]) {
+      const tile = element("div", "parallel-demo-counter");
+      add(tile, element("strong", "", String(count || 0)),
+        element("small", "", name));
+      summary.appendChild(tile);
+    }
+    card.appendChild(summary);
+    const previews = element("div", "parallel-metric-list");
+    card.appendChild(previews);
+    cards.appendChild(card);
+    const query = encodeURIComponent(device.device_key);
+    try {
+      const result = await api("/parallel/simulation/latest?device=" + query);
+      if (!current(cycle)) return;
+      const keys = [
+        ["pv_power", "PV"], ["battery_soc", "SOC"], ["battery_power", "АКБ"]
+      ];
+      for (const [key, label] of keys) {
+        const reading = result.values && result.values[key];
+        const ready = reading && reading.quality === "simulated" &&
+          reading.value_decimal !== null && reading.value_decimal !== undefined;
+        const tile = element("div", "parallel-reading");
+        add(tile, element("small", "", label),
+          element("strong", "", ready ?
+            number(reading.value_decimal) + " " + (reading.unit || "") : "—"),
+          element("span", "", "Тільки тестові дані"));
+        previews.appendChild(tile);
+      }
+    } catch (_error) {
+      previews.appendChild(createEmpty("Тестові значення недоступні",
+        "Можна перевірити базу, не змінюючи реальні пристрої."));
+    }
+    const rawSection = element("section", "parallel-raw-viewer");
+    rawSection.appendChild(element("h3", "", "Повний архів сирих регістрів"));
+    const table = element("div", "parallel-raw-table");
+    rawSection.appendChild(table);
+    const button = element("button", "more-button", "Показати регістри (200)");
+    button.type = "button";
+    rawSection.appendChild(button);
+    let offset = 0;
+    button.addEventListener("click", async () => {
+      button.disabled = true;
+      try {
+        const page = await api("/parallel/simulation/raw?device=" + query +
+          "&offset=" + offset + "&limit=200");
+        if (!current(cycle)) return;
+        const rows = page.raw_registers || [];
+        for (const item of rows) {
+          const row = element("div", "parallel-raw-row");
+          add(row, element("code", "", String(item.register_address)),
+            element("span", "", "FC" + item.function_code),
+            element("strong", "", String(item.raw_uint16)),
+            element("small", "", "тестовий"));
+          table.appendChild(row);
+        }
+        offset += rows.length;
+        button.textContent = "Показано " + offset + " із " + page.total +
+          (offset < page.total ? " · ще 200" : " · усі записи");
+        button.hidden = offset >= page.total;
+      } catch (_error) {
+        table.appendChild(createEmpty("Не вдалося прочитати сирі регістри",
+          "Повторіть спробу після перевірки MySQL."));
+      } finally {
+        if (current(cycle)) button.disabled = false;
+      }
+    });
+    card.appendChild(rawSection);
+  }
 }
 
 async function renderEvents(cycle) {
