@@ -184,6 +184,41 @@ sudo docker compose logs --tail=100 homeassistant
 для **вкладених файлів** або для інших шляхів, перевіряйте конкретний
 файл окремо, а не виконуйте рекурсивне `chown` чи `chmod`.
 
+### Результат запуску Home Assistant після ремонту (24.11.2026)
+
+На `ERGODATA-LNX` підтверджено роботу контейнера `deye-homeassistant`:
+`State=running`, `Exit=0`, `OOM=false`, `RestartCount=0`,
+`HTTP 302` на `127.0.0.1:8123`, пам'ять ≈480 MiB із ліміту 1,5 GiB.
+Системні служби `odoo18` та `nginx` активні, доступна ОЗП ≈4,6 GiB,
+PSI ≈0. Home Assistant виявив сторонню інтеграцію `solarman`;
+**налаштування інтеграції, Modbus і показники Deye ще не перевірені**.
+
+Журнал містив `[aiodhcpwatcher] Cannot watch for dhcp packets: Operation
+not permitted`: через `cap_drop: ALL` та ізольовану Docker bridge-мережу
+автовиявлення DHCP недоступне. Для ручного додавання Deye за відомою
+адресою це не блокує роботу. Не надавайте `privileged`, `NET_RAW` і
+не вмикайте `network_mode: host` лише заради автовиявлення.
+
+Перевірка маршруту **зсередини контейнера** (тільки TCP handshake,
+жодних Modbus-запитів):
+
+```bash
+sudo docker exec deye-homeassistant python3 -c 'import socket; s=socket.create_connection(("192.168.89.106",50006),timeout=5); print("TELTONIKA_TCP_FROM_HA: PASS"); s.close()'
+```
+
+На робочому ПК відкрийте SSH-тунель у окремому PowerShell
+(`18123` — локальний порт ПК, не відкриває мережевий сервіс на Debian):
+
+```powershell
+ssh -N -o ExitOnForwardFailure=yes -L 127.0.0.1:18123:127.0.0.1:8123 ivital@192.168.5.31
+```
+
+Потім у браузері ПК відкрийте `http://127.0.0.1:18123`, пройдіть
+первинне налаштування, створіть **унікального локального адміністратора**.
+Пароль не надсилайте в чат або Git. Поки не додавайте `solarman`,
+якщо режим TCP-порту 50006 (`Modbus TCP over Serial Gateway` або
+`Serial Over IP`) не підтверджений.
+
 ### Контрольований пробний запуск після позитивного preflight
 
 ```bash
