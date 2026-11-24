@@ -41,6 +41,7 @@ jobs:
           bash -n deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh
           bash deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh --check
           bash -n deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh
+          bash -n deploy/rakurs/standalone/audit_browser_delivery.sh
           bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
           bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
