@@ -1,6 +1,7 @@
 "use strict";
 // Rakurs standalone: the ONLY data API is this app's /api/v1/* backed by MySQL.
 const base = "/api/v1";
+const DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
 const views = [
   ["overview", "Огляд", "◈"],
   ["pv", "Сонце", "☀"],
@@ -56,7 +57,8 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path) {
-  const response = await fetch(base + path, {cache: "no-store", credentials: "same-origin"});
+  const url = base + path + (DEMO_MODE ? (path.includes("?") ? "&demo=1" : "?demo=1") : "");
+  const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
 }
@@ -114,6 +116,15 @@ function verifiedKeys() {
   return new Set(state.verified.map(s => s.signal_key));
 }
 function addStatusMessage() {
+  if (DEMO_MODE) {
+    message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ",
+      "Один синтетичний знімок у MySQL. Жоден інвертор або Teltonika не опитувалися. " +
+      "Значення призначені лише для перевірки дизайну та API.", true);
+    if (!state.status || !state.status.has_simulated_samples) {
+      message("Тестовий знімок не знайдено", "Спочатку запустіть контрольоване завантаження симулятора.", true);
+    }
+    return;
+  }
   if (!state.status) {
     message("Підключення до MySQL не підтверджено",
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
@@ -130,7 +141,8 @@ function metricCard(label, icon, key, values) {
   if (actual && data.unit) val.appendChild(element("span", "unit", data.unit));
   add(card, element("div", "card-icon", icon), element("h3", "", label), val,
       element("div", "detail" + (actual ? " verified" : ""),
-        actual ? "З MySQL · " + time(data.observed_at_utc) + " · " + (data.quality || "якість не вказана")
+        actual ? (DEMO_MODE ? "СИМУЛЬОВАНО · " : "З MySQL · ") +
+          time(data.observed_at_utc) + " · " + (data.quality || "якість не вказана")
           : "Підтвердженого вимірювання немає"));
   return card;
 }
@@ -150,11 +162,13 @@ async function renderOverview(cycle) {
     ["Заряд АКБ", "▣"], ["Потужність АКБ", "↯"], ["Температура інвертора", "♨"],
     ["Виробіток за добу", "◉"], ["Споживання за добу", "▥"]
   ];
-  section("Оперативні показники", "Тільки фактичні значення MySQL");
+  section("Оперативні показники", DEMO_MODE ? "СИМУЛЯЦІЯ · один тестовий знімок" :
+                                                    "Тільки фактичні значення MySQL");
   const deck = element("div", "cards");
   main.appendChild(deck);
   let values = {};
-  if (state.status && state.status.verified_signals > 0) {
+  if (state.status && (DEMO_MODE ? state.status.simulated_signals > 0 :
+                                       state.status.verified_signals > 0)) {
     try {
       values = (await api("/latest?keys=" + encodeURIComponent(keys.join(",")))).values;
     } catch (_error) {
@@ -171,7 +185,8 @@ async function renderOverview(cycle) {
   const info = element("div", "kv");
   [
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    ["Підтверджені сигнали", state.status ? state.status.verified_signals : "—"],
+    [DEMO_MODE ? "Симульовані сигнали" : "Підтверджені сигнали",
+      state.status ? (DEMO_MODE ? state.status.simulated_signals : state.status.verified_signals) : "—"],
     ["Планові сигнали", planCount()]
   ].forEach(pair => {
     const item = element("div", "");
@@ -185,9 +200,11 @@ async function renderOverview(cycle) {
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title, items.length + " запланованих полів · без вигаданих даних");
+  section(title, DEMO_MODE ? "СИМУЛЯЦІЯ · " + items.length + " полів каталогу" :
+                                              items.length + " запланованих полів · без вигаданих даних");
   const tags = element("div", "tags");
-  add(tags, element("span", "tag", "Джерело: MySQL rakurs"),
+  add(tags, element("span", "tag", DEMO_MODE ? "СИМУЛЯЦІЯ · MySQL rakurs" :
+                                                      "Джерело: MySQL rakurs"),
     element("span", "tag warning", "Сумісність регістрів SG05LP3 не підтверджено"));
   main.appendChild(tags);
   if (!items.length) { main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр планових сигналів.")); return; }
@@ -207,7 +224,8 @@ async function renderGroup(groups, title, cycle) {
     const info = element("div", "");
     add(info, element("strong", "", metric.label),
       element("small", "", verified.has(metric.key)
-        ? "Підтверджений сигнал" : "Плановий · ще не перевірено"));
+        ? (DEMO_MODE ? "СИМУЛЬОВАНИЙ сигнал" : "Підтверджений сигнал") :
+          "Плановий · ще не перевірено"));
     const value = element("div", "number" + (hasValue ? "" : " unknown"),
       hasValue ? number(record.value_decimal) + " " + (record.unit || "") : "—");
     value.title = hasValue ? time(record.observed_at_utc) : "Немає підтвердженого значення";
@@ -255,7 +273,9 @@ function svgChart(points, unit) {
 }
 async function renderHistory(cycle, archived) {
   addStatusMessage();
-  section(archived ? "Архів вимірювань" : "Історія показників", "Час даних — UTC; відображення — Київ");
+  section(archived ? "Архів вимірювань" : "Історія показників",
+          DEMO_MODE ? "СИМУЛЯЦІЯ · один тестовий знімок · час Київ" :
+                      "Час даних — UTC; відображення — Київ");
   const available = state.verified;
   if (!available.length) {
     main.appendChild(createEmpty("Немає підтверджених сигналів",
@@ -315,7 +335,8 @@ async function renderHistory(cycle, archived) {
 }
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
-  section(sectionName, "Записи виключно з MySQL rakurs");
+  section(sectionName, DEMO_MODE ? "СИМУЛЯЦІЯ · тестовий знімок MySQL" :
+                                        "Записи виключно з MySQL rakurs");
   const root = panel(sectionName);
   main.appendChild(root);
   try {
@@ -338,13 +359,14 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
 }
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", "Статус незалежного Rakurs");
+  section("Конфігурація системи", DEMO_MODE ? "РЕЖИМ СИМУЛЯЦІЇ" :
+                                                      "Статус незалежного Rakurs");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
-    ["Джерело", "MySQL"],
+    ["Джерело", DEMO_MODE ? "MySQL · СИМУЛЯЦІЯ" : "MySQL"],
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
     ["Підтверджені сигнали", state.status ? state.status.verified_signals : "—"],
     ["Колектор Deye", "Не запущений"]
@@ -383,6 +405,14 @@ async function render() {
   }
 }
 async function boot() {
+  const switcher = element("a", "tag warning", DEMO_MODE ?
+      "ВИЙТИ З СИМУЛЯЦІЇ" : "СИМУЛЯЦІЯ DEYE");
+  switcher.href = DEMO_MODE ? "/" : "/?demo=1";
+  switcher.title = DEMO_MODE ? "Показувати лише реальні вимірювання" :
+      "Показати лише синтетичні значення без зв’язку з інвертором";
+  const actions = document.querySelector(".top-actions");
+  if (actions) actions.appendChild(switcher);
+  if (DEMO_MODE) document.body.classList.add("demo-mode");
   const results = await Promise.allSettled([
     api("/catalog"), api("/status"), api("/signals"), api("/auth")
   ]);
