@@ -241,6 +241,21 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(posted.status_code, 303)
         self.assertTrue(posted.headers["Location"].endswith("/?demo=1"))
 
+    def test_versioned_js_prevents_stale_dashboard_after_ha_migration(self):
+        html = (RAKURS / "standalone/templates/index.html").read_text()
+        js = (RAKURS / "standalone/static/app.js").read_text()
+        script = (RAKURS / "standalone/repair_dashboard_assets.sh").read_text()
+        self.assertIn('/static/app.js?v=rakurs-deye-modbus-624-20261124', html)
+        self.assertIn('["modbus", "Modbus", "▤"]', js)
+        self.assertIn("const DEMO_MODE = new URLSearchParams(", js)
+        self.assertIn("sha256sum", script)
+        self.assertIn('https://$DOMAIN$ASSET_PATH', script)
+        self.assertIn("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS", script)
+        self.assertIn("RAKURS_ASSET_FIX=PASS", script)
+        self.assertNotIn("DELETE FROM", script)
+        self.assertNotIn("TRUNCATE", script)
+        self.assertNotIn("docker ", script)
+
     def test_demo_frontend_auto_loads_only_when_no_real_data(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
         self.assertIn('!real.has_real_samples', js)
