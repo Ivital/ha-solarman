@@ -13,7 +13,7 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app-events-20261124.js'
+ASSET_PATH='/static/app-parallel-20261124.js'
 FILES=(app.py static/app.js templates/index.html)
 cd "$ROOT"
 
