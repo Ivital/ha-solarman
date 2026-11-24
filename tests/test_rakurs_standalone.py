@@ -281,6 +281,31 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn("getpass.getpass", web_user)
         self.assertIn("generate_password_hash", bootstrap)
 
+    def test_immediate_legacy_removal_scoped_to_deye_homeassistant(self):
+        script = (RAKURS / "standalone/remove_legacy_ha_now.sh").read_text()
+        template = (RAKURS / "standalone/nginx-maintenance.conf").read_text()
+        for marker in (
+            "deye-homeassistant", "homeassistant", "deye-monitoring",
+            "192.168.5.31", "RAKURS_MAINTENANCE_HTTPS=PASS",
+            "tar -tzf", "rm -rf --", "--audit", "--remove-now",
+            "proxy_pass http://127.0.0.1:8123;", "docker image rm",
+            "RAKURS_MAINTENANCE_UPGRADING",
+        ):
+            if marker == "192.168.5.31":
+                continue
+            self.assertIn(marker, script)
+        self.assertNotIn("docker system prune", script)
+        self.assertNotIn("docker compose down", script)
+        self.assertNotIn("docker image rm -f", script)
+        self.assertIn("RAKURS_MAINTENANCE_UPGRADING", template)
+        self.assertIn("return 503", template)
+
+    def test_publish_supports_prior_maintenance_vhost(self):
+        script = (RAKURS / "standalone/switch_rakurs_nginx.sh").read_text()
+        self.assertIn("RAKURS_MAINTENANCE_UPGRADING", script)
+        self.assertIn("proxy_pass http://127.0.0.1:8123;", script)
+        self.assertIn("rakurs-https.conf", script)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Rakurs standalone migration with individually gated phases.
-# NEVER delete or disable old HA until new HTTPS Rakurs login is verified.
+# Rakurs migration with individually gated phases.
+# Owner authorized immediate removal of unused HA before new standalone is live.
+# For --remove-now, a safe HTTPS maintenance page replaces HA first.
 set -Eeuo pipefail
 umask 077
 MODE="${1:---status}"
@@ -11,6 +12,12 @@ case "$MODE" in
     bash "$DIR/apply_auth_schema.sh" --check
     bash "$DIR/retire_homeassistant.sh" --audit
     echo 'STATUS_ONLY=PASS; NO CHANGES'
+    ;;
+  --remove-now)
+    echo '=== REMOVE UNUSED HA NOW; KEEP RAKURS HTTPS IN MAINTENANCE ==='
+    bash "$DIR/remove_legacy_ha_now.sh" --audit
+    bash "$DIR/remove_legacy_ha_now.sh" --remove-now
+    echo 'OLD_HA_REMOVED; NEW_RAKURS_NOT_YET_DEPLOYED'
     ;;
   --prepare)
     echo '=== LOCAL SOURCE AND AUTH SCHEMA CHECKS ==='
@@ -41,24 +48,25 @@ case "$MODE" in
       exit 2
     }
     echo 'RAKURS_STANDALONE_LOGIN_READY=PASS; UNAUTHORIZED_API=401'
-    echo 'Current public HTTPS site and HA have NOT been changed.'
+    echo 'The existing public HTTPS site remains unchanged (HA or maintenance).'
     echo 'Run --publish only after checking the new localhost login.'
     ;;
   --publish)
     echo '=== VERIFY ISOLATED NEW APP BEFORE HTTPS SWITCH ==='
     bash "$DIR/switch_rakurs_nginx.sh" --check
     bash "$DIR/switch_rakurs_nginx.sh" --apply
-    echo 'NEW_HTTPS_RAKURS=LIVE; OLD_HA_STILL_AVAILABLE_FOR_ROLLBACK'
+    echo 'NEW_HTTPS_RAKURS=LIVE; previous vhost backup saved for rollback'
     echo 'Log in through the real HTTPS site and verify pages before --retire.'
     ;;
   --retire)
+    echo 'Legacy post-switch retirement is only for deployments where HA was not already removed.'
     echo '=== INSPECT LEGACY HA AND KEEP OTHER SERVICES SAFE ==='
     bash "$DIR/retire_homeassistant.sh" --audit
     bash "$DIR/retire_homeassistant.sh" --remove-ha
     echo 'LEGACY_HA_RETIREMENT_COMPLETED; KEEP_BACKUP_FOR_ROLLBACK'
     ;;
   *)
-    echo 'Usage: migrate_rakurs.sh [--status|--prepare|--publish|--retire]' >&2
+    echo 'Usage: migrate_rakurs.sh [--status|--remove-now|--prepare|--publish|--retire]' >&2
     exit 2
     ;;
 esac

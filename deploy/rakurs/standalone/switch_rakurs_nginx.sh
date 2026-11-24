@@ -35,9 +35,11 @@ sudo -v
 sudo grep -q 'server_name rakurs.zakryttya.org.ua' "$DEST" || {
   echo 'STOP: current file is not Rakurs HTTPS vhost' >&2; exit 2
 }
-sudo grep -q 'proxy_pass http://127.0.0.1:8123;' "$DEST" || {
-  echo 'STOP: previous backend is not HA; inspect current Nginx manually' >&2; exit 2
-}
+if ! sudo grep -Fq 'proxy_pass http://127.0.0.1:8123;' "$DEST"; then
+  sudo grep -Fq 'RAKURS_MAINTENANCE_UPGRADING' "$DEST" || {
+    echo 'STOP: vhost is neither old HA nor known Rakurs maintenance' >&2; exit 2
+  }
+fi
 read -r -p "Type SWITCH-RAKURS to replace ONLY Rakurs HTTPS proxy: " CONFIRM </dev/tty
 [[ "$CONFIRM" == 'SWITCH-RAKURS' ]] || { echo 'ABORTED'; exit 2; }
 
