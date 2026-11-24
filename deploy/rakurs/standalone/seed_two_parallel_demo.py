@@ -299,10 +299,43 @@ def main():
                             "device_key IN (%s,%s)", DEVICE_KEYS)
                 existing = cur.fetchall()
             if existing:
-                raise RuntimeError(
-                    "STOP: one or both twin-device keys already exist; "
-                    "inspect manually before rerunning. No new rows inserted."
-                )
+                if len(existing) != 2 or {row[0] for row in existing} != set(DEVICE_KEYS):
+                    raise RuntimeError(
+                        "STOP: partial twin seed exists; inspect DB before retry."
+                    )
+                with db.cursor() as cur:
+                    for key in DEVICE_KEYS:
+                        cur.execute(
+                            "SELECT id,kind FROM rakurs_devices WHERE device_key=%s",
+                            (key,),
+                        )
+                        d = cur.fetchone()
+                        if not d or d[1] != "simulation":
+                            raise RuntimeError("STOP: reserved demo key belongs to real device")
+                        device_id = d[0]
+                        for table, expected in (
+                            ("rakurs_modbus_register_samples", 815),
+                            ("rakurs_modbus_field_samples", 624),
+                            ("rakurs_samples", 316),
+                            ("rakurs_modbus_poll_runs", 1),
+                        ):
+                            cur.execute("SELECT COUNT(*) FROM " + table +
+                                        " WHERE device_id=%s", (device_id,))
+                            if cur.fetchone()[0] != expected:
+                                raise RuntimeError(
+                                    "STOP: incomplete earlier twin seed for " + key
+                                )
+                    cur.execute(
+                        "SELECT COUNT(*) FROM rakurs_parallel_members "
+                        "WHERE member_kind='simulation' AND device_id IN "
+                        "(SELECT id FROM rakurs_devices WHERE device_key IN (%s,%s))",
+                        DEVICE_KEYS,
+                    )
+                    if cur.fetchone()[0] != 2:
+                        raise RuntimeError("STOP: simulation group membership incomplete")
+                print("TWO_DEYE_SEED_ALREADY_APPLIED=PASS")
+                print("MYSQL_CHANGED=NO")
+                return 0
             backup_database(password)
             apply_schema(db)
             receipts = seed(db, fields, metrics, addresses)
