@@ -12,6 +12,13 @@ class RakursProxyTest(unittest.TestCase):
         self.assertIn("https://rakurs.zakryttya.org.ua$request_uri", s)
         self.assertNotIn("proxy_pass", s)
 
+    def test_activation_retains_strict_tls_and_rollback(self):
+        text = (ROOT / "activate_https.sh").read_text()
+        self.assertIn("seq 1 20", text)
+        self.assertIn("sudo rm -f -- \"$link\" \"$site\"", text)
+        self.assertNotIn("curl -k", text)
+        self.assertNotIn("--insecure", text)
+
     def test_https_local_upstream_and_san(self):
         s = (ROOT / "nginx-https.conf.template").read_text()
         self.assertIn("proxy_pass http://127.0.0.1:8123;", s)

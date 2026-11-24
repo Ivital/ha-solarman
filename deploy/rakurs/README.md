@@ -90,6 +90,34 @@ The hook only reloads Nginx after renewal of the Rakurs certificate.
 Verify from an external network that both HTTPS names terminate at the
 intended Nginx rather than an upstream/misrouted server.
 
+## TLS hostname mismatch during first activation (24.11.2026)
+
+The first `activate_https.sh` run confirmed an existing HA owner and
+passed `nginx -t`, but the immediate `curl --resolve ... 127.0.0.1`
+checks received the **wrong TLS certificate** (hostname mismatch).
+The activation script correctly rolled back **only** the Rakurs
+HTTPS server file. The Let's Encrypt certificate remains valid for
+both names and need NOT be reissued.
+
+Possible causes: an HTTPS listener bound to a more specific local
+address than the new wildcard `listen 443`; delayed Nginx worker reload;
+or conflicting SNI/server blocks. Diagnose read-only:
+
+```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+bash deploy/rakurs/diagnose_tls.sh
+```
+
+The script shows the *public* certificate subject/SAN/fingerprint served
+on `127.0.0.1` and `192.168.5.31` for both SNI hostnames, Nginx
+port bindings, a restricted list of Nginx TLS directives, and reload
+warnings. **No private key contents** are printed or modified.
+
+`activate_https.sh` now polls up to 20 times after Nginx reload;
+TLS validation remains enabled. If it still fails, it rolls back.
+Do not guess `listen` parameters or enable `curl -k` as a fix.
+
 ## Home Assistant behind reverse proxy (2026+)
 
 In Home Assistant UI: **Settings → System → Network → HTTP server**: enable **Trust X-Forwarded-For** and configure **Trusted proxies** with the *actual source IP observed inside Home Assistant* from the host proxy's Docker connection; the Docker bridge gateway printed by preflight is a candidate, not confirmed. Use a precise address, not an overly broad Docker subnet. Saving these settings causes an HA restart/verification. Complete this over the SSH tunnel first so lockouts do not affect public access. Set the external URL to `https://rakurs.zakryttya.org.ua` in the HA Network settings.

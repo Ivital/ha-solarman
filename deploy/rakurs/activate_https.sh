@@ -56,19 +56,30 @@ if ! sudo systemctl reload nginx; then
   exit 1
 fi
 
-echo '=== LOOPBACK HTTPS PROXY CHECK ==='
-code="$(curl --noproxy '*' --silent --show-error --max-time 10 \
-  --resolve rakurs.zakryttya.org.ua:443:127.0.0.1 \
-  -o /dev/null -w '%{http_code}' https://rakurs.zakryttya.org.ua/)" || code=000
+echo '=== WAIT FOR NEW NGINX TLS WORKERS AND VERIFY BOTH HTTPS NAMES ==='
+# Reload is graceful: the first connection may still reach a worker using
+# the previous certificate. Do NOT disable TLS verification or use -k.
+code=000
+www_code=000
+for attempt in $(seq 1 20); do
+  code="$(curl --noproxy '*' --silent --max-time 5 \
+    --resolve rakurs.zakryttya.org.ua:443:127.0.0.1 \
+    -o /dev/null -w '%{http_code}' https://rakurs.zakryttya.org.ua/)" || code=000
 
-www_code="$(curl --noproxy '*' --silent --show-error --max-time 10 \
-  --resolve www.rakurs.zakryttya.org.ua:443:127.0.0.1 \
-  -o /dev/null -w '%{http_code}' https://www.rakurs.zakryttya.org.ua/)" || www_code=000
+  www_code="$(curl --noproxy '*' --silent --max-time 5 \
+    --resolve www.rakurs.zakryttya.org.ua:443:127.0.0.1 \
+    -o /dev/null -w '%{http_code}' https://www.rakurs.zakryttya.org.ua/)" || www_code=000
 
-echo "Canonical HTTPS HTTP=$code"
-echo "www HTTPS HTTP=$www_code"
-if [[ "$code" == 000 || "$code" == 400 || "$code" == 403 || "$code" == 404 || "$code" == 502 || "$code" == 503 || "$code" == 504 || "$www_code" != 301 ]]; then
-  echo 'STOP: HTTPS check failed (possible untrusted proxy); rolling back ONLY Rakurs HTTPS' >&2
+  echo "Attempt $attempt: canonical HTTP=$code, www HTTP=$www_code"
+  if [[ "$code" =~ ^(200|301|302|303|307|308)$ && "$www_code" == 301 ]]; then
+    break
+  fi
+  sleep 1
+done
+
+if [[ ! "$code" =~ ^(200|301|302|303|307|308)$ || "$www_code" != 301 ]]; then
+  echo 'STOP: HTTPS failed certificate, proxy, or redirect check; rolling back ONLY Rakurs HTTPS' >&2
+  echo 'Inspect SNI, address-specific listen directives, and Nginx reload logs using deploy/rakurs/diagnose_tls.sh' >&2
   sudo rm -f -- "$link" "$site"
   sudo nginx -t && sudo systemctl reload nginx
   exit 1
