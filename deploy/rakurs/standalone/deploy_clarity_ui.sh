@@ -20,7 +20,7 @@ FILES=("$JS" "$CSS" "$HTML")
 for item in "${FILES[@]}"; do
   test -s "$HERE/$item" || { echo "STOP: source $item missing" >&2; exit 2; }
 done
-grep -Fq '/static/app-clarity-20261124.js' "$HERE/$HTML"
+grep -Eq '/static/app-(clarity|events)-20261124.js' "$HERE/$HTML"
 grep -Fq '/static/clarity-ui-20261124.css' "$HERE/$HTML"
 grep -Fq 'Показники Deye з бази даних' "$HERE/$HTML"
 grep -Fq 'restoreServerReadings();' "$HERE/$JS"
@@ -32,6 +32,10 @@ if command -v node >/dev/null; then
   node tests/test_rakurs_clarity_ui.js
 fi
 echo 'CLARITY_UI_SOURCE_PREFLIGHT=PASS'
+if [[ "$MODE" != "--check" ]] && grep -Fq '/static/app-events-20261124.js' "$HERE/$HTML"; then
+  echo 'STOP: legacy Clarity installer would revert Events UI. Use deploy_events_ui.sh --apply.' >&2
+  exit 2
+fi
 if [[ "$MODE" == "--check" ]]; then
   echo 'DRY_RUN=PASS MYSQL_WRITES=0'
   exit 0
