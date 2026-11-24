@@ -712,6 +712,45 @@ def parallel_simulation_raw():
     })
 
 
+@app.get("/api/v1/parallel/simulation/fields")
+def parallel_simulation_fields():
+    """Paginated full decoded Modbus field catalogue for ONE simulated unit.
+
+    Never substitutes demo values for physical telemetry. Read-only SELECT.
+    """
+    selected = parallel_demo_selected()
+    try:
+        offset = int(request.args.get("offset", "0"))
+        limit = int(request.args.get("limit", "80"))
+    except ValueError:
+        abort(400, description="Некоректний розмір сторінки")
+    if not 0 <= offset <= 100000 or not 1 <= limit <= 100:
+        abort(400, description="Доступно 1–100 полів на сторінку")
+    total = one(
+        "SELECT COUNT(*) AS n FROM rakurs_modbus_field_samples AS m "
+        "WHERE m.device_id=%s AND m.quality='simulated' "
+        "AND m.ingest_source=%s",
+        (selected["id"], PARALLEL_DEMO_SOURCE),
+    )
+    records = rows(
+        "SELECT f.field_key,f.field_name,f.group_name,f.unit,"
+        "m.value_decimal,m.value_text,m.observed_at_utc,m.quality "
+        "FROM rakurs_modbus_field_samples AS m "
+        "JOIN rakurs_modbus_fields AS f ON f.id=m.field_id "
+        "WHERE m.device_id=%s AND m.quality='simulated' "
+        "AND m.ingest_source=%s "
+        "ORDER BY f.field_key,m.observed_at_utc DESC LIMIT %s OFFSET %s",
+        (selected["id"], PARALLEL_DEMO_SOURCE, limit, offset),
+    )
+    return jsonify({
+        "data_source": "mysql", "simulation": True,
+        "device_key": selected["device_key"],
+        "offset": offset, "limit": limit, "total": total["n"] if total else 0,
+        "fields": serialize(records),
+        "warning": "Значення є тестовими та не походять від фізичного Deye",
+    })
+
+
 @app.get("/api/v1/parallel/latest")
 def parallel_device_latest():
     selected = parallel_selected_device()
