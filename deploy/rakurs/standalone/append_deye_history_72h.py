@@ -13,6 +13,7 @@ import argparse
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 import getpass
+from functools import lru_cache
 import hashlib
 import math
 import sys
@@ -82,6 +83,7 @@ def _daily_energy(hour: float, component: str) -> float:
     return accum
 
 
+@lru_cache(maxsize=512)
 def snapshot(ts: datetime) -> dict[str, float]:
     _local, h = _hour(ts)
     pv, load, battery, grid, soc = _flows(h)
