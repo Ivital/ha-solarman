@@ -149,6 +149,22 @@ HOME_METRICS = (
 )
 
 
+def parallel_aggregate_requires_device_selection() -> bool:
+    """Prevent oldest 'latest signal wins' rule from mixing parallel devices.
+
+    The only safe combined view is a provenance-verified system aggregator.
+    Individual reads remain available under /api/v1/parallel/*.
+    """
+    if not hasattr(g, "parallel_aggregate_blocked"):
+        result = one(
+            "SELECT COUNT(*) AS n FROM rakurs_devices "
+            "WHERE kind='inverter' AND model LIKE %s",
+            ("%" + PARALLEL_MODEL + "%",),
+        )
+        g.parallel_aggregate_blocked = bool(result and result["n"] >= 2)
+    return g.parallel_aggregate_blocked
+
+
 @app.get("/")
 def index():
     keys = tuple(key for key, _, _ in HOME_METRICS)
@@ -176,6 +192,10 @@ def index():
             "ORDER BY m.observed_at_utc DESC",
             keys,
         )
+    if not simulated and parallel_aggregate_requires_device_selection():
+        # There is no verified group CT/BMS aggregation yet. Hide potentially
+        # misleading values instead of showing one inverter as both.
+        readings = []
     latest = {}
     for reading in readings:
         latest.setdefault(reading["signal_key"], reading)
@@ -383,6 +403,12 @@ def latest():
     keys = list(dict.fromkeys(k.strip() for k in value.split(",") if k.strip()))
     if not keys or len(keys) > MAX_KEYS or any(not KEY_RE.fullmatch(k) for k in keys):
         return jsonify({"error": "Некоректний перелік сигналів"}), 400
+    if not demo_mode() and parallel_aggregate_requires_device_selection():
+        return jsonify({
+            "data_source": "mysql", "simulation": False, "values": {},
+            "aggregate_verified": False, "device_selection_required": True,
+            "warning": "Виберіть конкретний інвертор: сума системи не підтверджена",
+        })
     found = {}
     for key in keys:
         if demo_mode():
@@ -427,6 +453,12 @@ def history():
         return jsonify({"error": "Некоректний проміжок часу"}), 400
     if hours < 1 or hours > 168:
         return jsonify({"error": "Доступно 1–168 годин"}), 400
+    if not demo_mode() and parallel_aggregate_requires_device_selection():
+        return jsonify({
+            "data_source": "mysql", "simulation": False, "signal": None,
+            "hours": hours, "points": [], "truncated": False,
+            "aggregate_verified": False, "device_selection_required": True,
+        })
     if demo_mode():
         signal = one(
             "SELECT s.signal_key, s.label_uk, s.unit FROM rakurs_signals AS s "
@@ -786,6 +818,12 @@ def parallel_device_modbus():
 
 @app.get("/api/v1/modbus-fields")
 def modbus_fields():
+    if not demo_mode() and parallel_aggregate_requires_device_selection():
+        return jsonify({
+            "data_source": "mysql", "simulation": False,
+            "fields": [], "register_count": 0,
+            "aggregate_verified": False, "device_selection_required": True,
+        })
     if demo_mode():
         sample_join = (
             "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
