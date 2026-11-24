@@ -229,6 +229,37 @@ class BackupTlsTests(unittest.TestCase):
                 mysql_dump_tls_flags(binary, "LAN_PLAINTEXT_ACK"),
                 ["--skip-ssl"])
 
+    def test_mysqldump_stdout_is_actually_gzipped_and_verified(self):
+        import gzip
+        import sys
+        import tempfile
+        from seed_two_parallel_demo import stream_dump_to_gzip
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "rakurs.sql.gz.partial"
+            command = [sys.executable, "-c",
+                       "import sys;sys.stdout.write('CREATE TABLE rakurs_test (id INT);\\n' * 4096)"]
+            code, error = stream_dump_to_gzip(command, output, timeout_seconds=20)
+            self.assertEqual(code, 0, error)
+            self.assertEqual(output.read_bytes()[:2], bytes.fromhex("1f8b"))
+            with gzip.open(output, "rb") as handle:
+                plain = handle.read()
+            self.assertEqual(plain.count(b"CREATE TABLE rakurs_test"), 4096)
+            self.assertLess(output.stat().st_size, len(plain) // 2)
+
+    def test_backup_subprocess_failure_does_not_pretend_success(self):
+        import sys
+        import tempfile
+        from seed_two_parallel_demo import stream_dump_to_gzip
+        with tempfile.TemporaryDirectory() as tmp:
+            output = Path(tmp) / "incomplete.sql.gz.partial"
+            code, stderr = stream_dump_to_gzip(
+                [sys.executable, "-c",
+                 "import sys;sys.stdout.write('partial');sys.exit(12)"],
+                output, timeout_seconds=20
+            )
+            self.assertEqual(code, 12)
+            self.assertFalse((Path(tmp) / "incomplete.sql.gz").exists())
+
     def test_trusted_ca_requires_real_protected_file(self):
         from unittest.mock import patch
         import subprocess
