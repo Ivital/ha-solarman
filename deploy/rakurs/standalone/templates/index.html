@@ -6,7 +6,7 @@
   <meta name="color-scheme" content="dark">
   <title>Rakurs — Енергомоніторинг</title>
   <link rel="stylesheet" href="/static/style.css">
-  <script defer src="/static/app.js?v=rakurs-deye-modbus-624-20261124"></script>
+  <script defer src="/static/app.js?v=rakurs-primary-mysql-20261124-v2"></script>
 </head>
 <body>
   <div class="layout">
@@ -36,7 +36,20 @@
         </div>
       </header>
       <main id="content" class="content">
-        <div class="empty">Завантаження інтерфейсу…</div>
+        <div class="section-header">
+          <h2>Оперативні показники</h2>
+          <span class="subtle">Джерело: MySQL rakurs</span>
+        </div>
+        <div class="cards" aria-label="Показники Deye з бази даних">
+          {% for item in initial_cards %}
+          <article class="card">
+            <div class="card-icon">{{ item.icon }}</div>
+            <h3>{{ item.label }}</h3>
+            <div class="value">{{ item.value }}{% if item.unit and item.value != "—" %}<span class="unit">{{ item.unit }}</span>{% endif %}</div>
+            <div class="detail{% if item.quality %} verified{% endif %}">{{ item.quality or "Немає запису" }}</div>
+          </article>
+          {% endfor %}
+        </div>
       </main>
       <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
     </div>
