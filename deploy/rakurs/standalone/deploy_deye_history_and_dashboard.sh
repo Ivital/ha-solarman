@@ -25,7 +25,7 @@ done
 test -s "$HISTORY" || { echo 'STOP: history script missing' >&2; exit 2; }
 python3 -m py_compile "$HERE/app.py" "$HISTORY"
 python3 "$HISTORY"
-grep -Fq "app-parallel-archive-20261124.js" "$HERE/templates/index.html"
+grep -Fq "app-parallel-twin-20261125.js" "$HERE/templates/index.html"
 grep -Fq "style.css?v=$VERSION" "$HERE/templates/index.html"
 grep -Fq 'Динаміка за 24 години' "$HERE/static/app.js"
 grep -Fq 'SELECT MAX(ms.observed_at_utc)' "$HERE/app.py"
@@ -33,7 +33,7 @@ if command -v node >/dev/null; then
   node --check "$HERE/static/app.js"
 fi
 echo 'RAKURS_HISTORY_PREFLIGHT=PASS'
-if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-archive-20261124.js' "$HERE/templates/index.html"; then
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-twin-20261125.js' "$HERE/templates/index.html"; then
   echo 'STOP: legacy installer would overwrite Clarity UI. Use deploy_clarity_ui.sh --apply instead.' >&2
   exit 2
 fi
