@@ -49,6 +49,42 @@ def verify_read(*, transport: str, slave: int, fc: int, address: int,
     a response must have exact exception function and code; they never carry
     invented words. Uses strict RTU CRC or TCP MBAP framing, never guesses.
     """
+    # Reject malformed metadata before parsing wire frames or trusting values.
+    if not isinstance(slave, int) or isinstance(slave, bool) or not 1 <= slave <= 247:
+        raise InvalidModbusFrame("Invalid Modbus slave address")
+    if fc not in (1, 2, 3, 4):
+        raise InvalidModbusFrame("Only read-only Modbus functions 1-4 are permitted")
+    maximum = 125 if fc in (3, 4) else 2000
+    if (not isinstance(count, int) or isinstance(count, bool)
+            or not 1 <= count <= maximum):
+        raise InvalidModbusFrame("Invalid register/coil count")
+    if (not isinstance(address, int) or isinstance(address, bool)
+            or not 0 <= address <= 65535
+            or address + count > 65536):
+        raise InvalidModbusFrame("Invalid register/coil address range")
+    if status not in ("ok", "exception", "timeout", "error"):
+        raise InvalidModbusFrame("Unknown Modbus transaction status")
+    if not isinstance(request, bytes) or (
+            response is not None and not isinstance(response, bytes)):
+        raise InvalidModbusFrame("Wire frames must be raw bytes")
+    if not isinstance(words, list) or not isinstance(bits, list):
+        raise InvalidModbusFrame("Captured values must be lists")
+    if status != "ok" and (words or bits):
+        raise InvalidModbusFrame("Failed reads cannot contain measured values")
+    if fc in (3, 4) and bits or fc in (1, 2) and words:
+        raise InvalidModbusFrame("Measured value type does not match function")
+    if status == "ok":
+        values = words if fc in (3, 4) else bits
+        if len(values) != count or any(
+                not isinstance(value, int) or isinstance(value, bool)
+                or not 0 <= value <= (65535 if fc in (3, 4) else 1)
+                for value in values):
+            raise InvalidModbusFrame("Invalid captured value count or range")
+    elif status == "timeout" and response is not None:
+        raise InvalidModbusFrame("Timeout cannot contain a response frame")
+    elif status == "exception" and exception_code is None:
+        raise InvalidModbusFrame("Missing exception code")
+
     if transport == "modbus-tcp":
         fmt = "tcp"
     elif transport == "rs485":
