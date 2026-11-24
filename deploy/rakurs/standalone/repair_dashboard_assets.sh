@@ -14,7 +14,7 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 cd "$ROOT"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app.js?v=rakurs-deye-modbus-624-20261124'
+ASSET_PATH='/static/app.js?v=rakurs-primary-mysql-20261124-v2'
 SCRIPT_MARKER='const DEMO_MODE = new URLSearchParams(window.location.search)'
 MODBUS_MARKER='["modbus", "Modbus", "▤"]'
 CHECK_JS="$HERE/static/app.js"
@@ -129,7 +129,7 @@ with client.session_transaction(base_url="https://localhost") as sess:
 response = client.get("/?demo=1", base_url="https://localhost")
 assert response.status_code == 200, f"HTML_HTTP={response.status_code}"
 html = response.get_data(as_text=True)
-expected = "/static/app.js?v=rakurs-deye-modbus-624-20261124"
+expected = "/static/app.js?v=rakurs-primary-mysql-20261124-v2"
 assert expected in html, "New HTML does not load the versioned JS"
 print("AUTHORIZED_HTML_HTTP=200")
 print("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS")
