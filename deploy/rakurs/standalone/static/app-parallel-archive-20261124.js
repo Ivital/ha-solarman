@@ -285,7 +285,11 @@ async function renderOverview(cycle, primedValues = null) {
     element("h2", "", "Енергія під контролем"),
     element("p", "", "Основні показники, напрямки потоків та зміни за часом — на одному екрані."));
   main.appendChild(intro);
-  section("Збережений зріз", "Останні показники з MySQL · час Київ");
+  await renderTwinSummary(cycle);
+  if (!current(cycle)) return;
+  section("Збережений зріз", DEMO_MODE ?
+    "Попередній тестовий набір одного пристрою · НЕ сумарні показники двох Deye" :
+    "Останні показники з MySQL · час Київ");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
   deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
@@ -632,9 +636,70 @@ async function renderHistory(cycle, archived) {
   range.addEventListener("change", refresh);
   await refresh();
 }
+async function renderTwinSummary(cycle) {
+  // The original overview KPIs are from ONE legacy synthetic device.
+  // Independent 20 kW twin devices must be visible on the overview.
+  let profile;
+  try {
+    profile = await api("/parallel/simulation");
+  } catch (_error) {
+    return;
+  }
+  if (!current(cycle) || !profile?.simulation || !profile.storage_ready ||
+      !Array.isArray(profile.devices) || profile.devices.length !== 2) return;
+  section("Два інвертори Deye", "Окремі тестові дані кожного пристрою · MySQL");
+  const grid = element("div", "parallel-home-grid");
+  main.appendChild(grid);
+  const results = await Promise.allSettled(profile.devices.map(d =>
+    api("/parallel/simulation/latest?device=" + encodeURIComponent(d.device_key))));
+  if (!current(cycle)) return;
+  profile.devices.forEach((d, i) => {
+    const card = element("article", "parallel-device parallel-home-device");
+    const title = element("div", "parallel-device-head");
+    add(title, element("strong", "parallel-device-name", "Тестовий Deye №" + d.slot_no),
+      element("span", "parallel-state", "СИМУЛЯЦІЯ"));
+    card.appendChild(title);
+    card.appendChild(element("p", "parallel-device-model",
+      "SUN-20K-SG05LP3-EU-SM2 · 20 кВт номінально"));
+    const values = results[i].status === "fulfilled" &&
+      results[i].value.simulation ? (results[i].value.values || {}) : {};
+    const metrics = element("div", "parallel-metric-list");
+    for (const [key, label] of [
+      ["pv_power", "PV"], ["battery_power", "АКБ"], ["battery_soc", "SOC"]
+    ]) {
+      const item = values[key];
+      const valid = item && item.quality === "simulated" &&
+        item.value_decimal !== null && item.value_decimal !== undefined;
+      const tile = element("div", "parallel-reading");
+      add(tile, element("small", "", label),
+        element("strong", "", valid ?
+          number(item.value_decimal) + " " + (item.unit || "") : "—"),
+        element("span", "", "Тестове значення · НЕ телеметрія"));
+      metrics.appendChild(tile);
+    }
+    card.appendChild(metrics);
+    const footer = element("div", "parallel-home-foot");
+    footer.appendChild(element("span", "", "Сирі регістри: " +
+      d.raw_registers + " · поля Modbus: " + d.decoded_fields));
+    const link = element("a", "parallel-open-link", "Переглянути обидва інвертори");
+    link.href = "#/parallel";
+    footer.appendChild(link);
+    card.appendChild(footer);
+    grid.appendChild(card);
+  });
+  main.appendChild(element("p", "parallel-readonly-note",
+    "Це дві симуляції, не показники реального обладнання. Спільна АКБ " +
+    "не має підтвердженого SOC; відсотки тестових пристроїв не додаються."));
+}
+
 async function renderParallel(cycle) {
   section("Два інвертори — одна система",
     "Deye SUN-20K-SG05LP3-EU-SM2 · спільна акумуляторна батарея");
+  // Show populated database data BEFORE unconnected physical placeholders.
+  await renderParallelDemo(cycle);
+  if (!current(cycle)) return;
+  section("Фізичні інвертори — ще не підключені",
+    "Місця для двох реальних Deye, без вигаданих показників");
   const intro = panel("Паралельна система · 2 × 20 кВт",
     "40 кВт — номінальна паспортна потужність двох інверторів, а не поточна генерація.");
   intro.className += " parallel-intro";
@@ -766,7 +831,6 @@ async function renderParallel(cycle) {
     detail.appendChild(createEmpty("Не вдалося перевірити облік двох інверторів",
       "Джерело даних недоступне. Схема та значення не припускаються."));
   }
-  if (current(cycle)) await renderParallelDemo(cycle);
 }
 
 async function renderParallelDemo(cycle) {
@@ -879,6 +943,45 @@ async function renderParallelDemo(cycle) {
       }
     });
     card.appendChild(rawSection);
+    const decoded = element("section", "parallel-raw-viewer parallel-field-viewer");
+    decoded.appendChild(element("h3", "",
+      "Розшифровані поля Modbus — " + device.decoded_fields + " записів"));
+    const decodedRows = element("div", "parallel-raw-table");
+    decoded.appendChild(decodedRows);
+    const fieldButton = element("button", "more-button", "Переглянути поля Modbus (80)");
+    fieldButton.type = "button";
+    decoded.appendChild(fieldButton);
+    let fieldOffset = 0;
+    fieldButton.addEventListener("click", async () => {
+      fieldButton.disabled = true;
+      try {
+        const result = await api("/parallel/simulation/fields?device=" + query +
+          "&offset=" + fieldOffset + "&limit=80");
+        if (!current(cycle)) return;
+        const items = result.fields || [];
+        for (const entry of items) {
+          const row = element("div", "parallel-field-row");
+          const shown = entry.value_decimal !== null && entry.value_decimal !== undefined ?
+            number(entry.value_decimal) : entry.value_text || "—";
+          add(row,
+            element("code", "", entry.field_key),
+            element("span", "", entry.field_name),
+            element("strong", "", shown + " " + (entry.unit || "")),
+            element("small", "", "СИМУЛЯЦІЯ"));
+          decodedRows.appendChild(row);
+        }
+        fieldOffset += items.length;
+        fieldButton.textContent = "Показано " + fieldOffset + " із " + result.total +
+          (fieldOffset < result.total ? " · ще 80" : " · усі записи");
+        fieldButton.hidden = fieldOffset >= result.total;
+      } catch (_error) {
+        decodedRows.appendChild(createEmpty("Поля Modbus недоступні",
+          "Перевірте стан API та журнал сервера."));
+      } finally {
+        if (current(cycle)) fieldButton.disabled = false;
+      }
+    });
+    card.appendChild(decoded);
   }
 }
 
