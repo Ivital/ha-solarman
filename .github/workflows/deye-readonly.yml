@@ -46,6 +46,8 @@ jobs:
           bash deploy/rakurs/standalone/deploy_stable_dashboard.sh --check
           bash -n deploy/rakurs/standalone/deploy_clarity_ui.sh
           bash deploy/rakurs/standalone/deploy_clarity_ui.sh --check
+          bash -n deploy/rakurs/standalone/deploy_events_ui.sh
+          bash deploy/rakurs/standalone/deploy_events_ui.sh --check
           bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
           bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
