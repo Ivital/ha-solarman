@@ -1,0 +1,34 @@
+[Unit]
+Description=Rakurs standalone energy monitoring (MySQL only)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=rakurs
+Group=rakurs
+WorkingDirectory=/opt/rakurs
+Environment=RAKURS_DB_USER=rakurs_web
+Environment=RAKURS_DB_PASSWORD_FILE=/etc/rakurs/mysql_password
+Environment=RAKURS_SESSION_SECRET_FILE=/etc/rakurs/session_secret
+ExecStart=/var/lib/rakurs/.venv/bin/gunicorn --chdir /opt/rakurs --bind 127.0.0.1:8765 --workers 2 --threads 2 --timeout 20 standalone.app:app
+Restart=on-failure
+RestartSec=4
+TimeoutStopSec=15
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=512M
+TasksMax=80
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target
