@@ -48,17 +48,18 @@ fi
 systemctl is-active --quiet rakurs-standalone.service || {
   echo 'STOP: standalone service is not active' >&2; exit 2
 }
-[[ "$(curl -sS --max-time 8 -o /dev/null -w '%{http_code}' \
+[[ "$(curl --noproxy '*' -sS --max-time 8 -o /dev/null -w '%{http_code}' \
   http://127.0.0.1:8765/login)" == '200' ]] || {
   echo 'STOP: standalone login not responding' >&2; exit 2
 }
-sudo nginx -T 2>/dev/null | grep -q 'proxy_pass http://127.0.0.1:8765;' || {
+EFFECTIVE_NGINX="$(sudo nginx -T 2>/dev/null)"
+grep -Fq 'proxy_pass http://127.0.0.1:8765;' <<<"$EFFECTIVE_NGINX" || {
   echo 'STOP: new Rakurs HTTPS proxy not active' >&2; exit 2
 }
-if sudo nginx -T 2>/dev/null | grep -q 'proxy_pass http://127.0.0.1:8123;'; then
+if grep -Fq 'proxy_pass http://127.0.0.1:8123;' <<<"$EFFECTIVE_NGINX"; then
   echo 'STOP: active Nginx still references HA port 8123' >&2; exit 2
 fi
-CODE="$(curl -sS --max-time 12 --resolve \
+CODE="$(curl --noproxy '*' -sS --max-time 12 --resolve \
   rakurs.zakryttya.org.ua:443:127.0.0.1 \
   -o /dev/null -w '%{http_code}' \
   https://rakurs.zakryttya.org.ua/login)"
@@ -69,47 +70,74 @@ read -r -p 'Type REMOVE-LEGACY-HA to back up then delete the old HA only: ' \
   CONFIRM </dev/tty
 [[ "$CONFIRM" == 'REMOVE-LEGACY-HA' ]] || { echo 'ABORTED'; exit 2; }
 
-if sudo docker container inspect "$CONTAINER" >/dev/null 2>&1; then
-  # Verify no other Docker container binds the same HA configuration directory.
-  while IFS= read -r c; do
-    [[ "$c" == "$CONTAINER" ]] && continue
-    if sudo docker inspect --format '{{range .Mounts}}{{println .Source}}{{end}}' "$c" |
-      grep -Fxq "$DATA"; then
-      echo "STOP: $DATA is used by other container $c" >&2; exit 2
-    fi
-  done < <(sudo docker ps -a --format '{{.Names}}')
-  IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$CONTAINER")"
-  IMAGE_NAME="$(sudo docker inspect --format '{{.Config.Image}}' "$CONTAINER")"
-  case "$IMAGE_NAME" in
-    ghcr.io/home-assistant/home-assistant:*) ;;
-    *) echo "STOP: unexpected image for $CONTAINER ($IMAGE_NAME)" >&2; exit 2 ;;
-  esac
-  sudo docker stop "$CONTAINER"
-fi
-
-BACKUP="$HOME/rakurs-legacy-ha-backup-$(date -u +%Y%m%dT%H%M%SZ).tar.gz"
-if [[ -d "$DATA" ]]; then
-  tar --create --gzip --file="$BACKUP" -C "$ROOT/deploy" data
-  chmod 600 "$BACKUP"
-  tar -tzf "$BACKUP" >/dev/null
-  echo "LEGACY_BACKUP_VALIDATED=$BACKUP"
-fi
-if sudo docker container inspect "$CONTAINER" >/dev/null 2>&1; then
-  sudo docker rm "$CONTAINER"
-  echo 'LEGACY_HOME_ASSISTANT_CONTAINER_REMOVED=PASS'
-  # Never force image removal: Docker refuses if other containers use it.
-  if [[ -n "${IMAGE_ID:-}" ]]; then
-    if sudo docker image rm "$IMAGE_ID" >/dev/null 2>&1; then
-      echo 'UNUSED_HOME_ASSISTANT_IMAGE_REMOVED=PASS'
-    else
-      echo 'HOME_ASSISTANT_IMAGE_RETAINED=still_used_or_protected'
-    fi
+# Fail closed unless the verified old container is still present.
+sudo docker container inspect "$CONTAINER" >/dev/null || {
+  echo 'STOP: legacy container already absent; inspect remaining data separately' >&2
+  exit 2
+}
+MOUNT="$(sudo docker inspect --format '{{range .Mounts}}{{if eq .Destination "/config"}}{{.Source}}{{end}}{{end}}' "$CONTAINER")"
+[[ "$MOUNT" == "$DATA" ]] || {
+  echo 'STOP: legacy /config mount does not match expected directory' >&2; exit 2
+}
+# Verify no other Docker container mounts this data directory before deletion.
+while IFS= read -r c; do
+  [[ "$c" == "$CONTAINER" ]] && continue
+  if sudo docker inspect --format '{{range .Mounts}}{{println .Source}}{{end}}' "$c" |
+    grep -Fxq "$DATA"; then
+    echo "STOP: $DATA is used by other container $c" >&2
+    exit 2
   fi
+done < <(sudo docker ps -a --format '{{.Names}}')
+IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$CONTAINER")"
+IMAGE_NAME="$(sudo docker inspect --format '{{.Config.Image}}' "$CONTAINER")"
+case "$IMAGE_NAME" in
+  ghcr.io/home-assistant/home-assistant:*) ;;
+  *) echo "STOP: unexpected image for $CONTAINER ($IMAGE_NAME)" >&2; exit 2 ;;
+esac
+[[ -d "$DATA" ]] || {
+  echo 'STOP: old HA data directory missing, no deletion performed' >&2; exit 2
+}
+
+# Private, root-owned backup directory: works even for root-owned HA files.
+BACKUP_DIR="$(sudo mktemp -d /var/backups/rakurs-legacy-ha-XXXXXXXX)"
+sudo chmod 0700 "$BACKUP_DIR"
+BACKUP="$BACKUP_DIR/ha-config.tar.gz"
+HA_STOPPED=0
+HA_REMOVED=0
+rollback_on_error() {
+  rc=$?
+  trap - ERR
+  if (( HA_STOPPED == 1 && HA_REMOVED == 0 )); then
+    echo 'Retirement failed before removal: restarting legacy HA container.' >&2
+    sudo docker start "$CONTAINER" || true
+  else
+    echo 'Retirement failed: inspect container and backup before further actions.' >&2
+  fi
+  echo "RECOVERY_BACKUP_DIR=$BACKUP_DIR" >&2
+  exit "$rc"
+}
+trap rollback_on_error ERR
+
+# Stop first for a consistent SQLite/WAL snapshot, then verify the archive
+# before the irreversible docker rm or deletion of its configuration.
+sudo docker stop --time 40 "$CONTAINER"
+HA_STOPPED=1
+sudo tar --one-file-system -czf "$BACKUP" -C "$ROOT/deploy" data
+sudo tar -tzf "$BACKUP" >/dev/null
+sudo sha256sum "$BACKUP" | sudo tee "$BACKUP_DIR/backup.sha256" >/dev/null
+echo "LEGACY_BACKUP_VALIDATED=$BACKUP"
+
+sudo docker rm "$CONTAINER"
+HA_REMOVED=1
+echo 'LEGACY_HOME_ASSISTANT_CONTAINER_REMOVED=PASS'
+# Docker refuses removal when an image is still used elsewhere; never force.
+if sudo docker image rm "$IMAGE_ID" >/dev/null 2>&1; then
+  echo 'UNUSED_HOME_ASSISTANT_IMAGE_REMOVED=PASS'
+else
+  echo 'HOME_ASSISTANT_IMAGE_RETAINED=still_used_or_protected'
 fi
-if [[ -d "$DATA" ]]; then
-  # The directory has been confirmed to be the exact isolated bind source.
-  sudo rm -rf -- "$DATA"
-  echo 'LEGACY_HOME_ASSISTANT_CONFIG_REMOVED=PASS'
-fi
+sudo rm -rf -- "$DATA"
+echo 'LEGACY_HOME_ASSISTANT_CONFIG_REMOVED=PASS'
+trap - ERR
 echo 'Docker engine, Nginx and its Rakurs HTTPS certificate retained.'
 echo 'The old app backup is kept for rollback; remove it separately after verification.'
