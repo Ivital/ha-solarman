@@ -14,10 +14,10 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 cd "$ROOT"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app.js?v=rakurs-history-72h-v1'
+ASSET_PATH='/static/app-stable-20261124.js'
 SCRIPT_MARKER='let DEMO_MODE = new URLSearchParams(window.location.search)'
 MODBUS_MARKER='["modbus", "Modbus", "▤"]'
-CHECK_JS="$HERE/static/app.js"
+CHECK_JS="$HERE/static/app-stable-20261124.js"
 CHECK_HTML="$HERE/templates/index.html"
 
 test -s "$CHECK_JS"
