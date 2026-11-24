@@ -2,6 +2,13 @@
 # Restore data visibility in the EXISTING Rakurs home, navigation and API.
 # No MySQL writes, no standalone demo website and no Nginx configuration edits.
 set -Eeuo pipefail
+# Historical installer. Keep --check for forensic audits, but never permit an
+# old deployment entrypoint to overwrite the current twin-device release.
+if [[ "${1:---check}" == "--apply" ]]; then
+  echo 'STOP: legacy deploy disabled; use deploy_parallel_ui.sh --apply' >&2
+  exit 2
+fi
+
 umask 077
 
 MODE="${1:---check}"
