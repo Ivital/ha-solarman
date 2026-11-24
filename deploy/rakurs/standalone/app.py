@@ -329,15 +329,29 @@ def demo_mode() -> bool:
             "SELECT 1 AS n FROM rakurs_samples "
             "WHERE quality<>'simulated' LIMIT 1"
         )
-        if real is not None:
-            g.use_simulated_samples = False
-        else:
-            synthetic = one(
-                "SELECT 1 AS n FROM rakurs_samples "
-                "WHERE quality='simulated' AND ingest_source=%s LIMIT 1",
-                (DEMO_INGEST_SOURCE,),
+        synthetic = one(
+            "SELECT 1 AS n FROM rakurs_samples "
+            "WHERE quality='simulated' AND ingest_source=%s LIMIT 1",
+            (DEMO_INGEST_SOURCE,),
+        )
+        if real is not None and synthetic is not None:
+            # A single physical sample must never switch the entire two-unit
+            # overview to an unverified global "live" mode. Keep legacy demo
+            # explicit until BOTH group members have individually recent,
+            # approved, non-simulated measurements.
+            complete = one(
+                "SELECT COUNT(DISTINCT pm.device_id) AS n "
+                "FROM rakurs_parallel_members AS pm "
+                "JOIN rakurs_devices AS d ON d.id=pm.device_id "
+                "JOIN rakurs_samples AS m ON m.device_id=pm.device_id "
+                "WHERE pm.member_kind='physical' AND pm.member_verified=1 "
+                "AND pm.transport_verified=1 AND d.kind='inverter' "
+                "AND m.quality='good' AND m.observed_at_utc "
+                ">= UTC_TIMESTAMP(6) - INTERVAL 120 SECOND"
             )
-            g.use_simulated_samples = synthetic is not None
+            g.use_simulated_samples = not (complete and complete["n"] >= 2)
+        else:
+            g.use_simulated_samples = real is None and synthetic is not None
     return g.use_simulated_samples
 
 
