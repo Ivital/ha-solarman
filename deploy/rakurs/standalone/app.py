@@ -227,7 +227,31 @@ def catalog():
 
 
 def demo_mode() -> bool:
-    return request.args.get("demo") == "1"
+    """Select stored sample data for the normal site without editing its provenance.
+
+    The API prefers real telemetry if it exists; otherwise show the stored
+    one-shot Deye samples on the normal routes. ?real=1 forces real-only;
+    ?demo=1 explicitly selects synthetic data. Results are request-scoped.
+    """
+    if request.args.get("real") == "1":
+        return False
+    if request.args.get("demo") == "1":
+        return True
+    if not hasattr(g, "use_simulated_samples"):
+        real = one(
+            "SELECT 1 AS n FROM rakurs_samples "
+            "WHERE quality<>'simulated' LIMIT 1"
+        )
+        if real is not None:
+            g.use_simulated_samples = False
+        else:
+            synthetic = one(
+                "SELECT 1 AS n FROM rakurs_samples "
+                "WHERE quality='simulated' AND ingest_source=%s LIMIT 1",
+                (DEMO_INGEST_SOURCE,),
+            )
+            g.use_simulated_samples = synthetic is not None
+    return g.use_simulated_samples
 
 
 @app.get("/api/v1/status")
@@ -255,6 +279,7 @@ def status():
             "data_source": "mysql", "mode": "simulation", "database": SCHEMA,
             "registered_devices": devices["n"], "verified_signals": 0,
             "simulated_signals": signals["n"],
+            "displayed_signals": signals["n"],
             "has_real_samples": False,
             "has_simulated_samples": sample_exists is not None,
             "collector_active": False, "home_assistant_dependency": False,
@@ -268,7 +293,8 @@ def status():
     return jsonify({
         "data_source": "mysql", "mode": "real", "database": SCHEMA,
         "mysql_host": HOST, "registered_devices": devices["n"],
-        "verified_signals": verified["n"], "has_real_samples": sample_exists is not None,
+        "verified_signals": verified["n"], "displayed_signals": verified["n"],
+        "has_real_samples": sample_exists is not None,
         "collector_active": False, "home_assistant_dependency": False,
     })
 
