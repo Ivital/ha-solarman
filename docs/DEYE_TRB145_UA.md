@@ -8,12 +8,28 @@ VPN та робочі сервери залишаються незмінними
 
 ```text
 Deye Modbus RJ45 RS485 → Teltonika (Modbus TCP ⇄ RTU)
-                    → 4G / CGNAT → WireGuard VPN → Linux / Docker / Home Assistant
+                    → 4G → наявний VPN-сервер MikroTik
+                    → локальна мережа → Debian 192.168.5.31 / Docker / Home Assistant
 ```
 
 Використовуйте саме Modbus TCP ↔ RTU gateway, не прозорий Serial-over-IP.
-Прямий TCP-доступ до шлюзу з Інтернету заборонений. SIM з публічною IP
-не потрібна: Teltonika встановлює вихідне VPN-з'єднання.
+У користувача вже є VPN-сервер MikroTik, до якого Teltonika підключається
+як VPN-клієнт; доступ до Teltonika здійснюється за її приватною адресою.
+Тип VPN і конкретні адреси ще не підтверджені. На Debian другий VPN
+розгортати не потрібно. SIM з публічною IP не потрібна, якщо Teltonika
+встановлює вихідне VPN-з'єднання. Прямий доступ до Modbus з WAN заборонений.
+
+Перед налаштуванням опитування перевірте маршрут із Debian до Teltonika:
+```bash
+read -rp "Private VPN IP Teltonika: " TELTONIKA_IP
+ip -4 route get "$TELTONIKA_IP"
+ping -c 2 -W 2 "$TELTONIKA_IP" || true
+```
+За відсутності ICMP-відповіді потрібна окрема перевірка TCP-порту шлюзу;
+ICMP може бути заблоковано. Не додавайте статичних маршрутів навмання.
+Якщо доступу з Debian немає, перевіряються маршрут назад до 192.168.5.31
+та правила MikroTik firewall `forward`. Паролі, ключі й конфігураційний
+експорт MikroTik у Git не завантажувати.
 
 ## Порти та фізичний зв'язок
 
@@ -30,11 +46,14 @@ Deye Modbus RJ45 RS485 → Teltonika (Modbus TCP ⇄ RTU)
 
 ## Захист
 
-- VPN (приклад Teltonika 10.77.45.2, сервер 10.77.45.1).
-- Дозволити TCP 1502 шлюзу лише від VPN-адреси сервера; не з мобільного WAN.
+- Використати наявний VPN-сервер MikroTik і чинного VPN-клієнта Teltonika.
+- Дозволяти підключення до TCP-порту Modbus-шлюзу тільки з Debian
+  192.168.5.31 через MikroTik та VPN; номер порту потрібно підтвердити
+  в налаштуваннях Teltonika. Не відкривати порт на WAN.
 - Home Assistant слухає виключно 127.0.0.1:8123 на Linux-хості.
 - Доступ до вебпанелі — SSH-тунель або окремий захищений HTTPS reverse proxy.
-- WireGuard keys, паролі, `deploy/data` та `deploy/.env` не зберігати в Git.
+- VPN-ключі, паролі MikroTik/Teltonika, `deploy/data` та `deploy/.env`
+  не зберігати в Git.
 - Інтеграція допускає лише Modbus FC03/FC04. Це запобіжник у застосунку,
   а не апаратна заборона запису з інших Modbus-клієнтів.
 
@@ -102,8 +121,8 @@ docker compose logs --tail=100 homeassistant
 
 | Поле | Початкове значення |
 |---|---|
-| Host | VPN IP Teltonika, наприклад 10.77.45.2 |
-| Port | TCP 1502 — лише якщо так налаштовано шлюз |
+| Host | Фактична приватна VPN-адреса Teltonika (не припускати конкретну IP) |
+| Port | Фактичний TCP-порт Modbus TCP ↔ RTU шлюзу на Teltonika |
 | Transport | modbus_tcp |
 | Lookup file | deye_p3.yaml, вручну |
 | Modbus Slave ID | 1, перевірити |
@@ -120,7 +139,7 @@ docker compose logs --tail=100 homeassistant
 1. Python compileall і unittest мають завершитися PASS.
 2. GitHub Actions мають пройти успішно.
 3. `docker compose config` має відпрацювати без запуску.
-4. VPN handshake і TCP перевіряються до Modbus.
+4. Чинний VPN MikroTik↔Teltonika, маршрути Debian↔Teltonika та TCP шлюзу перевіряються до Modbus.
 5. SOC, PV, GRID, LOAD і GEN порівнюються з фізичним інвертором.
 6. Відсутні керувальні сутності й сервіси запису; секретів у Git немає.
 7. Фактичну модель Teltonika і розпіновку встановлено без припущень.
