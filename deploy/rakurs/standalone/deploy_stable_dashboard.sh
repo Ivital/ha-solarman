@@ -25,7 +25,7 @@ done
 cmp -s "$HERE/static/app.js" "$HERE/static/app-stable-20261124.js" || {
   echo 'STOP: cached and stable JS diverged' >&2; exit 2
 }
-grep -Fq 'src="/static/app-events-20261124.js"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-20261124.js"' "$HERE/templates/index.html"
 grep -Fq 'data-initial-mode=' "$HERE/templates/index.html"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app.js"
 grep -Fq 'client API incomplete' "$HERE/static/app.js"
