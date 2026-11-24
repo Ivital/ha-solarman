@@ -192,5 +192,55 @@ class ArchiveTransactionTests(unittest.TestCase):
         self.assertTrue(all(not frame.get("request_hex") for frame in a["frames"]))
 
 
+class BackupTlsTests(unittest.TestCase):
+    """Self-signed MySQL TLS must never be bypassed implicitly."""
+
+    def test_mysql_verified_by_default_and_plaintext_requires_explicit_ack(self):
+        from unittest.mock import patch
+        import subprocess
+        from seed_two_parallel_demo import mysql_dump_tls_flags
+        binary = "/usr/bin/mysqldump"
+        result = subprocess.CompletedProcess(
+            [binary, "--version"], 0,
+            stdout=b"mysqldump  Ver 8.0.40 for Linux", stderr=b"")
+        with patch("seed_two_parallel_demo.subprocess.run", return_value=result):
+            self.assertEqual(
+                mysql_dump_tls_flags(binary, "VERIFY_TLS"),
+                ["--ssl-mode=VERIFY_IDENTITY"])
+            self.assertEqual(
+                mysql_dump_tls_flags(binary, "LAN_PLAINTEXT_ACK"),
+                ["--ssl-mode=DISABLED"])
+            with self.assertRaises(RuntimeError):
+                mysql_dump_tls_flags(binary, "DISABLED")
+
+    def test_mariadb_client_uses_compatible_switches(self):
+        from unittest.mock import patch
+        import subprocess
+        from seed_two_parallel_demo import mysql_dump_tls_flags
+        binary = "/usr/bin/mariadb-dump"
+        result = subprocess.CompletedProcess(
+            [binary, "--version"], 0,
+            stdout=b"mariadb-dump Ver 10.19 Distrib 10.11.14-MariaDB", stderr=b"")
+        with patch("seed_two_parallel_demo.subprocess.run", return_value=result):
+            self.assertEqual(
+                mysql_dump_tls_flags(binary, "VERIFY_TLS"),
+                ["--ssl", "--ssl-verify-server-cert"])
+            self.assertEqual(
+                mysql_dump_tls_flags(binary, "LAN_PLAINTEXT_ACK"),
+                ["--skip-ssl"])
+
+    def test_trusted_ca_requires_real_protected_file(self):
+        from unittest.mock import patch
+        import subprocess
+        from seed_two_parallel_demo import mysql_dump_tls_flags
+        binary = "/usr/bin/mysqldump"
+        result = subprocess.CompletedProcess(
+            [binary, "--version"], 0, stdout=b"mysqldump Ver 8.0", stderr=b"")
+        with patch("seed_two_parallel_demo.subprocess.run", return_value=result):
+            with self.assertRaises(RuntimeError):
+                mysql_dump_tls_flags(binary, "VERIFY_TLS",
+                                     "/nonexistent/mysql-ca-do-not-trust.pem")
+
+
 if __name__ == "__main__":
     unittest.main()
