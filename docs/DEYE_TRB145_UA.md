@@ -154,6 +154,36 @@ sudo docker compose logs --tail=100 homeassistant
 залишаються помилки прав доступу `s6` або `/config`, зафіксуйте журнал
 і не вмикайте `privileged: true` чи `network_mode: host` навмання.
 
+### Виправлення доступу до /config (24.11.2026)
+
+Після вимкнення Docker init Home Assistant завершився з `Exit=1`:
+`PermissionError: [Errno 13] Permission denied: '/config/.ha_run.lock'`.
+`cap_drop: ALL` забирає `CAP_DAC_OVERRIDE`, тому root-процес контейнера
+не може писати в каталог `deploy/data`, створений власником `ivital`
+з правами `0755`. Не надавайте `chmod 777` і не додавайте
+`privileged: true` чи `CAP_DAC_OVERRIDE` для обходу захисту.
+
+Скрипт виправляє **тільки сам каталог** `deploy/data`, не змінюючи
+файли, Docker volume інших систем та права рекурсивно. Він також звіряє
+точний шлях bind mount контейнера, вимагає зупинений контейнер і має
+режим перевірки без змін:
+
+```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+bash deploy/repair_config_permissions.sh --check
+bash deploy/repair_config_permissions.sh --apply
+cd deploy
+sudo docker compose up -d --no-deps --force-recreate homeassistant
+sudo docker compose ps -a
+sudo docker compose logs --tail=100 homeassistant
+```
+
+Доступ до `deploy/data` на хості після зміни потребуватиме `sudo`;
+це бажано для секретів Home Assistant. Якщо з'являться помилки прав
+для **вкладених файлів** або для інших шляхів, перевіряйте конкретний
+файл окремо, а не виконуйте рекурсивне `chown` чи `chmod`.
+
 ### Контрольований пробний запуск після позитивного preflight
 
 ```bash

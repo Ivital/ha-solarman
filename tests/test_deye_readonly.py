@@ -89,6 +89,14 @@ class ReadOnlyPolicyTest(unittest.TestCase):
         self.assertIs(ha["init"], False, "S6-overlay must be PID 1 (Docker init conflicts)")
         self.assertTrue((ROOT / "deploy" / "preflight_capacity.py").is_file())
 
+    def test_config_permission_repair_guardrails(self):
+        text = (ROOT / "deploy" / "repair_config_permissions.sh").read_text(encoding="utf-8")
+        for guard in ('--check', '--apply', 'deye-homeassistant', '/config',
+                      'mount_src', 'exited', 'sudo chown 0:0', 'sudo chmod 0700'):
+            self.assertIn(guard, text)
+        self.assertNotIn('chown -R', text)
+        self.assertNotIn('chmod -R', text)
+
     def test_capacity_threshold(self):
         script = runpy.run_path(str(ROOT / "deploy" / "preflight_capacity.py"))
         permitted = script["capacity_allows_probe"]
