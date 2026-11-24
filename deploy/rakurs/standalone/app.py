@@ -595,6 +595,65 @@ def parallel_device_events():
     })
 
 
+@app.get("/api/v1/parallel/history")
+def parallel_device_history():
+    selected = parallel_selected_device()
+    key = checked_key()
+    if key not in PARALLEL_SIGNAL_KEYS:
+        abort(400, description="Непідтверджений сигнал профілю")
+    try:
+        hours = int(request.args.get("hours", "24"))
+    except ValueError:
+        abort(400, description="Некоректний проміжок часу")
+    if not 1 <= hours <= 168:
+        abort(400, description="Доступно 1–168 годин")
+    data = rows(
+        "SELECT m.observed_at_utc, m.value_decimal, m.quality, s.unit "
+        "FROM rakurs_samples AS m "
+        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+        "WHERE m.device_id=%s AND s.signal_key=%s "
+        "AND s.verified=1 AND m.quality<>'simulated' "
+        "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
+        "ORDER BY m.observed_at_utc DESC LIMIT %s",
+        (selected["id"], key, hours, MAX_HISTORY + 1),
+    )
+    truncated = len(data) > MAX_HISTORY
+    points = data[:MAX_HISTORY]
+    points.reverse()
+    return jsonify({
+        "data_source": "mysql", "device_key": selected["device_key"],
+        "signal_key": key, "hours": hours,
+        "points": serialize(points), "truncated": truncated,
+        "aggregation_verified": False,
+    })
+
+
+@app.get("/api/v1/parallel/modbus-fields")
+def parallel_device_modbus():
+    selected = parallel_selected_device()
+    data = rows(
+        "SELECT f.field_key, f.group_name, f.field_name, f.unit, "
+        "f.registers_json, m.value_decimal, m.value_text, "
+        "m.quality, m.observed_at_utc "
+        "FROM rakurs_modbus_fields AS f "
+        "LEFT JOIN rakurs_modbus_field_samples AS m "
+        "ON m.field_id=f.id AND m.device_id=%s "
+        "AND m.quality<>'simulated' "
+        "AND m.observed_at_utc=("
+        "SELECT MAX(ms.observed_at_utc) "
+        "FROM rakurs_modbus_field_samples AS ms "
+        "WHERE ms.device_id=%s AND ms.field_id=f.id "
+        "AND ms.quality<>'simulated') "
+        "WHERE f.verified=1 ORDER BY f.id LIMIT 700",
+        (selected["id"], selected["id"]),
+    )
+    return jsonify({
+        "data_source": "mysql", "device_key": selected["device_key"],
+        "fields": serialize(data), "count": len(data),
+        "verified_only": True, "aggregation_verified": False,
+    })
+
+
 @app.get("/api/v1/modbus-fields")
 def modbus_fields():
     if demo_mode():
