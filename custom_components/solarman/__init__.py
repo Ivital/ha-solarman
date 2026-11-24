@@ -1,30 +1,26 @@
 from __future__ import annotations
 
-from pathlib import Path
 from logging import getLogger
-from datetime import datetime
 
 from homeassistant import loader
 from homeassistant.const import Platform
 from homeassistant.helpers.typing import ConfigType
 from homeassistant.helpers.device_registry import DeviceEntry
-from homeassistant.helpers.event import async_track_time_interval
-from homeassistant.helpers import config_validation, discovery_flow
+from homeassistant.helpers import config_validation
 from homeassistant.helpers.entity_registry import RegistryEntry, async_get, async_migrate_entries
-from homeassistant.config_entries import ConfigEntry, SOURCE_INTEGRATION_DISCOVERY
+from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback, split_entity_id
 
 from .const import *
 from .common import *
 from .services import register
-from .discovery import discover
 from .coordinator import Coordinator
 from .config_flow import ConfigFlowHandler
 
 _LOGGER = getLogger(__name__)
 
-_DIRECTORY = Path(__file__).parent
-_PLATFORMS = [i for i in Platform._member_map_.values() if _DIRECTORY.joinpath(i.value + ".py").is_file()]
+# Read-only instance: do not load any entity that can control hardware.
+_PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 CONFIG_SCHEMA = config_validation.empty_config_schema(DOMAIN)
 
@@ -37,14 +33,6 @@ async def async_setup(hass: HomeAssistant, _: ConfigType):
         _LOGGER.debug(f"Error reading version: {strepr(e)}")
 
     register(hass)
-
-    async def discovery(*_: datetime):
-        async for v in await discover(hass):
-            discovery_flow.async_create_flow(hass, DOMAIN, context = {"source": SOURCE_INTEGRATION_DISCOVERY}, data = v)
-
-    hass.async_create_background_task(discovery(), "Solarman setup discovery")
-
-    async_track_time_interval(hass, discovery, DISCOVERY_INTERVAL, cancel_on_shutdown = True)
 
     return True
 
