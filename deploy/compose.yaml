@@ -5,7 +5,8 @@ services:
     container_name: deye-homeassistant
     # Probe mode on the shared Odoo host. No automatic OOM restart loop.
     restart: "no"
-    init: true
+    # Home Assistant uses s6-overlay as PID 1; Docker tini (--init) breaks startup.
+    init: false
     # Hard cgroup constraints: HA may stop on OOM, but cannot consume all host RAM.
     mem_limit: ${HA_MEMORY_LIMIT:-1536m}
     memswap_limit: ${HA_MEMSWAP_LIMIT:-1536m}

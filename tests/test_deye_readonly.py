@@ -86,6 +86,7 @@ class ReadOnlyPolicyTest(unittest.TestCase):
         self.assertEqual(ha["cpus"], "${HA_CPU_LIMIT:-1.0}")
         self.assertEqual(ha["pids_limit"], 160)
         self.assertEqual(ha["logging"]["options"]["max-file"], "3")
+        self.assertIs(ha["init"], False, "S6-overlay must be PID 1 (Docker init conflicts)")
         self.assertTrue((ROOT / "deploy" / "preflight_capacity.py").is_file())
 
     def test_capacity_threshold(self):

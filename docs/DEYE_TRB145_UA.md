@@ -132,6 +132,28 @@ docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --qu
 VM уже має 8 ГіБ, але під навантаженням Odoo необхідне додаткове
 спостереження.
 
+### Усунення помилки першого старту (24.11.2026)
+
+Перший запуск образу Home Assistant завершився повідомленням
+`s6-overlay-suexec: fatal: can only run as pid 1`, оскільки Compose
+помилково містив `init: true` (Docker tini перехоплював PID 1).
+Виправлено на `init: false` і додано регресійний тест. Попередній
+контейнер треба **перестворити**, а не просто перезапустити:
+
+```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+sudo docker compose -f deploy/compose.yaml --env-file deploy/.env config --quiet
+cd deploy
+sudo docker compose up -d --no-deps --force-recreate homeassistant
+sudo docker compose ps -a
+sudo docker compose logs --tail=100 homeassistant
+```
+
+Команда не запускає опитування інвертора. Якщо після виправлення
+залишаються помилки прав доступу `s6` або `/config`, зафіксуйте журнал
+і не вмикайте `privileged: true` чи `network_mode: host` навмання.
+
 ### Контрольований пробний запуск після позитивного preflight
 
 ```bash
