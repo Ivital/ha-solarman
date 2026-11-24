@@ -89,7 +89,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertEqual(
             self.client.get("/api/v1/latest?keys=pv_power,battery_soc").get_json()["values"], {}
         )
-        self.assertEqual(len(self.data_calls), 2)
+        self.assertEqual(len(self.data_calls), 4)
         self.assertEqual(self.data_calls[-1][-1], ("battery_soc",))
 
     def test_latest_returns_only_verified_measurements(self):
@@ -128,7 +128,8 @@ class StandaloneMySqlTests(unittest.TestCase):
         normal = self.client.get("/api/v1/modbus-fields")
         self.assertEqual(normal.status_code, 200)
         self.assertFalse(normal.get_json()["simulation"])
-        self.assertIn("m.quality<>'simulated'", self.data_calls[0][1])
+        self.assertTrue(any("m.quality<>'simulated'" in call[1]
+                            for call in self.data_calls))
 
     def test_malformed_keys_no_data_queries(self):
         for p in ("/api/v1/latest?keys=", "/api/v1/latest?keys=pv%27%3Bdrop",
@@ -140,11 +141,55 @@ class StandaloneMySqlTests(unittest.TestCase):
         r = self.client.get("/api/v1/history?key=pv_power&hours=24")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["points"], [])
-        self.assertEqual(len(self.data_calls), 1)
+        self.assertEqual(len(self.data_calls), 3)
         for value in ("0", "169", "abc"):
             self.assertEqual(
                 self.client.get("/api/v1/history?key=pv_power&hours="+value).status_code, 400
             )
+
+    def test_primary_homepage_and_default_api_show_seeded_mysql_without_query_flag(self):
+        value = {
+            "signal_key": "pv_power", "unit": "кВт",
+            "value_decimal": Decimal("5.100000000"), "quality": "simulated",
+            "label_uk": "Генерація PV", "raw_value": None,
+            "observed_at_utc": datetime(2026, 11, 24, 17, 0),
+        }
+        def lookup(sql, params):
+            if "WHERE quality<>'simulated' LIMIT 1" in sql:
+                return None
+            if "WHERE quality='simulated' AND ingest_source=%s" in sql:
+                return {"n": 1}
+            if "COUNT(DISTINCT m.signal_id)" in sql:
+                return {"n": 316}
+            if "COUNT(*)" in sql:
+                return {"n": 1}
+            if "SELECT 1 AS n" in sql:
+                return {"n": 1}
+            if "m.value_decimal" in sql:
+                return value
+            return None
+        self.data_one = lookup
+        self.data_rows = lambda sql, params: (
+            [value] if "FROM rakurs_signals AS s" in sql else []
+        )
+        homepage = self.client.get("/")
+        self.assertEqual(homepage.status_code, 200)
+        html = homepage.get_data(as_text=True)
+        self.assertIn("Генерація PV", html)
+        self.assertIn("5.1", html)
+        self.assertIn("simulated", html)
+        self.assertIn("rakurs-primary-mysql-20261124-v2", html)
+
+        status = self.client.get("/api/v1/status").get_json()
+        self.assertEqual(status["mode"], "simulation")
+        self.assertEqual(status["simulated_signals"], 316)
+        self.assertEqual(status["verified_signals"], 0)
+        latest = self.client.get("/api/v1/latest?keys=pv_power").get_json()
+        self.assertTrue(latest["simulation"])
+        self.assertEqual(latest["values"]["pv_power"]["value_decimal"], "5.100000000")
+
+        real = self.client.get("/api/v1/status?real=1").get_json()
+        self.assertEqual(real["mode"], "real")
 
     def test_password_file_mode_and_ownership(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -296,9 +341,9 @@ class AuthenticationTests(unittest.TestCase):
         html = (RAKURS / "standalone/templates/index.html").read_text()
         js = (RAKURS / "standalone/static/app.js").read_text()
         script = (RAKURS / "standalone/repair_dashboard_assets.sh").read_text()
-        self.assertIn('/static/app.js?v=rakurs-deye-modbus-624-20261124', html)
+        self.assertIn('/static/app.js?v=rakurs-primary-mysql-20261124-v2', html)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
-        self.assertIn("const DEMO_MODE = new URLSearchParams(", js)
+        self.assertIn("let DEMO_MODE = new URLSearchParams(", js)
         self.assertIn("sha256sum", script)
         self.assertIn('https://$DOMAIN$ASSET_PATH', script)
         self.assertIn("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS", script)
@@ -307,14 +352,16 @@ class AuthenticationTests(unittest.TestCase):
         self.assertNotIn("TRUNCATE", script)
         self.assertNotIn("docker ", script)
 
-    def test_demo_frontend_auto_loads_only_when_no_real_data(self):
+    def test_primary_dashboard_displays_existing_samples_without_demo_url(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('!real.has_real_samples', js)
-        self.assertIn('demo.has_simulated_samples && demo.simulated_signals > 0', js)
-        self.assertIn('window.location.replace(target.pathname + target.search + target.hash)', js)
-        self.assertIn('get("real") === "1"', js)
-        self.assertIn('DEMO_MODE ? "/?real=1" : "/?demo=1"', js)
+        self.assertIn('DEMO_MODE = Boolean(state.status && state.status.mode === "simulation")', js)
+        self.assertIn('const FORCE_REAL_MODE =', js)
+        self.assertIn('const selection = FORCE_REAL_MODE ? "real=1"', js)
+        self.assertNotIn('window.location.replace(', js)
         self.assertNotIn('message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ"', js)
+        html = (RAKURS / "standalone/templates/index.html").read_text()
+        self.assertIn('Показники Deye з бази даних', html)
+        self.assertIn('{{ item.value }}', html)
 
     def test_browser_login_and_logout_forms_allowed_by_csp(self):
         login = self.client.get("/login")
@@ -332,7 +379,8 @@ class AuthenticationTests(unittest.TestCase):
         self.data_one = lambda sql, params: (
             AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql else None
         )
-        dashboard = self.client.get("/")
+        with patch.object(module, "rows", return_value=[]):
+            dashboard = self.client.get("/")
         self.assertEqual(dashboard.status_code, 200)
         self.assertIn("form-action 'self'", dashboard.headers["Content-Security-Policy"])
 
