@@ -1,3 +1,15 @@
+# Deye / Teltonika — режим моніторингу (форк Ivital)
+
+> **Цей форк використовується для локального моніторингу Deye через RS485 → Teltonika → 4G/WireGuard → Home Assistant.** У гілці розробки підтримуються тільки читання Modbus FC03/FC04 і транспорт `modbus_tcp`. Керування інвертором і команди запису вимкнені.
+>
+> Для встановлення **нашої** версії користуйтеся [українською інструкцією](./docs/DEYE_TRB145_UA.md) та [Docker Compose](./deploy/compose.yaml). Не встановлюйте цей форк через посилання HACS нижче: воно належить оригінальному репозиторію і встановлює інший код.
+>
+> До апаратної перевірки Deye/Teltonika це тестова збірка. Основна гілка `main` оновлюється лише після приймання PR.
+
+---
+
+## Відомості про оригінальний проєкт
+
 # ⚡ Solarman Stick Logger
 
 [![License](https://img.shields.io/github/license/davidrapan/ha-solarman)](https://github.com/davidrapan/ha-solarman/blob/main/license)
