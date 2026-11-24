@@ -659,11 +659,11 @@ def parallel_simulation_overview():
         })
     result = rows(
         "SELECT pm.slot_no,d.device_key,d.model,"
-        "(SELECT COUNT(*) FROM rakurs_modbus_register_samples AS r "
+        "(SELECT COUNT(DISTINCT r.function_code,r.register_address) FROM rakurs_modbus_register_samples AS r "
         " WHERE r.device_id=d.id AND r.quality='simulated') AS raw_registers,"
-        "(SELECT COUNT(*) FROM rakurs_modbus_field_samples AS f "
+        "(SELECT COUNT(DISTINCT f.field_id) FROM rakurs_modbus_field_samples AS f "
         " WHERE f.device_id=d.id AND f.quality='simulated') AS decoded_fields,"
-        "(SELECT COUNT(*) FROM rakurs_samples AS s "
+        "(SELECT COUNT(DISTINCT s.signal_id) FROM rakurs_samples AS s "
         " WHERE s.device_id=d.id AND s.quality='simulated') AS ui_fields "
         "FROM rakurs_parallel_members AS pm "
         "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
@@ -759,8 +759,11 @@ def parallel_simulation_fields():
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_field_samples AS m "
         "WHERE m.device_id=%s AND m.quality='simulated' "
-        "AND m.ingest_source=%s",
-        (selected["id"], PARALLEL_DEMO_SOURCE),
+        "AND m.ingest_source=%s AND m.observed_at_utc=("
+        "SELECT MAX(x.observed_at_utc) FROM rakurs_modbus_field_samples AS x "
+        "WHERE x.device_id=m.device_id AND x.quality='simulated' "
+        "AND x.ingest_source=%s)",
+        (selected["id"], PARALLEL_DEMO_SOURCE, PARALLEL_DEMO_SOURCE),
     )
     records = rows(
         "SELECT f.field_key,f.field_name,f.group_name,f.unit,"
@@ -768,9 +771,13 @@ def parallel_simulation_fields():
         "FROM rakurs_modbus_field_samples AS m "
         "JOIN rakurs_modbus_fields AS f ON f.id=m.field_id "
         "WHERE m.device_id=%s AND m.quality='simulated' "
-        "AND m.ingest_source=%s "
-        "ORDER BY f.field_key,m.observed_at_utc DESC LIMIT %s OFFSET %s",
-        (selected["id"], PARALLEL_DEMO_SOURCE, limit, offset),
+        "AND m.ingest_source=%s AND m.observed_at_utc=("
+        "SELECT MAX(x.observed_at_utc) FROM rakurs_modbus_field_samples AS x "
+        "WHERE x.device_id=m.device_id AND x.quality='simulated' "
+        "AND x.ingest_source=%s) "
+        "ORDER BY f.field_key LIMIT %s OFFSET %s",
+        (selected["id"], PARALLEL_DEMO_SOURCE, PARALLEL_DEMO_SOURCE,
+         limit, offset),
     )
     return jsonify({
         "data_source": "mysql", "simulation": True,
