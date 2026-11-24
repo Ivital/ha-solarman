@@ -396,16 +396,23 @@ class FullModbusSimulationTests(unittest.TestCase):
         self.assertEqual(len(fields), len(extracted))
         addresses = set()
 
+        def flatten_registers(value):
+            if isinstance(value, int) and not isinstance(value, bool):
+                yield value
+            elif isinstance(value, list):
+                for item in value:
+                    yield from flatten_registers(item)
+
         def all_register_addresses(value):
             if isinstance(value, dict):
                 for k, v in value.items():
-                    if k == "registers" and isinstance(v, list):
-                        yield from (x for x in v if isinstance(x, int))
+                    if k == "registers":
+                        yield from flatten_registers(v)
                     else:
                         yield from all_register_addresses(v)
             elif isinstance(value, list):
-                for v in value:
-                    yield from all_register_addresses(v)
+                for item in value:
+                    yield from all_register_addresses(item)
 
         for field, (group, entry) in zip(fields, extracted):
             self.assertEqual(field["group"], group)
