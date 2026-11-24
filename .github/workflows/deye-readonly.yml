@@ -93,6 +93,7 @@ jobs:
           node --check deploy/rakurs/standalone/static/app-clarity-20261124.js
           node --check deploy/rakurs/standalone/static/app-parallel-20261124.js
           node --check deploy/rakurs/standalone/static/app-parallel-archive-20261124.js
+          node --check deploy/rakurs/standalone/static/app-parallel-twin-20261125.js
           node tests/test_rakurs_clarity_ui.js
       - name: Read-only integration tests
         run: python -m unittest discover -s tests -p 'test_deye*.py' -v
