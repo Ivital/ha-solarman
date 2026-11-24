@@ -67,7 +67,7 @@ def main():
                 "TO 'rakurs_web'@'192.168.5.31'"
             )
             c.execute(
-                "GRANT UPDATE ON rakurs.rakurs_users "
+                "GRANT UPDATE (last_login_at_utc) ON rakurs.rakurs_users "
                 "TO 'rakurs_web'@'192.168.5.31'"
             )
         test = pymysql.connect(
