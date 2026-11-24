@@ -217,9 +217,7 @@ async function renderGroup(groups, title, cycle) {
   section(title, DEMO_MODE ? "Демо · " + items.length + " полів каталогу" :
                                               items.length + " запланованих полів · без вигаданих даних");
   const tags = element("div", "tags");
-  add(tags, element("span", "tag", DEMO_MODE ? "СИМУЛЯЦІЯ · MySQL rakurs" :
-                                                      "Джерело: MySQL rakurs"),
-    element("span", "tag warning", "Сумісність регістрів SG05LP3 не підтверджено"));
+  add(tags, element("span", "tag", "Джерело: MySQL rakurs"));
   main.appendChild(tags);
   if (!items.length) { main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр планових сигналів.")); return; }
   const verified = verifiedKeys();
