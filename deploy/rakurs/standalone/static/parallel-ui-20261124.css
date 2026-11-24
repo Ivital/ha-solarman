@@ -24,6 +24,9 @@
 .parallel-reading strong{font-size:17px;color:#e3f5f5}
 .parallel-reading span{font-size:9px;color:#86a4b8}
 .parallel-device-events{font-size:11px;color:#abc8d5;margin:12px 0 0}
+.parallel-device-chart{border-top:1px solid #31526a;margin-top:17px;padding-top:14px}
+.parallel-device-chart h3{font-size:12px;margin:0 0 12px;color:#b4cfdd}
+.parallel-device-chart .chart{background:#122b40;border-color:#34516a}
 .shared-soc{font-size:26px;font-weight:780;color:#82d9e4;margin:10px 0}
 .parallel-aggregate{font-size:13px;border:1px dashed #416175;background:#173148;
   padding:15px;border-radius:12px;color:#c2deea}
