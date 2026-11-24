@@ -79,7 +79,8 @@ done
 
 if [[ ! "$code" =~ ^(200|301|302|303|307|308)$ || "$www_code" != 301 ]]; then
   echo 'STOP: HTTPS failed certificate, proxy, or redirect check; rolling back ONLY Rakurs HTTPS' >&2
-  echo 'Inspect SNI, address-specific listen directives, and Nginx reload logs using deploy/rakurs/diagnose_tls.sh' >&2
+  echo '=== AUTOMATIC TLS/SNI DIAGNOSTIC BEFORE ROLLBACK ===' >&2
+  bash deploy/rakurs/diagnose_tls.sh || true
   sudo rm -f -- "$link" "$site"
   sudo nginx -t && sudo systemctl reload nginx
   exit 1
