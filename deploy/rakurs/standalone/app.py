@@ -352,6 +352,37 @@ def batches():
     return jsonify({"data_source": "mysql", "simulation": demo_mode(),
                     "batches": serialize(result)})
 
+@app.get("/api/v1/modbus-fields")
+def modbus_fields():
+    if demo_mode():
+        sample_join = (
+            "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
+            "AND m.quality='simulated' AND m.ingest_source=%s "
+            "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s)"
+        )
+        params = (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY)
+    else:
+        sample_join = (
+            "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
+            "AND m.quality<>'simulated'"
+        )
+        params = ()
+    data = rows(
+        "SELECT f.field_key, f.group_name, f.field_name, f.platform, "
+        "f.unit, f.registers_json, f.derived, f.verified, "
+        "m.value_decimal, m.value_text, m.quality, m.observed_at_utc "
+        "FROM rakurs_modbus_fields AS f " + sample_join +
+        " ORDER BY f.id LIMIT 700",
+        params
+    )
+    reg_count = one("SELECT COUNT(*) AS n FROM rakurs_modbus_register_inventory")
+    return jsonify({
+        "data_source": "mysql", "simulation": demo_mode(),
+        "count": len(data), "register_count": reg_count["n"],
+        "fields": serialize(data),
+    })
+
+
 # Register MySQL-backed authorization only after all read-only routes exist.
 from .auth import init_auth
 init_auth(app, lambda sql, params=(): one(sql, params), lambda: conn())
