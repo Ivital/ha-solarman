@@ -15,21 +15,21 @@ TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
   app.py parallel_support.py modbus_archive.py templates/index.html
-  static/app-parallel-archive-20261124.js static/parallel-archive-20261124.css
+  static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
 )
 cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-archive-20261124.js"' "$HERE/templates/index.html"
-grep -Fq 'href="/static/parallel-archive-20261124.css"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js"' "$HERE/templates/index.html"
+grep -Fq 'href="/static/parallel-twin-20261125.css"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
-grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-archive-20261124.js"
-grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-archive-20261124.js"
+grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
+grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'aggregate_verified": False' "$HERE/parallel_support.py"
 if command -v node >/dev/null 2>&1; then
-  node --check "$HERE/static/app-parallel-archive-20261124.js"
+  node --check "$HERE/static/app-parallel-twin-20261125.js"
   node tests/test_rakurs_clarity_ui.js
 fi
 bash -n "$HERE/audit_parallel_host_readonly.sh"
@@ -91,7 +91,7 @@ for attempt in $(seq 1 30); do
     --connect-timeout 2 --max-time 3 http://127.0.0.1:8765/login || true)"
   SCRIPT="$(curl --noproxy '*' -s -o /dev/null -w '%{http_code}' \
     --connect-timeout 2 --max-time 3 \
-    http://127.0.0.1:8765/static/app-parallel-archive-20261124.js || true)"
+    http://127.0.0.1:8765/static/app-parallel-twin-20261125.js || true)"
   if [[ "$LOGIN" == 200 && "$SCRIPT" == 200 ]] &&
      systemctl is-active --quiet rakurs-standalone.service; then
     READY=YES
@@ -132,8 +132,8 @@ with c.session_transaction(base_url="https://localhost") as s:
 home = c.get("/", base_url="https://localhost")
 assert home.status_code == 200
 html = home.get_data(as_text=True)
-for fragment in ("/static/app-parallel-archive-20261124.js",
-                 "/static/parallel-archive-20261124.css",
+for fragment in ("/static/app-parallel-twin-20261125.js",
+                 "/static/parallel-twin-20261125.css",
                  'Показники Deye з бази даних', "5.1", "6.4", "72"):
     assert fragment in html, "Missing HTML/DB content: " + fragment
 print("PARALLEL_EXISTING_HOME=PASS")
@@ -161,7 +161,7 @@ print("EXISTING_EVENTS=PASS")
 PY
 
 echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
-for path in static/app-parallel-archive-20261124.js static/parallel-archive-20261124.css; do
+for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css; do
   expected="$(sha256sum "$HERE/$path" | awk '{print $1}')"
   tmp="$(mktemp)"
   for route in LOCAL PUBLIC; do
