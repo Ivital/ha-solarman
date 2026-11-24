@@ -370,7 +370,6 @@ def status():
             "has_real_samples": False,
             "has_simulated_samples": sample_exists is not None,
             "collector_active": False, "home_assistant_dependency": False,
-        "mysql_transport": mysql_transport_state(),
             "mysql_transport": mysql_transport_state(),
         })
     devices = one("SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key<>%s",
@@ -385,6 +384,7 @@ def status():
         "verified_signals": verified["n"], "displayed_signals": verified["n"],
         "has_real_samples": sample_exists is not None,
         "collector_active": False, "home_assistant_dependency": False,
+        "mysql_transport": mysql_transport_state(),
     })
 
 @app.get("/api/v1/signals")
