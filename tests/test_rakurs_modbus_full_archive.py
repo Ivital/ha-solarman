@@ -185,6 +185,29 @@ class ArchiveTransactionTests(unittest.TestCase):
         self.assertEqual(db.committed, 0)
         self.assertEqual(db.rolled_back, 1)
 
+    def test_verified_real_timeout_writes_device_event_without_fake_samples(self):
+        db = FakeDb(kind="inverter", verified=True)
+        payload = {
+            "device_key": "deye_unit_1", "poll_uid": "timeout_poll_2026_01",
+            "quality": "partial", "transport": "rs485", "slave_id": 1,
+            "ingest_source": "approved_collector",
+            "observed_at_utc": "2026-11-25T00:00:00Z",
+            "frames": [{
+                "function_code": 3, "start_address": 100, "requested_count": 2,
+                "status": "timeout", "words": [], "bits": [],
+                "request_hex": rtu("010300640002"),
+                "error_code": "READ_TIMEOUT",
+            }],
+        }
+        receipt = persist(db, payload)
+        self.assertEqual(receipt["raw_registers"], 0)
+        self.assertTrue(any(
+            q.startswith("INSERT INTO rakurs_device_events") and
+            params[3] == "MODBUS_TIMEOUT"
+            for q, params in db.statements
+        ))
+        self.assertEqual(db.committed, 1)
+
     def test_source_contains_complete_two_device_snapshot(self):
         fields, signals, addresses = check_source()
         self.assertEqual((len(fields), len(signals), len(addresses)), (624, 316, 815))
