@@ -48,6 +48,9 @@ jobs:
           bash deploy/rakurs/standalone/deploy_clarity_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_events_ui.sh
           bash deploy/rakurs/standalone/deploy_events_ui.sh --check
+          bash -n deploy/rakurs/standalone/audit_parallel_host_readonly.sh
+          bash -n deploy/rakurs/standalone/deploy_parallel_ui.sh
+          bash deploy/rakurs/standalone/deploy_parallel_ui.sh --check
           bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
           bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
           bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
@@ -79,9 +82,11 @@ jobs:
         run: |
           python -m unittest discover -s tests -p 'test_rakurs_standalone.py' -v
           python -m unittest discover -s tests -p 'test_rakurs_history_72h.py' -v
+          python -m unittest discover -s tests -p 'test_rakurs_parallel.py' -v
           node --check deploy/rakurs/standalone/static/app.js
           node tests/test_rakurs_ssr_guard.js
           node --check deploy/rakurs/standalone/static/app-clarity-20261124.js
+          node --check deploy/rakurs/standalone/static/app-parallel-20261124.js
           node tests/test_rakurs_clarity_ui.js
       - name: Read-only integration tests
         run: python -m unittest discover -s tests -p 'test_deye*.py' -v
