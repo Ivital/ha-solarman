@@ -27,3 +27,13 @@ class RakursMySqlArchiveTests(unittest.TestCase):
         for forbidden in ("MYSQL_PWD", "RAKURS_MYSQL_PASSWORD=", "curl -k",
                           "uci set", "docker compose up"):
             self.assertNotIn(forbidden, content)
+
+
+    def test_tls_certificate_diagnostic_is_read_only(self):
+        code = (R / "mysql_archive_tls_diagnose.py").read_text(encoding="utf-8")
+        self.assertIn('"-starttls", "mysql"', code)
+        self.assertIn('"-verify_hostname", HOST', code)
+        for forbidden in ("--password", "MYSQL_PWD", "INSERT INTO", "DELETE FROM",
+                          "DROP TABLE", "uci set"):
+            self.assertNotIn(forbidden, code)
+        self.assertIn("UNTRUSTED CERTIFICATE", code)

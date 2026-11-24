@@ -30,6 +30,7 @@ jobs:
           bash -n deploy/rakurs/install_diagram.sh
           bash -n deploy/rakurs/audit_storage.sh
           bash -n deploy/rakurs/mysql_archive_preflight.sh
+          python -m py_compile deploy/rakurs/mysql_archive_tls_diagnose.py
           sh -n deploy/rakurs/renewal-nginx-reload.sh
           python -m unittest discover -s tests -p 'test_rakurs_proxy.py' -v
       - name: Validate Docker Compose configuration
