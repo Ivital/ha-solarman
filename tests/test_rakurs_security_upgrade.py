@@ -93,6 +93,10 @@ class LiveArchiveApiTests(unittest.TestCase):
             if "FROM rakurs_devices AS d" in sql:
                 return [{"id":21,"device_key":"real_1","kind":"inverter",
                          "model":app_module.PARALLEL_MODEL}]
+            if "FROM rakurs_modbus_poll_runs" in sql:
+                return [{"poll_uid":"poll_real_2026","quality":"good",
+                         "status":"complete","request_count":1,"response_count":1,
+                         "exception_count":0}]
             if "FROM rakurs_modbus_register_samples" in sql:
                 return [{"frame_id":88,"function_code":3,
                          "register_address":124,"raw_uint16":500,
