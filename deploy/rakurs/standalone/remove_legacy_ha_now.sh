@@ -102,9 +102,11 @@ sudo docker inspect "$CONTAINER" | sudo tee "$BACKUP_DIR/container-inspect.json"
 SWITCHED=0
 REMOVED=0
 HA_STOPPED=0
+STEP="prepare rollback"
 on_error() {
   rc=$?
   trap - ERR
+  echo "FAILED_STEP=$STEP EXIT_CODE=$rc" >&2
   if (( REMOVED == 0 )); then
     echo 'Failure before deletion: restoring prior HA site and container.' >&2
     if (( HA_STOPPED == 1 )); then sudo docker start "$CONTAINER" || true; fi
@@ -121,29 +123,46 @@ on_error() {
 trap on_error ERR
 
 # Switch only the Rakurs HTTPS site, leave certificate and other sites alone.
+STEP='install maintenance config and reload Nginx'
 SWITCHED=1
 sudo install -m 0644 "$MAINTENANCE" "$VHOST"
 sudo nginx -t
 sudo systemctl reload nginx
+STEP='verify local HTTPS maintenance response, bypass any shell HTTPS proxy'
 BODY="$(mktemp)"
-HTTP="$(curl -sS --max-time 12 --resolve "$DOMAIN:443:127.0.0.1" \
-  -o "$BODY" -w '%{http_code}' "https://$DOMAIN/")"
-grep -Fq 'RAKURS_MAINTENANCE_UPGRADING' "$BODY"
-rm -f "$BODY"
-[[ "$HTTP" == '503' ]] || { echo "STOP: maintenance check HTTP=$HTTP" >&2; false; }
+HEADERS="$(mktemp)"
+trap 'rm -f -- "${BODY:-}" "${HEADERS:-}"' EXIT
+HTTP="$(curl --noproxy '*' --silent --show-error --max-time 12 \
+  --connect-timeout 4 --resolve "$DOMAIN:443:127.0.0.1" \
+  --dump-header "$HEADERS" --output "$BODY" \
+  --write-out '%{http_code}' "https://$DOMAIN/")"
+if [[ "$HTTP" != '503' ]] || ! grep -Fq 'RAKURS_MAINTENANCE_UPGRADING' "$BODY"; then
+  echo "STOP: localhost HTTPS maintenance not confirmed (HTTP=$HTTP)" >&2
+  echo 'Response status / content-type (no response body disclosed):' >&2
+  grep -iE '^(HTTP/|content-type:|x-rakurs-maintenance:)' "$HEADERS" >&2 || true
+  echo 'Nginx site will be rolled back; HA remains untouched.' >&2
+  false
+fi
+rm -f -- "$BODY" "$HEADERS"
+unset BODY HEADERS
+trap - EXIT
 echo 'RAKURS_MAINTENANCE_HTTPS=PASS'
 
 # Stop for a consistent copy of the prior HA SQLite/WAL/config.
+STEP="stop old HA container"
 sudo docker stop --time 40 "$CONTAINER"
 HA_STOPPED=1
+STEP="create and verify HA config backup"
 sudo tar --one-file-system -C "$ROOT/deploy" \
   -czf "$BACKUP_DIR/ha-config.tar.gz" data
 sudo tar -tzf "$BACKUP_DIR/ha-config.tar.gz" >/dev/null
 sudo sha256sum "$BACKUP_DIR/ha-config.tar.gz" | sudo tee "$BACKUP_DIR/backup.sha256" >/dev/null
 echo "HA_CONFIG_BACKUP_VERIFIED=$BACKUP_DIR/ha-config.tar.gz"
 
+STEP="remove verified old HA container"
 sudo docker rm "$CONTAINER"
 REMOVED=1
+STEP="remove isolated old HA config after verified backup"
 sudo rm -rf -- "$DATA"
 echo 'HOME_ASSISTANT_CONTAINER_AND_CONFIG_REMOVED=PASS'
 

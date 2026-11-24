@@ -299,6 +299,9 @@ class AuthenticationTests(unittest.TestCase):
         self.assertNotIn("docker image rm -f", script)
         self.assertIn("RAKURS_MAINTENANCE_UPGRADING", template)
         self.assertIn("return 503", template)
+        self.assertIn("curl --noproxy '*'", script)
+        self.assertIn("FAILED_STEP=$STEP", script)
+        self.assertIn('X-Rakurs-Maintenance', template)
 
     def test_publish_supports_prior_maintenance_vhost(self):
         script = (RAKURS / "standalone/switch_rakurs_nginx.sh").read_text()
