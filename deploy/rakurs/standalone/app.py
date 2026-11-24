@@ -118,7 +118,7 @@ def secure_headers(response):
     response.headers["Content-Security-Policy"] = (
         "default-src 'none'; script-src 'self'; style-src 'self'; "
         "img-src 'self' data:; connect-src 'self'; "
-        "font-src 'self'; base-uri 'none'; form-action 'none'; "
+        "font-src 'self'; base-uri 'none'; form-action 'self'; "
         "frame-ancestors 'none'"
     )
     return response
