@@ -1,7 +1,8 @@
 "use strict";
 // Rakurs standalone: the ONLY data API is this app's /api/v1/* backed by MySQL.
 const base = "/api/v1";
-const DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
+let DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
+const FORCE_REAL_MODE = new URLSearchParams(window.location.search).get("real") === "1";
 const views = [
   ["overview", "Огляд", "◈"],
   ["pv", "Сонце", "☀"],
@@ -58,7 +59,8 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path) {
-  const url = base + path + (DEMO_MODE ? (path.includes("?") ? "&demo=1" : "?demo=1") : "");
+  const selection = FORCE_REAL_MODE ? "real=1" : (DEMO_MODE ? "demo=1" : "");
+  const url = base + path + (selection ? (path.includes("?") ? "&" : "?") + selection : "");
   const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
@@ -465,46 +467,27 @@ async function render() {
   }
 }
 async function boot() {
-  // The one-shot dataset is explicitly tagged simulated. When it is the
-  // only data in MySQL, open it by default instead of displaying blank cards.
-  // ?real=1 remains an explicit way to view only real telemetry.
-  const forceReal = new URLSearchParams(window.location.search).get("real") === "1";
-  if (!DEMO_MODE && !forceReal) {
-    try {
-      const real = await api("/status");
-      if (!real.has_real_samples) {
-        const response = await fetch(base + "/status?demo=1", {
-          cache: "no-store", credentials: "same-origin"
-        });
-        if (response.ok) {
-          const demo = await response.json();
-          if (demo.has_simulated_samples && demo.simulated_signals > 0) {
-            const target = new URL(window.location.href);
-            target.searchParams.set("demo", "1");
-            window.location.replace(target.pathname + target.search + target.hash);
-            return;
-          }
-        }
-      }
-    } catch (_error) {
-      // Keep the ordinary read-only mode if status cannot be established.
-    }
-  }
-
-  const switcher = element("a", "tag", DEMO_MODE ?
-      "Реальні дані" : "Демо Deye");
-  switcher.href = DEMO_MODE ? "/?real=1" : "/?demo=1";
-  switcher.title = DEMO_MODE ? "Показувати лише реальні вимірювання" :
-      "Показати лише синтетичні значення без зв’язку з інвертором";
-  const actions = document.querySelector(".top-actions");
-  if (actions) actions.appendChild(switcher);
-  if (DEMO_MODE) document.body.classList.add("demo-mode");
+  // Always load the database status before selecting a display mode. When
+  // only synthetic samples exist, use them on the ordinary Rakurs homepage.
   const results = await Promise.allSettled([
     api("/catalog"), api("/status"), api("/signals"), api("/auth")
   ]);
   state.catalog = results[0].status === "fulfilled" ? results[0].value : null;
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
   state.verified = results[2].status === "fulfilled" ? results[2].value.signals : [];
+  // The API is the source of truth: never label synthetic values as verified.
+  DEMO_MODE = Boolean(state.status && state.status.mode === "simulation");
+
+  const switcher = element("a", "tag",
+      FORCE_REAL_MODE ? "Показати наявні дані" :
+      DEMO_MODE ? "Реальні вимірювання" : "Дані Deye");
+  switcher.href = FORCE_REAL_MODE ? "/" :
+      DEMO_MODE ? "/?real=1" : "/?demo=1";
+  switcher.title = DEMO_MODE ? "Показувати лише показники реального інвертора" :
+      "Показати наявні записи MySQL";
+  const actions = document.querySelector(".top-actions");
+  if (actions) actions.appendChild(switcher);
+  if (DEMO_MODE) document.body.classList.add("demo-mode");
   updateConnection(state.status !== null);
   if (results[3].status === "fulfilled") createLogout(results[3].value);
   await render();
