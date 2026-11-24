@@ -523,7 +523,7 @@ def parallel_registered_devices():
     return rows(
         "SELECT d.id, d.device_key, d.kind, d.model, d.serial_number "
         "FROM rakurs_devices AS d "
-        "WHERE d.device_key<>%s AND d.model LIKE %s "
+        "WHERE d.device_key<>%s AND d.kind='inverter' AND d.model LIKE %s "
         "ORDER BY d.device_key LIMIT 20",
         (DEMO_DEVICE_KEY, "%" + PARALLEL_MODEL + "%"),
     )
