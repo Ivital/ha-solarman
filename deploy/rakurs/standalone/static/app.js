@@ -12,6 +12,7 @@ const views = [
   ["history", "Історія", "▥"],
   ["events", "Події", "◇"],
   ["archive", "Архів", "▦"],
+  ["modbus", "Modbus", "▤"],
   ["system", "Система", "⚙"]
 ];
 const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0 };
@@ -116,15 +117,7 @@ function verifiedKeys() {
   return new Set(state.verified.map(s => s.signal_key));
 }
 function addStatusMessage() {
-  if (DEMO_MODE) {
-    message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ",
-      "Один синтетичний знімок у MySQL. Жоден інвертор або Teltonika не опитувалися. " +
-      "Значення призначені лише для перевірки дизайну та API.", true);
-    if (!state.status || !state.status.has_simulated_samples) {
-      message("Тестовий знімок не знайдено", "Спочатку запустіть контрольоване завантаження симулятора.", true);
-    }
-    return;
-  }
+  if (DEMO_MODE) return;
   if (!state.status) {
     message("Підключення до MySQL не підтверджено",
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
@@ -162,7 +155,7 @@ async function renderOverview(cycle) {
     ["Заряд АКБ", "▣"], ["Потужність АКБ", "↯"], ["Температура інвертора", "♨"],
     ["Виробіток за добу", "◉"], ["Споживання за добу", "▥"]
   ];
-  section("Оперативні показники", DEMO_MODE ? "СИМУЛЯЦІЯ · один тестовий знімок" :
+  section("Оперативні показники", DEMO_MODE ? "Демо · один знімок" :
                                                     "Тільки фактичні значення MySQL");
   const deck = element("div", "cards");
   main.appendChild(deck);
@@ -200,7 +193,7 @@ async function renderOverview(cycle) {
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title, DEMO_MODE ? "СИМУЛЯЦІЯ · " + items.length + " полів каталогу" :
+  section(title, DEMO_MODE ? "Демо · " + items.length + " полів каталогу" :
                                               items.length + " запланованих полів · без вигаданих даних");
   const tags = element("div", "tags");
   add(tags, element("span", "tag", DEMO_MODE ? "СИМУЛЯЦІЯ · MySQL rakurs" :
@@ -209,11 +202,18 @@ async function renderGroup(groups, title, cycle) {
   main.appendChild(tags);
   if (!items.length) { main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр планових сигналів.")); return; }
   const verified = verifiedKeys();
-  const keys = items.filter(i => verified.has(i.key)).slice(0, 24).map(i => i.key);
+  const keys = items.filter(i => verified.has(i.key)).map(i => i.key);
   let values = {};
-  if (keys.length) {
-    try { values = (await api("/latest?keys=" + encodeURIComponent(keys.join(",")))).values; }
-    catch (_error) { if (current(cycle)) message("Дані тимчасово недоступні", "Не вдалося отримати значення MySQL.", true); }
+  for (let offset = 0; offset < keys.length; offset += 24) {
+    const chunk = keys.slice(offset, offset + 24);
+    try {
+      const batch = (await api("/latest?keys=" + encodeURIComponent(chunk.join(",")))).values;
+      Object.assign(values, batch);
+    } catch (_error) {
+      if (current(cycle)) message("Дані тимчасово недоступні",
+        "Не вдалося отримати значення MySQL.", true);
+      break;
+    }
   }
   if (!current(cycle)) return;
   const list = element("div", "metric-list");
@@ -233,9 +233,6 @@ async function renderGroup(groups, title, cycle) {
     list.appendChild(row);
   }
   main.appendChild(list);
-  if (items.filter(i => verified.has(i.key)).length > 24) {
-    main.appendChild(createEmpty("Більше підтверджених сигналів", "Актуальні значення першої групи з 24; решта доступні в «Історії»."));
-  }
 }
 function svgChart(points, unit) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -335,7 +332,7 @@ async function renderHistory(cycle, archived) {
 }
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
-  section(sectionName, DEMO_MODE ? "СИМУЛЯЦІЯ · тестовий знімок MySQL" :
+  section(sectionName, DEMO_MODE ? "Демо · MySQL" :
                                         "Записи виключно з MySQL rakurs");
   const root = panel(sectionName);
   main.appendChild(root);
@@ -357,9 +354,50 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
     add(table, thead, tbody); wrap.appendChild(table); root.appendChild(wrap);
   } catch (_error) { if (current(cycle)) root.appendChild(createEmpty("База недоступна", "Не вдалося прочитати записи.")); }
 }
+async function renderModbus(cycle) {
+  addStatusMessage();
+  section("Повний перелік Modbus", DEMO_MODE ?
+    "Профіль P3 · один тестовий знімок" : "Профіль P3 · довідник регістрів");
+  const pane = panel("Параметри Deye", "Найменування, адреси, значення та одиниці");
+  main.appendChild(pane);
+  try {
+    const payload = await api("/modbus-fields");
+    if (!current(cycle)) return;
+    const summary = element("p", "subtle",
+      "Параметрів: " + payload.count + " · Адрес у профілі: " + payload.register_count);
+    pane.appendChild(summary);
+    const wrap = element("div", "table-wrap");
+    const table = element("table", "data-table");
+    const head = element("thead", ""), tr = element("tr", "");
+    ["Група", "Параметр", "Адреса Modbus", "Значення", "Одиниця"].forEach(t =>
+      tr.appendChild(element("th", "", t)));
+    head.appendChild(tr);
+    const body = element("tbody", "");
+    for (const field of payload.fields) {
+      const row = element("tr", "");
+      let regs = field.registers_json || "[]";
+      try {
+        regs = JSON.parse(regs);
+        regs = regs.map(r => "0x" + Number(r).toString(16).toUpperCase().padStart(4, "0"))
+          .join(", ");
+      } catch (_error) {
+        regs = String(regs);
+      }
+      const value = field.value_text !== null && field.value_text !== undefined ?
+        field.value_text : number(field.value_decimal);
+      [field.group_name, field.field_name, regs || "Розрахунковий",
+       value, field.unit || ""].forEach(v => row.appendChild(element("td", "", v)));
+      body.appendChild(row);
+    }
+    add(table, head, body); wrap.appendChild(table); pane.appendChild(wrap);
+  } catch (_error) {
+    pane.appendChild(createEmpty("Не вдалося завантажити реєстр", "Перевірте MySQL."));
+  }
+}
+
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", DEMO_MODE ? "РЕЖИМ СИМУЛЯЦІЇ" :
+  section("Конфігурація системи", DEMO_MODE ? "Демо режим" :
                                                       "Статус незалежного Rakurs");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
@@ -401,12 +439,13 @@ async function render() {
     case "events": await renderTable("/events", "Події", ["Час", "Рівень", "Код", "Повідомлення", "Пристрій"],
       ["observed_at_utc", "severity", "event_code", "message", "device_key"], cycle); break;
     case "archive": await renderHistory(cycle, true); break;
+    case "modbus": await renderModbus(cycle); break;
     case "system": await renderSystem(cycle); break;
   }
 }
 async function boot() {
   const switcher = element("a", "tag warning", DEMO_MODE ?
-      "ВИЙТИ З СИМУЛЯЦІЇ" : "СИМУЛЯЦІЯ DEYE");
+      "Звичайний режим" : "Демо Deye");
   switcher.href = DEMO_MODE ? "/" : "/?demo=1";
   switcher.title = DEMO_MODE ? "Показувати лише реальні вимірювання" :
       "Показати лише синтетичні значення без зв’язку з інвертором";
