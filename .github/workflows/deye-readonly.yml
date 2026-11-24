@@ -39,6 +39,8 @@ jobs:
           bash -n deploy/rakurs/standalone/retire_homeassistant.sh
           bash -n deploy/rakurs/standalone/migrate_rakurs.sh
           bash -n deploy/rakurs/standalone/remove_legacy_ha_now.sh
+          python -m py_compile deploy/rakurs/standalone/nginx_rakurs_route_audit.py
+          python -m unittest discover -s tests -p 'test_rakurs_nginx_route_audit.py' -v
           python -m py_compile deploy/rakurs/standalone/app.py
           python -m py_compile deploy/rakurs/standalone/auth.py
           python -m py_compile deploy/rakurs/standalone/bootstrap_admin.py
