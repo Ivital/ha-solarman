@@ -12,10 +12,12 @@
 
 - [x] Python compileall PASS — GitHub Actions 24.11.2026
 - [x] unittest PASS (8 тестів) — GitHub Actions 24.11.2026
-- [ ] docker compose config PASS — додано окремий крок у CI, результат очікує повторного запуску
-- [ ] GitHub Actions PASS — після оновлення цього PR
+- [x] docker compose config PASS — GitHub Actions 24.11.2026
+- [ ] GitHub Actions PASS — фінальний коміт має пройти повторне CI, включно з Hassfest
 - [ ] Code review та відсутність секретів у Git
 - [ ] Наступним етапом: апаратні тести Modbus/Teltonika, WireGuard, архів, дашборд
+
+У форку немає GitHub topics, Issues та власних brand-ресурсів, тому HACS-перевірка публікації каталогу не застосовна до цього приватно використовуваного моніторингу і вимкнена для форка. Встановлення виконується через Docker, не через HACS.
 
 Відсутній реальний доступ до Deye й Teltonika: розгортання в цей етап не входить.
 Не зливати PR до успішного рев'ю і CI.
