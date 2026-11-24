@@ -465,9 +465,35 @@ async function render() {
   }
 }
 async function boot() {
+  // The one-shot dataset is explicitly tagged simulated. When it is the
+  // only data in MySQL, open it by default instead of displaying blank cards.
+  // ?real=1 remains an explicit way to view only real telemetry.
+  const forceReal = new URLSearchParams(window.location.search).get("real") === "1";
+  if (!DEMO_MODE && !forceReal) {
+    try {
+      const real = await api("/status");
+      if (!real.has_real_samples) {
+        const response = await fetch(base + "/status?demo=1", {
+          cache: "no-store", credentials: "same-origin"
+        });
+        if (response.ok) {
+          const demo = await response.json();
+          if (demo.has_simulated_samples && demo.simulated_signals > 0) {
+            const target = new URL(window.location.href);
+            target.searchParams.set("demo", "1");
+            window.location.replace(target.pathname + target.search + target.hash);
+            return;
+          }
+        }
+      }
+    } catch (_error) {
+      // Keep the ordinary read-only mode if status cannot be established.
+    }
+  }
+
   const switcher = element("a", "tag", DEMO_MODE ?
-      "Звичайний режим" : "Демо Deye");
-  switcher.href = DEMO_MODE ? "/" : "/?demo=1";
+      "Реальні дані" : "Демо Deye");
+  switcher.href = DEMO_MODE ? "/?real=1" : "/?demo=1";
   switcher.title = DEMO_MODE ? "Показувати лише реальні вимірювання" :
       "Показати лише синтетичні значення без зв’язку з інвертором";
   const actions = document.querySelector(".top-actions");
