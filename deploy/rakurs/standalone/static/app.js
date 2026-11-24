@@ -24,6 +24,13 @@ const navigation = document.getElementById("nav");
 const SSR_MODE = main ? main.dataset.initialMode : "";
 const SSR_PRESENT = Boolean(main && main.querySelector(
   '.cards[aria-label="Показники Deye з бази даних"]'));
+const SSR_ORIGINAL_NODES = SSR_PRESENT ?
+  Array.from(main.childNodes).map(node => node.cloneNode(true)) : [];
+function restoreServerReadings() {
+  if (SSR_ORIGINAL_NODES.length) {
+    main.replaceChildren(...SSR_ORIGINAL_NODES.map(node => node.cloneNode(true)));
+  }
+}
 
 function element(tag, className, content) {
   const item = document.createElement(tag);
@@ -490,8 +497,7 @@ async function render() {
   buildNav();
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
   let primedValues = null;
-  if (state.route === "overview" && SSR_PRESENT &&
-      main.querySelector('.cards[aria-label="Показники Deye з бази даних"]')) {
+  if (state.route === "overview" && SSR_PRESENT) {
     // This is the key guard: a failed/stale client API must not replace the
     // successful server-rendered database values with placeholders.
     const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
@@ -503,12 +509,17 @@ async function render() {
       const critical = ["pv_power", "load_power", "battery_soc"];
       if (!critical.every(key => values[key] && values[key].value_decimal !== null)) {
         // Preserve server-rendered readings, and do not switch the page to —.
+        restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API incomplete");
         return;
       }
       primedValues = values;
+      if (!FORCE_REAL_MODE && critical.some(key => values[key].quality === "simulated")) {
+        DEMO_MODE = true; // source metadata always wins over stale mode state
+      }
     } catch (_error) {
       if (current(cycle)) {
+        restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API failed");
       }
       return;
