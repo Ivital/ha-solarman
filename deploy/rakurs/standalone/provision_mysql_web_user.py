@@ -13,6 +13,7 @@ import secrets
 import sys
 
 import pymysql
+from mysql_transport import mysql_tls_options
 
 SECRET = Path("/etc/rakurs/mysql_password")
 
@@ -41,7 +42,7 @@ def main():
     try:
         admin = pymysql.connect(
             host="192.168.5.30", port=3306, database="rakurs",
-            user="Ivital", password=admin_pass, ssl_disabled=True,
+            user="Ivital", password=admin_pass, **mysql_tls_options(require_verified=True),
             autocommit=True, connect_timeout=7, read_timeout=8,
             cursorclass=pymysql.cursors.DictCursor,
         )
@@ -72,7 +73,7 @@ def main():
             )
         test = pymysql.connect(
             host="192.168.5.30", port=3306, database="rakurs",
-            user="rakurs_web", password=private_password, ssl_disabled=True,
+            user="rakurs_web", password=private_password, **mysql_tls_options(require_verified=True),
             autocommit=True, connect_timeout=7, read_timeout=8,
             cursorclass=pymysql.cursors.DictCursor,
         )
