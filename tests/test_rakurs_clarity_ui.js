@@ -1,0 +1,194 @@
+"use strict";
+// Run the actual clarity JavaScript with a small DOM simulator; no MySQL/network.
+const fs = require("node:fs");
+const path = require("node:path");
+const vm = require("node:vm");
+const assert = require("node:assert/strict");
+const root = path.join(__dirname, "../deploy/rakurs/standalone");
+const js = fs.readFileSync(path.join(root, "static/app-clarity-20261124.js"), "utf8");
+const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
+const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
+
+class Node {
+  constructor(tag) {
+    this.tagName = tag;
+    this.childNodes = [];
+    this.attributes = {};
+    this.dataset = {};
+    this.value = "";
+    this.textContent = "";
+    this.hidden = false;
+    this.className = "";
+    this.ssr = false;
+    this.namespaceURI = "http://www.w3.org/2000/svg";
+    this.listeners = {};
+    this.classList = {add() {}};
+  }
+  appendChild(child) { this.childNodes.push(child); return child; }
+  append(...children) { this.childNodes.push(...children); }
+  replaceChildren(...children) { this.childNodes = children; }
+  cloneNode(deep) {
+    const n = new Node(this.tagName);
+    n.textContent = this.textContent;
+    n.ssr = this.ssr;
+    n.className = this.className;
+    n.attributes = {...this.attributes};
+    if (deep) n.childNodes = this.childNodes.map(x => x.cloneNode(true));
+    return n;
+  }
+  setAttribute(key, val) { this.attributes[key] = String(val); }
+  addEventListener(key, fn) { this.listeners[key] = fn; }
+  querySelector(selector) {
+    if (selector.includes('Показники Deye з бази даних')) {
+      return descendants(this).find(x => x.ssr) || null;
+    }
+    return null;
+  }
+}
+function descendants(node) {
+  return [node, ...node.childNodes.flatMap(child => descendants(child))];
+}
+function byClass(node, className) {
+  return descendants(node).filter(x => (x.className || "").split(/\s+/).includes(className));
+}
+const measurements = {
+  pv_power: [5.1, "кВт"], load_power: [6.4, "кВт"],
+  battery_soc: [72, "%"], grid_power: [0, "кВт"],
+  battery_power: [1.3, "кВт"], inverter_temperature: [37.6, "°C"],
+  pv_energy_today: [21.4, "кВт·год"], load_energy_today: [34.3, "кВт·год"]
+};
+const latest = Object.fromEntries(Object.entries(measurements).map(([k, [v, unit]]) => [
+  k, {value_decimal: String(v), unit, quality: "simulated",
+    observed_at_utc: "2026-11-24T17:53:54Z"}
+]));
+const history = Array.from({length: 30}, (_, i) => ({
+  value_decimal: String(i % 10 + 1),
+  observed_at_utc: "2026-11-23T" + String(i % 24).padStart(2, "0") + ":00:00Z",
+  quality: "simulated"
+}));
+const fields = Array.from({length: 160}, (_, i) => ({
+  field_key: "reg_" + i, field_name: "Input " + i, group_name: "Power",
+  registers_json: JSON.stringify([i]), value_decimal: String(i + 1),
+  value_text: null, unit: "W"
+}));
+function prepare(mode) {
+  const main = new Node("main");
+  main.dataset.initialMode = "simulation";
+  const ssr = new Node("div");
+  ssr.ssr = true;
+  ssr.textContent = "5.1 6.4 72";
+  main.childNodes = [ssr];
+  const nav = new Node("nav");
+  const elements = {
+    content: main, nav, connection: new Node("span"),
+    updated: new Node("span"), "view-title": new Node("h1"),
+    "mode-indicator": new Node("span")
+  };
+  const actions = new Node("div");
+  const doc = {
+    getElementById: key => elements[key] || null,
+    querySelector: selector => selector === ".top-actions" ? actions : null,
+    createElement: tag => new Node(tag),
+    createElementNS: (_uri, tag) => new Node(tag),
+    createTextNode: value => {
+      const n = new Node("text"); n.textContent = value; return n;
+    },
+    body: {classList: {add() {}}},
+  };
+  const loc = {pathname: "/", search: "", hash: "#/overview"};
+  const events = {};
+  const fetchCalls = [];
+  async function fetch(url) {
+    fetchCalls.push(url);
+    if (mode === "fail" || (mode === "partial" && url.includes("/latest"))) {
+      if (mode === "partial" && url.includes("/latest"))
+        return {ok: true, json: async () => ({values: {pv_power: latest.pv_power}})};
+      throw Error("Unreachable");
+    }
+    const data = url.includes("/catalog")
+      ? {groups: {pv: [{key: "pv_power", label: "PV power"}]}, all_metric_count: 316}
+      : url.includes("/status") ? {
+        mode: "simulation", displayed_signals: 316, simulated_signals: 316,
+        has_real_samples: false
+      }
+      : url.includes("/signals") ?
+        {signals: [{signal_key: "pv_power", label_uk: "PV power", unit: "кВт"}]}
+      : url.includes("/auth") ? {authenticated: false}
+      : url.includes("/latest") ? {values: latest}
+      : url.includes("/history") ? {signal: {unit: "кВт"}, points: history}
+      : url.includes("/modbus-fields") ?
+        {count: fields.length, register_count: 815, fields}
+      : {devices: [], events: [], batches: []};
+    return {ok: true, json: async () => data};
+  }
+  const sandbox = {
+    window: {location: loc, addEventListener: (name, fn) => {events[name] = fn;}},
+    location: loc, document: doc, fetch,
+    URLSearchParams, Number, Date, String, Array, Set, Math,
+    encodeURIComponent, console: {warn() {}}
+  };
+  vm.runInNewContext(js, sandbox, {filename: "app-clarity-20261124.js"});
+  return {main, nav, events, loc, fetchCalls, ssr};
+}
+async function settle() {
+  await new Promise(resolve => setTimeout(resolve, 60));
+}
+async function run() {
+  assert(html.includes("/static/app-clarity-20261124.js"));
+  assert(html.includes("/static/clarity-ui-20261124.css"));
+  assert(html.includes('Показники Deye з бази даних'));
+  assert(css.includes(".energy-diagram"));
+  assert(css.includes("@media(max-width:760px)"));
+  assert(css.includes("prefers-reduced-motion"));
+  for (const scenario of ["fail", "partial"]) {
+    const app = prepare(scenario);
+    await settle();
+    assert.equal(app.main.childNodes.length, 1, scenario + ": SSR wiped");
+    assert.equal(app.main.childNodes[0].textContent, app.ssr.textContent);
+    console.log("CLARITY_SSR_GUARD_" + scenario.toUpperCase() + "=PASS");
+  }
+  const app = prepare("success");
+  await settle();
+  assert.equal(byClass(app.main, "kpi").length, 4, "Four headline metrics");
+  assert.equal(byClass(app.main, "energy-diagram").length, 1, "Energy flow diagram");
+  assert.equal(byClass(app.main, "trend-card").length, 4, "Four history graphs");
+  assert.equal(byClass(app.nav, "nav-group-label").length, 3, "Grouped navigation");
+  assert.equal(byClass(app.nav, "nav").length, 1, "nav root still present");
+  assert(app.fetchCalls.some(x => x.includes("/api/v1/history?key=pv_power")));
+  console.log("CLARITY_OVERVIEW=PASS");
+
+  app.loc.hash = "#/trends";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main, "trend-card").length, 4);
+  const buttons = byClass(app.main, "range-control")[0].childNodes;
+  assert.equal(buttons.length, 3);
+  buttons[2].listeners.click();
+  await settle();
+  assert(app.fetchCalls.some(x => x.includes("hours=168")));
+  console.log("CLARITY_TRENDS_24_72_168=PASS");
+
+  app.loc.hash = "#/modbus";
+  await app.events.hashchange();
+  const tbody = descendants(app.main).find(x => x.tagName === "tbody");
+  assert.equal(tbody.childNodes.length, 100, "initial Modbus page");
+  const more = byClass(app.main, "more-button")[0];
+  more.listeners.click();
+  assert.equal(tbody.childNodes.length, 160, "next Modbus page");
+  const search = byClass(app.main, "search-field")[0];
+  search.value = "Input 149";
+  search.listeners.input();
+  assert.equal(tbody.childNodes.length, 1, "search Modbus");
+  console.log("CLARITY_MODBUS_FILTER_AND_PAGINATION=PASS");
+
+  app.loc.hash = "#/pv";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main, "metric").length, 1);
+  console.log("CLARITY_SIGNAL_FILTER=PASS");
+
+  app.loc.hash = "#/history";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main, "history-workspace").length, 1);
+  assert.equal(byClass(app.main, "history-summary").length, 1);
+  console.log("CLARITY_HISTORY=PASS");
+}
+run().catch(e => {console.error(e.stack);process.exitCode=1;});
