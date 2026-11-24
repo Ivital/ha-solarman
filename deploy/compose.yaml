@@ -7,8 +7,8 @@ services:
     restart: "no"
     init: true
     # Hard cgroup constraints: HA may stop on OOM, but cannot consume all host RAM.
-    mem_limit: ${HA_MEMORY_LIMIT:-768m}
-    memswap_limit: ${HA_MEMSWAP_LIMIT:-768m}
+    mem_limit: ${HA_MEMORY_LIMIT:-1536m}
+    memswap_limit: ${HA_MEMSWAP_LIMIT:-1536m}
     cpus: ${HA_CPU_LIMIT:-1.0}
     pids_limit: 160
     stop_grace_period: 40s

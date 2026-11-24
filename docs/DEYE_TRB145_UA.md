@@ -101,20 +101,24 @@ Slave ID та серійні параметри.
 
 Потрібні Docker Engine, Docker Compose Plugin та окремий Linux-хост.
 
-### Важливо: сервер ergodata-lnx (Debian 13, 4 GiB, Odoo 18)
+### Важливо: сервер ergodata-lnx (Debian 13, 8 GiB, Odoo 18)
 
-Аудит 24.11.2026 виявив ~1,2 GiB MemAvailable, шість процесів
-`odoo18.service` (разом ~1,54 GiB PSS) та відсутність активного
-swap-in/swap-out. Наразі **не запускайте** Home Assistant на цьому сервері
-без збільшення запасу оперативної пам'яті або окремої VM: роботу Odoo
-зупиняти або оптимізувати без окремого плану не можна.
+24.11.2026 VM `ERGODATA-LNX` на Hyper-V `DCKSHZ` штатно вимкнено, обсяг
+статичної ОЗП збільшено з 4 до 8 ГіБ і VM успішно запущено. Після запуску
+`MemAvailable` ≈ 6,7 ГіБ, swap 0 B, `odoo18` і `nginx` активні,
+`systemctl --failed` = 0; `preflight_capacity.py` повідомив PASS
+(6888 MiB доступно, 37,3 GiB на диску). Ці результати НЕ є перевіркою
+пікового навантаження Odoo, а вебдоступність Ergodata ще потрібно перевірити.
 
-Стандартний Compose містить безпечні для ПРОБНОГО запуску обмеження
-`mem_limit=768m`, `memswap_limit=768m`, `cpus=1.0`, `pids_limit=160`,
-`restart=no` та ротацію журналів. Обмеження контейнера **не гарантує**
-відсутності впливу на інші служби, а 768 MiB може виявитися замало для
-самого Home Assistant: у цьому разі контейнер зупиниться. Не змінюйте
-`restart` на `unless-stopped` до стабільного випробування.
+Після збільшення ОЗП для **контрольованого пробного запуску** встановлено
+ліміти `mem_limit=1536m`, `memswap_limit=1536m`, `cpus=1.0`,
+`pids_limit=160`, `restart=no`, ротацію журналів та доступ до вебпанелі
+тільки через `127.0.0.1:8123`. Відсутність контейнерного swap не дає
+Home Assistant безконтрольно витісняти Odoo. Водночас обмеження
+**не гарантують** відсутності впливу на інші служби: перевіряйте CPU,
+пам'ять, PSI й стан Odoo. Якщо для Home Assistant 1536 МБ замало —
+не збільшуйте ліміти автоматично; спочатку аналіз журналів і навантаження.
+Не змінюйте `restart` на `unless-stopped` до стабільного випробування.
 
 ### Перевірка без запуску
 
@@ -124,26 +128,30 @@ docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --qu
 ```
 
 Порогове значення preflight — 1536 MiB `MemAvailable`, це мінімум
-для **оцінки** пробного запуску, а не підтвердження безпеки. Для
-постійної експлуатації рекомендовано 8 GiB ОЗП на наявному сервері
-або окрема VM з 4 GiB ОЗП.
+для **оцінки** пробного запуску, а не підтвердження безпеки.
+VM уже має 8 ГіБ, але під навантаженням Odoo необхідне додаткове
+спостереження.
 
 ### Контрольований пробний запуск після позитивного preflight
 
 ```bash
+cd ~/deye-monitoring-src
+git pull --ff-only
+python3 deploy/preflight_capacity.py
 cd deploy
-cp -n .env.example .env
+test ! -e .env && cp .env.example .env || echo "Using existing .env; inspect current limits"
 mkdir -p data
 docker compose config --quiet
-docker compose pull homeassistant
-docker compose up -d --no-deps homeassistant
-docker compose ps
-docker stats --no-stream deye-homeassistant
-docker compose logs --tail=100 homeassistant
+sudo docker compose pull homeassistant
+sudo docker compose up -d --no-deps homeassistant
+sudo docker compose ps
+sudo docker stats --no-stream deye-homeassistant
+sudo docker compose logs --tail=100 homeassistant
 ```
 
 Якщо Odoo деградує, зростає PSI, починається swap-in/out чи HA
-виходить за ліміт, негайно виконайте `cd deploy && docker compose down`.
+виходить за ліміт, негайно виконайте `cd deploy && sudo docker compose down`
+(тільки з каталогу цього проєкту).
 Не використовуйте `docker system prune` або видалення томів Odoo.
 Ресурси фіксуйте до/після запуску: `free -h`, `vmstat 1 5`,
 `cat /proc/pressure/memory`, `docker stats --no-stream`.
