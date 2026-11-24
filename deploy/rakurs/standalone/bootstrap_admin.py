@@ -11,6 +11,7 @@ import re
 import sys
 
 import pymysql
+from mysql_transport import mysql_tls_options
 from werkzeug.security import generate_password_hash
 
 HOST, DATABASE, DATABASE_USER = "192.168.5.30", "rakurs", "Ivital"
@@ -30,7 +31,8 @@ def main():
     try:
         db = pymysql.connect(
             host=HOST, port=3306, database=DATABASE, user=DATABASE_USER,
-            password=mysql_password, ssl_disabled=True, autocommit=False,
+            password=mysql_password, **mysql_tls_options(require_verified=True),
+            autocommit=False,
             connect_timeout=6, read_timeout=7,
             cursorclass=pymysql.cursors.DictCursor,
         )
