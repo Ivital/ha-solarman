@@ -43,8 +43,16 @@ systemctl is-active --quiet rakurs-standalone.service || {
 
 # The previous interrupted attempt should have restored the old app. Do not
 # depend on this: check and save the actual current working installed files.
-test -s "$TARGET/app.py"
-test -s "$TARGET/static/app.js"
+# /opt/rakurs is 0750 root:rakurs; the deploying user cannot stat
+# its files directly. Test as root and print an explicit diagnostic.
+sudo test -s "$TARGET/app.py" || {
+  echo 'STOP: installed Rakurs app.py missing or empty' >&2
+  exit 2
+}
+sudo test -s "$TARGET/static/app.js" || {
+  echo 'STOP: installed Rakurs app.js missing or empty' >&2
+  exit 2
+}
 BACKUP="$(sudo mktemp -d /var/backups/rakurs-demo-XXXXXXXX)"
 sudo chmod 0700 "$BACKUP"
 sudo cp -p "$TARGET/app.py" "$BACKUP/app.py"
