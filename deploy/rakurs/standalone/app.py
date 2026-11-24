@@ -914,6 +914,51 @@ def parallel_page_options(max_limit):
     return offset, limit
 
 
+@app.get("/api/v1/parallel/health")
+def parallel_live_health():
+    """Observation-only health: no connection/collector activity is inferred.
+
+    A recent poll is evidence of archived communication, NOT proof that a
+    continuously running collector process is healthy.
+    """
+    devices = parallel_registered_devices()
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    entries = []
+    for device in devices:
+        last = one(
+            "SELECT observed_at_utc,finished_at_utc,status,quality,"
+            "response_count,exception_count,transport,slave_id "
+            "FROM rakurs_modbus_poll_runs "
+            "WHERE device_id=%s AND quality<>'simulated' "
+            "ORDER BY observed_at_utc DESC,id DESC LIMIT 1",
+            (device["id"],),
+        )
+        age = None
+        freshness = "no_data"
+        if last and isinstance(last.get("observed_at_utc"), datetime):
+            age = (now - last["observed_at_utc"]).total_seconds()
+            freshness = ("invalid_time" if age < -60 else
+                         "recent" if age <= 120 else
+                         "delayed" if age <= 600 else "stale")
+        entries.append({
+            "device_key": device["device_key"],
+            "slot_no": device.get("slot_no"),
+            "member_verified": bool(device.get("member_verified")),
+            "transport_verified": bool(device.get("transport_verified")),
+            "age_seconds": max(0, int(age)) if age is not None else None,
+            "freshness_state": freshness,
+            "last_poll": serialize(last),
+            "collector_process_confirmed": False,
+        })
+    return jsonify({
+        "data_source": "mysql", "expected_inverters": 2,
+        "simulation": False, "collector_process_confirmed": False,
+        "devices": entries, "shared_battery_soc_verified": False,
+        "warning": "Recent polls do not confirm collector process health; "
+                   "no physical Master/Slave or BMS source is inferred.",
+    })
+
+
 @app.get("/api/v1/parallel/polls")
 def parallel_live_polls():
     selected = parallel_selected_device()
