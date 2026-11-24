@@ -1,0 +1,78 @@
+/* Verified-only parallel inverter overview. */
+.parallel-intro,.parallel-shared{margin:18px 0}
+.parallel-warning{background:#342817;border:1px solid #68533c;color:#f7ddb4!important;
+  border-radius:10px;padding:12px 14px;font-size:12px!important;line-height:1.5}
+.parallel-devices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+  margin:20px 0}
+.parallel-device{min-width:0;border:1px solid #35536b;background:#12283b;
+  border-radius:16px;padding:19px 18px}
+.parallel-device-head{display:flex;justify-content:space-between;align-items:center;
+  gap:12px;flex-wrap:wrap}
+.parallel-device-name{font-size:17px;font-weight:750}
+.parallel-state{border:1px solid #8d7451;color:#eed2a0;background:#362b223d;
+  font-size:10.5px;padding:6px 9px;border-radius:100px}
+.parallel-device-model{color:#97b6c8;font-size:11.5px;margin:5px 0 18px}
+.parallel-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.parallel-fact{min-width:0;border:1px solid #30475a;border-radius:10px;
+  background:#182e42;padding:11px 12px;overflow-wrap:anywhere}
+.parallel-fact small{display:block;color:#91aabf;font-size:10px;margin-bottom:4px}
+.parallel-fact strong{font-size:11px;font-weight:600;line-height:1.4;color:#d5e8f1}
+.parallel-metric-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:15px}
+.parallel-reading{background:#17364b;border:1px solid #32546a;padding:10px;
+  border-radius:10px;display:flex;flex-direction:column;gap:5px}
+.parallel-reading small{font-size:10px;color:#a8c1d2}
+.parallel-reading strong{font-size:17px;color:#e3f5f5}
+.parallel-reading span{font-size:9px;color:#86a4b8}
+.parallel-device-events{font-size:11px;color:#abc8d5;margin:12px 0 0}
+.parallel-device-chart{border-top:1px solid #31526a;margin-top:17px;padding-top:14px}
+.parallel-device-chart h3{font-size:12px;margin:0 0 12px;color:#b4cfdd}
+.parallel-device-chart .chart{background:#122b40;border-color:#34516a}
+.shared-soc{font-size:26px;font-weight:780;color:#82d9e4;margin:10px 0}
+.parallel-aggregate{font-size:13px;border:1px dashed #416175;background:#173148;
+  padding:15px;border-radius:12px;color:#c2deea}
+.parallel-readonly-note{color:#a8c1d2;font-size:12px;line-height:1.5}
+@media(max-width:1100px){.parallel-devices{grid-template-columns:1fr}}
+@media(max-width:600px){.parallel-facts{grid-template-columns:1fr}
+  .parallel-metric-list{grid-template-columns:1fr}}
+
+.parallel-demo-panel{border-color:#68553b}
+.parallel-demo-counters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:17px 0}
+.parallel-demo-counter{background:#183345;border:1px solid #375269;border-radius:11px;
+  min-width:0;padding:12px;display:flex;flex-direction:column;gap:5px}
+.parallel-demo-counter strong{font-size:21px;color:#dff0f3}
+.parallel-demo-counter small{font-size:10px;color:#a5bfd0}
+.parallel-raw-viewer{margin-top:18px;border-top:1px solid #355269;padding-top:14px}
+.parallel-raw-viewer h3{font-size:12px;color:#d5e9f1}
+.parallel-raw-table{max-height:390px;overflow-y:auto;display:flex;flex-direction:column}
+.parallel-raw-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;
+  border-bottom:1px solid #2a455b;padding:7px 9px;font-size:11px}
+.parallel-raw-row:nth-child(even){background:#213747}
+.parallel-raw-row code{font-size:11px;color:#91dcd6}
+.parallel-raw-row small{color:#e5c89f;text-align:right}
+@media(max-width:520px){.parallel-demo-counters{grid-template-columns:1fr 1fr 1fr}
+  .parallel-demo-counter{padding:9px}
+  .parallel-demo-counter strong{font-size:17px}
+  .parallel-raw-row{gap:4px}}
+
+/* Two test devices appear first on both the overview and the parallel page. */
+.parallel-home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;
+  margin:14px 0 12px}
+.parallel-home-device{border-color:#357c8a}
+.parallel-home-foot{display:flex;flex-wrap:wrap;justify-content:space-between;
+  align-items:center;gap:12px;margin-top:16px;color:#aac6d5;font-size:11px}
+.parallel-open-link{color:#7ce6e7;text-decoration:underline;text-underline-offset:3px}
+.parallel-open-link:hover{color:#d7ffff}
+.parallel-field-viewer{margin-top:16px}
+.parallel-field-row{display:grid;grid-template-columns:105px minmax(0,1fr) 145px 74px;
+  align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid #29445a;
+  font-size:11px}
+.parallel-field-row:nth-child(even){background:#203849}
+.parallel-field-row code{overflow-wrap:anywhere;color:#88dadd}
+.parallel-field-row span{min-width:0;overflow-wrap:anywhere;color:#c5d9e5}
+.parallel-field-row strong{font-weight:650;overflow-wrap:anywhere;color:#e5f2f6}
+.parallel-field-row small{color:#f0cd9c;text-align:right;font-size:9px}
+@media(max-width:1000px){.parallel-home-grid{grid-template-columns:1fr}}
+@media(max-width:620px){
+  .parallel-field-row{grid-template-columns:80px minmax(0,1fr);gap:4px}
+  .parallel-field-row strong,.parallel-field-row small{text-align:left}
+}
