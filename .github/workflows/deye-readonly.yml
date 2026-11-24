@@ -37,6 +37,7 @@ jobs:
           bash deploy/rakurs/standalone/stage_standalone.sh --check
           bash -n deploy/rakurs/standalone/switch_rakurs_nginx.sh
           bash -n deploy/rakurs/standalone/retire_homeassistant.sh
+          bash -n deploy/rakurs/standalone/migrate_rakurs.sh
           python -m py_compile deploy/rakurs/standalone/app.py
           python -m py_compile deploy/rakurs/standalone/auth.py
           python -m py_compile deploy/rakurs/standalone/bootstrap_admin.py
