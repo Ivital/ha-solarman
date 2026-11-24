@@ -71,6 +71,54 @@ Slave ID та серійні параметри.
 - https://wiki.teltonika-networks.com/view/TRB145_Modbus
 - https://wiki.teltonika-networks.com/view/TRB145_Serial_Utilities
 
+## Фактична діагностика Teltonika `ITM` (24.11.2026)
+
+На пристрої з консоллю `root@ITM` підтверджено:
+
+- Модель `TRB145`, прошивка `TRB1_R_00.07.24.7`.
+- `rs_overip.1.enabled='1'`, `device='/dev/rs485'`,
+  `baudrate='115200'`, `parity='none'`, `databits='8'`,
+  `stopbits='1'`, `mode='server'`, `protocol='0'`.
+- TCP `:::50006` слухає процес `sodog`, що належить
+  до сімейства Serial Over IP. Це **не свідчить** про MBAP Modbus TCP.
+- `modbusgateway.gateway.enabled='0'`, `port='1883'` — **не доказ**
+  відсутності Modbus TCP over Serial Gateway: `1883` типовий для MQTT
+  брокера. Потрібно окремо читати `rs_modbus` / UI
+  `Services → Modbus → Modbus TCP over Serial Gateway`.
+- Hostname `ITM` може означати, що пристрій обслуговує інший
+  працюючий прилад (ІТМ), а не інвертор Deye. Перед будь-якими змінами
+  треба фізично підтвердити, до якого обладнання під'єднано RS485.
+
+**Заборонено без перевірки:** вимкнення `rs_overip`, увімкнення
+`rs_modbus`, зміна швидкості 115200, перезапуск `sodog` чи
+Modbus FC03/RTU-запит до цього порту. Це може зупинити діюче
+опитування ІТМ. TCP CONNECT з Home Assistant успішний, але
+інвертор Deye через цей канал ще НЕ ідентифіковано.
+
+Наступна **тільки read-only** діагностика на TRB145:
+
+```sh
+echo "=== SERIAL CONFIGURATION (selected non-secret fields) ==="
+for CFG in rs_overip rs_modbus; do
+  echo "=== $CFG ==="
+  uci -q show "$CFG" 2>/dev/null |
+    awk -F= '$1 ~ /\\.(enabled|enable|device|.*port|baudrate|baud|parity|databits|data_bits|stopbits|stop_bits|protocol|mode|server_id|id|full_duplex)$/ {print}'
+done
+echo "=== TCP 50006 CONNECTIONS ==="
+netstat -nt 2>/dev/null | grep ':50006' || true
+echo "=== END; NO CHANGES ==="
+```
+
+Перед тестовим читанням підтвердити обладнання на протилежному кінці
+RS485 і конкретний порт/службу. Якщо `ITM` — окремий функціональний
+шлюз для Ergodata, не використовувати його як Deye, а знайти потрібну
+Teltonika / інший серійний канал.
+
+Офіційні довідки:
+https://wiki.teltonika-networks.com/view/TRB145_Serial_Utilities
+https://wiki.teltonika-networks.com/view/TRB145_Modbus
+https://wiki.teltonika-networks.com/view/UCI_command_usage
+
 ## Порти та фізичний зв'язок
 
 На сторінці 49 (друкована нумерація) наданого посібника Deye для
