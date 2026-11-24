@@ -152,6 +152,7 @@ def normalize(payload):
                     transport=transport, slave=slave, fc=fc, address=addr,
                     count=count, status=status, request=request, response=response,
                     words=words, bits=bits, wire_format=payload.get("wire_format"),
+                    exception_code=exception_code,
                 )
             except InvalidModbusFrame as exc:
                 raise PayloadError("Unverified Modbus wire bytes: " + str(exc)) from exc
