@@ -32,7 +32,7 @@ if command -v node >/dev/null; then
   node tests/test_rakurs_clarity_ui.js
 fi
 echo 'CLARITY_UI_SOURCE_PREFLIGHT=PASS'
-if [[ "$MODE" != "--check" ]] && grep -Eq '/static/app-(events|parallel)-20261124.js' "$HERE/$HTML"; then
+if [[ "$MODE" != "--check" ]] && grep -Eq '/static/app-(events|parallel)(-archive)?-20261124.js' "$HERE/$HTML"; then
   echo 'STOP: legacy Clarity installer would revert Events UI. Use deploy_events_ui.sh --apply.' >&2
   exit 2
 fi
