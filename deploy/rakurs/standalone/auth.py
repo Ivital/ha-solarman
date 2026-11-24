@@ -50,7 +50,9 @@ def load_key() -> bytes | None:
 def _error_response():
     if request.path.startswith("/api/"):
         return jsonify({"error": "Потрібна авторизація"}), 401
-    # Preserve explicit demo selection through authentication.
+    # Only these two fixed, local routes may be carried through login.
+    if request.path in ("/deye", "/deye/modbus"):
+        return redirect("/login?next=" + request.path, code=303)
     if request.path == "/" and request.args.get("demo") == "1":
         return redirect("/login?demo=1", code=303)
     return redirect("/login", code=303)
@@ -162,11 +164,16 @@ def init_auth(app, one, conn):
     def login():
         if request.method == "GET":
             demo = request.args.get("demo") == "1"
+            next_path = request.args.get("next", "")
+            next_path = next_path if next_path in ("/deye", "/deye/modbus") else ""
             if session.get("uid"):
-                return redirect("/?demo=1" if demo else "/", code=303)
-            return render_template("login.html", csrf=_csrf(), error=None, demo=demo)
+                return redirect(next_path or ("/?demo=1" if demo else "/"), code=303)
+            return render_template("login.html", csrf=_csrf(), error=None,
+                                   demo=demo, next_path=next_path)
 
         demo = request.form.get("demo") == "1"
+        next_path = request.form.get("next", "")
+        next_path = next_path if next_path in ("/deye", "/deye/modbus") else ""
         if not _csrf_valid():
             abort(400)
         username = request.form.get("username", "").strip()
@@ -178,7 +185,7 @@ def init_auth(app, one, conn):
                 _attempt_key("source", _client_addr()))
         if blocked(keys):
             return render_template(
-                "login.html", csrf=_csrf(), demo=demo,
+                "login.html", csrf=_csrf(), demo=demo, next_path=next_path,
                 error="Тимчасове блокування після невдалих спроб. Спробуйте через 15 хвилин."
             ), 429
 
@@ -195,7 +202,7 @@ def init_auth(app, one, conn):
             record_failure(keys)
             LOG.warning("Invalid Rakurs login attempt")
             return render_template(
-                "login.html", csrf=_csrf(), demo=demo, error="Неправильний логін або пароль."
+                "login.html", csrf=_csrf(), demo=demo, next_path=next_path, error="Неправильний логін або пароль."
             ), 401
 
         # Successful authentication rotates the signed browser session.
@@ -215,7 +222,7 @@ def init_auth(app, one, conn):
                 "SET failure_count=0, locked_until_utc=NULL "
                 "WHERE attempt_key IN (%s,%s)", keys
             )
-        return redirect("/?demo=1" if demo else "/", code=303)
+        return redirect(next_path or ("/?demo=1" if demo else "/"), code=303)
 
     @app.post("/logout")
     def logout():
