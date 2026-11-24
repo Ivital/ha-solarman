@@ -44,7 +44,7 @@
           <p>Основні показники, напрямки потоків та зміни за часом — на одному екрані.</p>
         </div>
         <div class="section-header">
-          <h2>Зараз</h2>
+          <h2>Збережений зріз</h2>
           <span class="subtle">Останні збережені показники · час Київ</span>
         </div>
         <div class="cards cards-main" aria-label="Показники Deye з бази даних">
@@ -61,10 +61,8 @@
               <span class="unit">{{ item.unit if item.value != '—' else '' }}</span>
             </div>
             {% if idx == 3 and item.value != '—' %}
-            <div class="soc-meter" role="meter" aria-label="Рівень заряду акумулятора"
-                 aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ item.value }}">
-              <div class="soc-fill" style="width:{{ item.value }}%"></div>
-            </div>
+            <progress class="soc-meter" max="100" value="{{ item.value }}"
+                     aria-label="Рівень заряду акумулятора"></progress>
             {% endif %}
             <p class="kpi-caption">{{ 'Останній запис MySQL' if item.quality else 'Значення ще немає' }}</p>
           </article>
