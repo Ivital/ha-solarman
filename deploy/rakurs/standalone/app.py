@@ -139,6 +139,86 @@ def index():
     return render_template("index.html")
 
 
+# Server-rendered Deye snapshot, independent of all browser JavaScript and
+# unaffected by legacy Home Assistant's cached SPA/asset bundle.
+DEYE_SUMMARY = (
+    ("pv_power", "Сонячна генерація"),
+    ("load_power", "Навантаження"),
+    ("grid_power", "Мережа"),
+    ("battery_soc", "Заряд АКБ"),
+    ("battery_power", "Потужність АКБ"),
+    ("inverter_temperature", "Температура інвертора"),
+    ("pv_energy_today", "Генерація за добу"),
+    ("load_energy_today", "Споживання за добу"),
+)
+
+
+def _display_decimal(value):
+    if value is None:
+        return "—"
+    if isinstance(value, Decimal):
+        return format(value.normalize(), "f")
+    return str(value)
+
+
+@app.get("/deye")
+def deye_snapshot():
+    result = rows(
+        "SELECT s.signal_key, s.label_uk, s.unit, m.value_decimal, "
+        "m.quality, m.observed_at_utc "
+        "FROM rakurs_signals AS s "
+        "JOIN rakurs_samples AS m ON m.signal_id=s.id "
+        "JOIN rakurs_devices AS d ON d.id=m.device_id "
+        "WHERE d.device_key=%s AND m.quality='simulated' "
+        "AND m.ingest_source=%s ORDER BY s.label_uk",
+        (DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE),
+    )
+    lookup = {entry["signal_key"]: entry for entry in result}
+    summary = [
+        {
+            "label": label,
+            "value": _display_decimal(lookup[key]["value_decimal"]) if key in lookup else "—",
+            "unit": lookup[key]["unit"] or "" if key in lookup else "",
+        }
+        for key, label in DEYE_SUMMARY
+    ]
+    for entry in result:
+        entry["display_value"] = _display_decimal(entry["value_decimal"])
+    return render_template(
+        "deye_server.html", section="overview", title="Огляд Deye",
+        summary=summary, fields=result, count=len(result),
+        timestamp=result[0]["observed_at_utc"] if result else None,
+    )
+
+
+@app.get("/deye/modbus")
+def deye_modbus_snapshot():
+    result = rows(
+        "SELECT f.field_key, f.group_name, f.field_name, f.unit, "
+        "f.registers_json, m.value_decimal, m.value_text, m.quality "
+        "FROM rakurs_modbus_fields AS f "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
+        "AND m.quality='simulated' AND m.ingest_source=%s "
+        "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s) "
+        "ORDER BY f.id LIMIT 700",
+        (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY),
+    )
+    for entry in result:
+        addresses = json.loads(entry["registers_json"] or "[]")
+        entry["register_display"] = ", ".join(
+            f"0x{int(address):04X}" for address in addresses
+        ) or "Розрахунковий"
+        entry["display_value"] = (
+            str(entry["value_text"])
+            if entry["value_text"] is not None
+            else _display_decimal(entry["value_decimal"])
+        )
+    return render_template(
+        "deye_server.html", section="modbus", title="Усі параметри Modbus",
+        fields=result, count=len(result), summary=[], timestamp=None,
+    )
+
+
 @app.get("/api/v1/catalog")
 def catalog():
     # Unverified planned catalog, NOT actual measured values.
