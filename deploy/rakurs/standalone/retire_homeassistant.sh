@@ -78,6 +78,12 @@ if sudo docker container inspect "$CONTAINER" >/dev/null 2>&1; then
       echo "STOP: $DATA is used by other container $c" >&2; exit 2
     fi
   done < <(sudo docker ps -a --format '{{.Names}}')
+  IMAGE_ID="$(sudo docker inspect --format '{{.Image}}' "$CONTAINER")"
+  IMAGE_NAME="$(sudo docker inspect --format '{{.Config.Image}}' "$CONTAINER")"
+  case "$IMAGE_NAME" in
+    ghcr.io/home-assistant/home-assistant:*) ;;
+    *) echo "STOP: unexpected image for $CONTAINER ($IMAGE_NAME)" >&2; exit 2 ;;
+  esac
   sudo docker stop "$CONTAINER"
 fi
 
@@ -91,6 +97,14 @@ fi
 if sudo docker container inspect "$CONTAINER" >/dev/null 2>&1; then
   sudo docker rm "$CONTAINER"
   echo 'LEGACY_HOME_ASSISTANT_CONTAINER_REMOVED=PASS'
+  # Never force image removal: Docker refuses if other containers use it.
+  if [[ -n "${IMAGE_ID:-}" ]]; then
+    if sudo docker image rm "$IMAGE_ID" >/dev/null 2>&1; then
+      echo 'UNUSED_HOME_ASSISTANT_IMAGE_REMOVED=PASS'
+    else
+      echo 'HOME_ASSISTANT_IMAGE_RETAINED=still_used_or_protected'
+    fi
+  fi
 fi
 if [[ -d "$DATA" ]]; then
   # The directory has been confirmed to be the exact isolated bind source.
