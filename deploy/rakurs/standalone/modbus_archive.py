@@ -9,8 +9,14 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from decimal import Decimal
+from hashlib import sha256
 import json
 import re
+
+try:
+    from .modbus_wire import InvalidModbusFrame, verify_read
+except ImportError:  # offline standalone importer used by archive CLI
+    from modbus_wire import InvalidModbusFrame, verify_read
 
 KEY = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 UID = re.compile(r"^[A-Za-z0-9_-]{8,64}$")
@@ -83,6 +89,11 @@ def normalize(payload):
     if quality != "simulated" and slave is None:
         raise PayloadError("Live Modbus read requires identified slave")
     observed = utc_time(payload.get("observed_at_utc"))
+    if quality != "simulated" and (payload.get("fields") or payload.get("signals")):
+        raise PayloadError(
+            "Decoded live values are blocked until SG05LP3 firmware profile validation. "
+            "Archive independently verified raw frames only."
+        )
     frames = payload.get("frames")
     if not isinstance(frames, list) or not frames or len(frames) > 4096:
         raise PayloadError("At least one frame required, max 4096")
@@ -127,7 +138,7 @@ def normalize(payload):
             raise PayloadError("Errored frame must not invent returned register values")
         request = hexbytes(frame.get("request_hex"), required=quality != "simulated")
         response = hexbytes(frame.get("response_hex"),
-                            required=quality != "simulated" and status == "ok")
+                            required=quality != "simulated" and status in ("ok", "exception"))
         if quality != "simulated" and (not request or (status == "ok" and not response)):
             raise PayloadError("Real poll must retain complete request and successful response ADU")
         exception_code = frame.get("exception_code")
@@ -135,6 +146,15 @@ def normalize(payload):
             type(exception_code) is not int or not 0 <= exception_code <= 255
         ):
             raise PayloadError("Invalid exception code")
+        if quality != "simulated":
+            try:
+                verify_read(
+                    transport=transport, slave=slave, fc=fc, address=addr,
+                    count=count, status=status, request=request, response=response,
+                    words=words, bits=bits, wire_format=payload.get("wire_format"),
+                )
+            except InvalidModbusFrame as exc:
+                raise PayloadError("Unverified Modbus wire bytes: " + str(exc)) from exc
         error_code = frame.get("error_code")
         if error_code is not None and (
             not isinstance(error_code, str) or len(error_code) > 80
@@ -167,6 +187,22 @@ def normalize(payload):
                 frames=normalized, fields=fields, signals=signals)
 
 
+def payload_fingerprint(item: dict) -> str:
+    """Canonical hash protects retries from silently swallowing different polls."""
+    def stable(obj):
+        if isinstance(obj, bytes):
+            return obj.hex()
+        if isinstance(obj, datetime):
+            return obj.isoformat(timespec="microseconds")
+        if isinstance(obj, Decimal):
+            return str(obj)
+        raise TypeError(type(obj).__name__)
+    return sha256(json.dumps(
+        item, sort_keys=True, ensure_ascii=False, separators=(",", ":"),
+        allow_nan=False, default=stable,
+    ).encode("utf-8")).hexdigest()
+
+
 def persist(db, payload, *, manage_transaction=True):
     """Atomic archive. Real devices must be verified before accepting live data.
 
@@ -174,6 +210,7 @@ def persist(db, payload, *, manage_transaction=True):
     ingest account. Returns an idempotent receipt, never alters catalog validity.
     """
     item = normalize(payload)
+    fingerprint = payload_fingerprint(item) if item["quality"] != "simulated" else None
     if manage_transaction:
         db.begin()
     try:
@@ -196,13 +233,19 @@ def persist(db, payload, *, manage_transaction=True):
                 if kind != "inverter":
                     raise PayloadError("Live data cannot use simulation/planned device")
                 cur.execute(
-                    "SELECT 1 FROM rakurs_parallel_members "
+                    "SELECT modbus_address FROM rakurs_parallel_members "
                     "WHERE device_id=%s AND member_kind='physical' "
                     "AND member_verified=1 AND transport_verified=1 LIMIT 1",
                     (device_id,),
                 )
-                if not cur.fetchone():
-                    raise PayloadError("Physical telemetry is blocked until commissioning")
+                member = cur.fetchone()
+                verified_slave = (member["modbus_address"] if isinstance(member, dict)
+                                  else member[0] if member else None)
+                if verified_slave is None or verified_slave != item["slave_id"]:
+                    raise PayloadError(
+                        "Physical telemetry blocked: source slave ID is not "
+                        "identical to the verified member Modbus address"
+                    )
             cur.execute(
                 "SELECT id, device_id FROM rakurs_modbus_poll_runs WHERE poll_uid=%s",
                 (item["poll_uid"],),
@@ -213,6 +256,18 @@ def persist(db, payload, *, manage_transaction=True):
                                         if isinstance(previous, dict) else previous)
                 if prev_device != device_id:
                     raise PayloadError("Poll UID already belongs to another device")
+                if fingerprint is not None:
+                    cur.execute(
+                        "SELECT payload_sha256 FROM rakurs_modbus_poll_fingerprints "
+                        "WHERE poll_id=%s FOR UPDATE", (prev_id,),
+                    )
+                    saved = cur.fetchone()
+                    stored_hash = (saved["payload_sha256"] if isinstance(saved, dict)
+                                   else saved[0] if saved else None)
+                    if stored_hash != fingerprint:
+                        raise PayloadError(
+                            "Poll UID collision or legacy record without fingerprint"
+                        )
                 if manage_transaction:
                     db.rollback()
                 return {"status": "already_saved", "poll_id": prev_id}
@@ -307,6 +362,13 @@ def persist(db, payload, *, manage_transaction=True):
                     (device_id, signal_id, item["observed"], item["observed"],
                      decimal_or_none(record.get("value_decimal")),
                      record.get("raw_value"), item["quality"], item["source"]),
+                )
+            if fingerprint is not None:
+                cur.execute(
+                    "INSERT INTO rakurs_modbus_poll_fingerprints "
+                    "(poll_id,payload_sha256,created_at_utc) "
+                    "VALUES (%s,%s,UTC_TIMESTAMP(6))",
+                    (poll_id, fingerprint),
                 )
         if manage_transaction:
             db.commit()
