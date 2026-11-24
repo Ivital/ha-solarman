@@ -52,6 +52,9 @@ class SolarmanAccessPoint(SolarmanEntity, SwitchEntity):
         return None
 
     async def async_turn_(self, mode: int):
+        # Disallow changes to the logger's AP/Wi-Fi mode or restart.
+        raise PermissionError("Logger reconfiguration is disabled in monitoring")
+
         await self.coordinator.device.endpoint.load()
         if self.is_on is False:
             await request(self.coordinator.device.config.host, LOGGER_CMD, LOGGER_SET, {"apsta_mode": mode, "mode_sel": mode})
