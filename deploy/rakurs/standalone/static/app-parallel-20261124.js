@@ -718,7 +718,8 @@ async function renderParallel(cycle) {
         const values = latest.value.values || {};
         for (const [key, label] of keys) {
           const reading = values[key];
-          const present = reading && reading.value_decimal !== null;
+          const present = reading && reading.value_decimal !== null &&
+            reading.value_decimal !== undefined && reading.quality !== "simulated";
           const cell = element("div", "parallel-reading");
           add(cell, element("small", "", label),
             element("strong", "", present ?
