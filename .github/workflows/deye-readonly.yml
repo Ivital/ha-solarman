@@ -88,6 +88,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_rakurs_history_72h.py' -v
           python -m unittest discover -s tests -p 'test_rakurs_parallel.py' -v
           python -m unittest discover -s tests -p 'test_rakurs_modbus_full_archive.py' -v
+          python -m unittest discover -s tests -p 'test_rakurs_modbus_wire.py' -v
+          python -m unittest discover -s tests -p 'test_rakurs_security_upgrade.py' -v
           node --check deploy/rakurs/standalone/static/app.js
           node tests/test_rakurs_ssr_guard.js
           node --check deploy/rakurs/standalone/static/app-clarity-20261124.js
