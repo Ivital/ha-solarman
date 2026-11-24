@@ -13,7 +13,7 @@ HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app-stable-20261124.js'
+ASSET_PATH='/static/app-clarity-20261124.js'
 FILES=(app.py static/app.js templates/index.html)
 cd "$ROOT"
 
@@ -32,6 +32,10 @@ if command -v node >/dev/null; then
   node --check "$HERE/static/app.js"
 fi
 echo 'PRIMARY_DASHBOARD_SOURCE_PREFLIGHT=PASS'
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-clarity-20261124.js' "$HERE/templates/index.html"; then
+  echo 'STOP: legacy installer would overwrite Clarity UI. Use deploy_clarity_ui.sh --apply instead.' >&2
+  exit 2
+fi
 if [[ "$MODE" == "--check" ]]; then
   echo 'DRY_RUN=PASS MYSQL_CHANGED=NO'
   exit 0
