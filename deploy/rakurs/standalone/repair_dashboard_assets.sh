@@ -14,7 +14,7 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 cd "$ROOT"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
-ASSET_PATH='/static/app-events-20261124.js'
+ASSET_PATH='/static/app-parallel-20261124.js'
 SCRIPT_MARKER='let DEMO_MODE = new URLSearchParams(window.location.search)'
 MODBUS_MARKER='["modbus", "Modbus", "▤"]'
 CHECK_JS="$HERE/static/app-events-20261124.js"
@@ -27,7 +27,7 @@ grep -Fq "$SCRIPT_MARKER" "$CHECK_JS"
 grep -Fq "$MODBUS_MARKER" "$CHECK_JS"
 if command -v node >/dev/null; then node --check "$CHECK_JS"; fi
 echo 'RAKURS_ASSET_SOURCE_PREFLIGHT=PASS'
-if [[ "$MODE" != "--check" ]] && grep -Fq 'app-events-20261124.js' "$HERE/templates/index.html"; then
+if [[ "$MODE" != "--check" ]] && grep -Fq 'app-parallel-20261124.js' "$HERE/templates/index.html"; then
   echo 'STOP: legacy installer would overwrite Clarity UI. Use deploy_clarity_ui.sh --apply instead.' >&2
   exit 2
 fi
