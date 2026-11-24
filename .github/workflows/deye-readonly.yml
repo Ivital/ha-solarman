@@ -53,6 +53,8 @@ jobs:
           bash deploy/rakurs/standalone/deploy_parallel_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_full_modbus_archive.sh
           bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --check
+          python deploy/rakurs/standalone/apply_modbus_fingerprints.py
+          python deploy/rakurs/standalone/harden_mysql_grants.py
           python3 deploy/rakurs/standalone/seed_two_parallel_demo.py
           python3 -m py_compile deploy/rakurs/standalone/modbus_archive.py
           bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
