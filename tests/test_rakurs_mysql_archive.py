@@ -24,6 +24,11 @@ class RakursMySqlArchiveTests(unittest.TestCase):
         self.assertIn("SELECT CONCAT", content)
         self.assertIn("--network", content)
         self.assertIn("--login", content)
+        self.assertIn('DB_HOST="192.168.5.30"', content)
+        self.assertIn('DB_NAME="rakurs"', content)
+        self.assertIn("RAKURS_DB_USER", content)
+        self.assertNotIn("kshz1.mysql.tools", content)
+        self.assertNotIn("kshz1_rakurs", content)
         for forbidden in ("MYSQL_PWD", "RAKURS_MYSQL_PASSWORD=", "curl -k",
                           "uci set", "docker compose up"):
             self.assertNotIn(forbidden, content)
@@ -37,3 +42,4 @@ class RakursMySqlArchiveTests(unittest.TestCase):
                           "DROP TABLE", "uci set"):
             self.assertNotIn(forbidden, code)
         self.assertIn("UNTRUSTED CERTIFICATE", code)
+        self.assertIn('HOST = "192.168.5.30"', code)

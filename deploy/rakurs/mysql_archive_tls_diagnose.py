@@ -9,7 +9,7 @@ from __future__ import annotations
 import re
 import subprocess
 
-HOST = "kshz1.mysql.tools"
+HOST = "192.168.5.30"
 PORT = 3306
 
 
