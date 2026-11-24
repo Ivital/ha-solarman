@@ -501,6 +501,27 @@ function svgChart(points, unit) {
   }).join(" ");
   polyline.setAttribute("points", pointsString);
   svg.appendChild(polyline);
+  const first = points[real[0].index];
+  const last = points[real[real.length - 1].index];
+  if (first && last) {
+    const labels = [
+      [52, first.observed_at_utc, "start"],
+      [868, last.observed_at_utc, "end"]
+    ];
+    for (const [x, observed, anchor] of labels) {
+      const node = document.createElementNS(svg.namespaceURI, "text");
+      node.setAttribute("x", String(x));
+      node.setAttribute("y", "264");
+      node.setAttribute("text-anchor", anchor);
+      const date = new Date(observed);
+      node.textContent = Number.isNaN(date.getTime()) ? "" :
+        date.toLocaleString("uk-UA", {
+          timeZone: "Europe/Kyiv", day: "2-digit", month: "2-digit",
+          hour: "2-digit", minute: "2-digit"
+        });
+      svg.appendChild(node);
+    }
+  }
   return svg;
 }
 async function renderHistory(cycle, archived) {
