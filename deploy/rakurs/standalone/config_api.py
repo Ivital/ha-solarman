@@ -131,12 +131,20 @@ def register(app, *, rows, one, conn):
         alive = bool(isinstance(beat,datetime) and
                      -30 < (now-beat).total_seconds() < 90)
         setting = settings or {"enabled":False,"interval_seconds":60}
+        last_ok=(runtime or {}).get("last_success_utc")
+        success_recent=bool(
+            isinstance(last_ok,datetime) and
+            -30 < (now-last_ok).total_seconds() <=
+            max(180,2*int(setting["interval_seconds"])+10))
         return jsonify({
             "available":True, "enabled":bool(setting["enabled"]),
             "interval_seconds":setting["interval_seconds"],
             "worker_online":alive,
+            "scheduler_active":bool(setting["enabled"]) and alive and
+                               (runtime or {}).get("state")=="active",
             "actively_polling":bool(setting["enabled"]) and alive and
-                                (runtime or {}).get("state")=="active",
+                               success_recent,
+            "last_success_recent":success_recent,
             "runtime":{k:iso(v) for k,v in (runtime or {}).items()},
             "devices":[{k:iso(v) for k,v in d.items()} for d in devices],
         })
