@@ -1002,7 +1002,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
   section(sectionName, DEMO_MODE ? "Архів MySQL" :
                                         "Записи виключно з MySQL rakurs");
-  const root = panel(sectionName);
+  const root = panel();
   main.appendChild(root);
   try {
     const payload = await api(path);
@@ -1018,7 +1018,8 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
       const row = element("tr", "");
       fields.forEach(field => {
         const raw = item[field];
-        const displayed = field.endsWith("_utc") ? time(raw) :
+        const displayed = field === "commissioned_at_utc" && !raw ?
+          "Не зазначено" : field.endsWith("_utc") ? time(raw) :
           field === "kind" && (raw === "simulation" || raw === "inverter") ? "Інвертор" :
           field === "device_key" ? displayDeviceKey(raw) :
           (raw ?? "—");
@@ -1369,6 +1370,9 @@ async function renderArchive(cycle) {
 async function renderSystem(cycle) {
   addStatusMessage();
   section("Конфігурація системи", "Показники та пристрої MySQL");
+  let polling=null;
+  try { polling=await api("/config"); } catch(_error) {}
+  if(!current(cycle)) return;
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
@@ -1377,7 +1381,7 @@ async function renderSystem(cycle) {
     ["Джерело", "MySQL"],
     ["Пристрої у базі", state.status ? state.status.registered_devices : "—"],
     ["Показники у базі", state.status ? state.status.displayed_signals : "—"],
-    ["Автоматичне опитування", state.status?.collector_active ? "Увімкнено" : "Не запущено"]
+    ["Автоматичне опитування", polling?.actively_polling ? "Виконується" : polling?.enabled ? "Увімкнено, агент не підтверджений" : "Вимкнено"]
   ].forEach(pair => {
     const item = element("div", "");
     add(item, element("strong", "", pair[1]), element("small", "", pair[0]));
