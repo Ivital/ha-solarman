@@ -27,8 +27,6 @@ SCHEMA = "rakurs"
 KEY_RE = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
 MAX_KEYS = 24
 MAX_HISTORY = 1000
-DEMO_DEVICE_KEY = "simulated_deye_sg05lp3"
-DEMO_INGEST_SOURCE = "rakurs_demo_one_shot"
 LOGGER = logging.getLogger("rakurs.standalone")
 
 app = Flask(__name__, static_folder="static", template_folder="templates")
@@ -169,15 +167,22 @@ def parallel_aggregate_requires_device_selection() -> bool:
 
 
 def primary_device_id():
-    """One stable device for legacy single-device KPI and trend routes.
+    """Default single-device overview is slot 1 of the SAME two-Deye group.
 
-    This never aggregates two inverters. Individual device routes display
-    both units independently. After DB cleanup the first ingested device
-    becomes the primary source automatically.
+    A legacy standalone device, even with an earlier numeric id, never
+    becomes the source for home KPIs, history, charts or Modbus. Never
+    add the readings of two Deye units without verified topology.
     """
     if not hasattr(g, "primary_device"):
         found = one(
-            "SELECT device_id AS id FROM rakurs_samples ORDER BY device_id LIMIT 1"
+            "SELECT d.id AS id FROM rakurs_devices AS d "
+            "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
+            "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
+            "WHERE pg.group_key=%s AND pm.slot_no IN (1,2) "
+            "AND d.model LIKE %s "
+            "ORDER BY pm.slot_no, "
+            "CASE WHEN d.kind='inverter' THEN 0 ELSE 1 END, d.id LIMIT 1",
+            ("deye_sun20k_parallel_shared_battery", "%" + PARALLEL_MODEL + "%"),
         )
         g.primary_device = found["id"] if found else None
     return g.primary_device
@@ -301,11 +306,6 @@ def catalog():
     # Unverified planned catalog, NOT actual measured values.
     with CATALOG_FILE.open("r", encoding="utf-8") as source:
         return jsonify(json.load(source))
-
-
-def demo_mode() -> bool:
-    """Deprecated compatibility hook. RAKURS has one operational data mode."""
-    return False
 
 
 @app.get("/api/v1/status")
@@ -495,182 +495,6 @@ def parallel_selected_device():
     if found is None:
         abort(404, description="Інвертор не зареєстровано у профілі")
     return found
-
-
-# The twin simulator is separate from physical equipment inventory.
-# These endpoints never change the existing real-only /parallel/latest route.
-PARALLEL_DEMO_KEYS = ("sim_deye20k_parallel_1", "sim_deye20k_parallel_2")
-PARALLEL_DEMO_SOURCE = "rakurs_parallel_sim_seed_v1"
-
-
-def parallel_demo_storage_ready():
-    found = one(
-        "SELECT COUNT(*) AS n FROM information_schema.tables "
-        "WHERE table_schema=%s AND table_name IN "
-        "('rakurs_parallel_members','rakurs_modbus_poll_runs',"
-        "'rakurs_modbus_register_samples')",
-        (SCHEMA,),
-    )
-    return found is not None and found["n"] == 3
-
-
-def parallel_demo_selected():
-    key = request.args.get("device", "")
-    if key not in PARALLEL_DEMO_KEYS:
-        abort(404, description="Невідомий архівний профіль інвертора")
-    if not parallel_demo_storage_ready():
-        abort(404, description="Архів двох інверторів ще не створено")
-    result = one(
-        "SELECT d.id,d.device_key,pm.slot_no FROM rakurs_devices AS d "
-        "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
-        "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
-        "WHERE d.device_key=%s AND d.kind='simulation' "
-        "AND pm.member_kind='simulation' AND pg.model=%s",
-        (key, PARALLEL_MODEL),
-    )
-    if result is None:
-        abort(404, description="Архівний профіль інвертора не знайдено")
-    return result
-
-
-@app.get("/api/v1/parallel/simulation")
-def parallel_simulation_overview():
-    if not parallel_demo_storage_ready():
-        return jsonify({
-            "data_source": "mysql", "simulation": True,
-            "storage_ready": False, "devices": [],
-            "expected_devices": 2, "profile_register_addresses": 815,
-            "reason": "Структуру збереження сирих регістрів ще не встановлено",
-        })
-    result = rows(
-        "SELECT pm.slot_no,d.device_key,d.model,"
-        "(SELECT COUNT(DISTINCT r.function_code,r.register_address) FROM rakurs_modbus_register_samples AS r "
-        " WHERE r.device_id=d.id AND r.quality='simulated') AS raw_registers,"
-        "(SELECT COUNT(DISTINCT f.field_id) FROM rakurs_modbus_field_samples AS f "
-        " WHERE f.device_id=d.id AND f.quality='simulated') AS decoded_fields,"
-        "(SELECT COUNT(DISTINCT s.signal_id) FROM rakurs_samples AS s "
-        " WHERE s.device_id=d.id AND s.quality='simulated') AS ui_fields "
-        "FROM rakurs_parallel_members AS pm "
-        "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
-        "JOIN rakurs_devices AS d ON d.id=pm.device_id "
-        "WHERE pg.group_key=%s AND pm.member_kind='simulation' "
-        "AND d.kind='simulation' ORDER BY pm.slot_no",
-        ("deye_sun20k_parallel_shared_battery",),
-    )
-    return jsonify({
-        "data_source": "mysql", "simulation": True,
-        "storage_ready": True, "devices": serialize(result),
-        "expected_devices": 2, "profile_register_addresses": 815,
-        "physical_inverters_registered_here": 0,
-        "warning": "Походження архівних значень із фізичного Deye не підтверджене",
-    })
-
-
-@app.get("/api/v1/parallel/simulation/latest")
-def parallel_simulation_latest():
-    selected = parallel_demo_selected()
-    placeholders = ",".join("%s" for _ in PARALLEL_SIGNAL_KEYS)
-    samples = rows(
-        "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,m.quality,"
-        "m.observed_at_utc FROM rakurs_samples AS m "
-        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
-        "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
-        "AND m.quality='simulated' AND m.ingest_source=%s "
-        "ORDER BY m.observed_at_utc DESC",
-        (selected["id"],) + PARALLEL_SIGNAL_KEYS + (PARALLEL_DEMO_SOURCE,),
-    )
-    result = {}
-    for row in samples:
-        result.setdefault(row["signal_key"], row)
-    return jsonify({
-        "data_source": "mysql", "simulation": True,
-        "device_key": selected["device_key"], "values": serialize(result),
-        "aggregate_verified": False, "shared_battery_soc_verified": False,
-    })
-
-
-@app.get("/api/v1/parallel/simulation/raw")
-def parallel_simulation_raw():
-    selected = parallel_demo_selected()
-    try:
-        offset = int(request.args.get("offset", "0"))
-        limit = int(request.args.get("limit", "200"))
-    except ValueError:
-        abort(400, description="Некоректний розмір сторінки")
-    if not 0 <= offset <= 100000 or not 1 <= limit <= 500:
-        abort(400, description="Допустимо 1–500 регістрів на сторінку")
-    poll = one(
-        "SELECT id,observed_at_utc FROM rakurs_modbus_poll_runs "
-        "WHERE device_id=%s AND quality='simulated' AND ingest_source=%s "
-        "ORDER BY observed_at_utc DESC LIMIT 1",
-        (selected["id"], PARALLEL_DEMO_SOURCE),
-    )
-    if poll is None:
-        return jsonify({"data_source": "mysql", "simulation": True,
-                        "device_key": selected["device_key"],
-                        "raw_registers": [], "total": 0})
-    count = one(
-        "SELECT COUNT(*) AS n FROM rakurs_modbus_register_samples "
-        "WHERE poll_id=%s", (poll["id"],),
-    )
-    readings = rows(
-        "SELECT function_code,register_address,raw_uint16,quality,"
-        "observed_at_utc FROM rakurs_modbus_register_samples "
-        "WHERE poll_id=%s ORDER BY function_code,register_address,frame_id "
-        "LIMIT %s OFFSET %s", (poll["id"], limit, offset),
-    )
-    return jsonify({
-        "data_source": "mysql", "simulation": True,
-        "device_key": selected["device_key"], "total": count["n"],
-        "offset": offset, "limit": limit, "raw_registers": serialize(readings),
-        "note": "Архівні регістри; походження з фізичного Modbus не підтверджене",
-    })
-
-
-@app.get("/api/v1/parallel/simulation/fields")
-def parallel_simulation_fields():
-    """Paginated full decoded Modbus field catalogue for ONE simulated unit.
-
-    Never substitutes demo values for physical telemetry. Read-only SELECT.
-    """
-    selected = parallel_demo_selected()
-    try:
-        offset = int(request.args.get("offset", "0"))
-        limit = int(request.args.get("limit", "80"))
-    except ValueError:
-        abort(400, description="Некоректний розмір сторінки")
-    if not 0 <= offset <= 100000 or not 1 <= limit <= 100:
-        abort(400, description="Доступно 1–100 полів на сторінку")
-    total = one(
-        "SELECT COUNT(*) AS n FROM rakurs_modbus_field_samples AS m "
-        "WHERE m.device_id=%s AND m.quality='simulated' "
-        "AND m.ingest_source=%s AND m.observed_at_utc=("
-        "SELECT MAX(x.observed_at_utc) FROM rakurs_modbus_field_samples AS x "
-        "WHERE x.device_id=m.device_id AND x.quality='simulated' "
-        "AND x.ingest_source=%s)",
-        (selected["id"], PARALLEL_DEMO_SOURCE, PARALLEL_DEMO_SOURCE),
-    )
-    records = rows(
-        "SELECT f.field_key,f.field_name,f.group_name,f.unit,"
-        "m.value_decimal,m.value_text,m.observed_at_utc,m.quality "
-        "FROM rakurs_modbus_field_samples AS m "
-        "JOIN rakurs_modbus_fields AS f ON f.id=m.field_id "
-        "WHERE m.device_id=%s AND m.quality='simulated' "
-        "AND m.ingest_source=%s AND m.observed_at_utc=("
-        "SELECT MAX(x.observed_at_utc) FROM rakurs_modbus_field_samples AS x "
-        "WHERE x.device_id=m.device_id AND x.quality='simulated' "
-        "AND x.ingest_source=%s) "
-        "ORDER BY f.field_key LIMIT %s OFFSET %s",
-        (selected["id"], PARALLEL_DEMO_SOURCE, PARALLEL_DEMO_SOURCE,
-         limit, offset),
-    )
-    return jsonify({
-        "data_source": "mysql", "simulation": True,
-        "device_key": selected["device_key"],
-        "offset": offset, "limit": limit, "total": total["n"] if total else 0,
-        "fields": serialize(records),
-        "warning": "Походження значень із фізичного Deye не підтверджене",
-    })
 
 
 @app.get("/api/v1/parallel/latest")
