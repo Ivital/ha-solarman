@@ -192,13 +192,15 @@ def index():
         readings = rows(
             "SELECT s.signal_key,s.unit,m.value_decimal,m.quality "
             "FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.device_id=%s AND m.signal_id=s.id "
-            "AND m.observed_at_utc=("
-            "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id) "
+            "JOIN (SELECT signal_id,MAX(observed_at_utc) AS latest_at "
+            "FROM rakurs_samples WHERE device_id=%s "
+            "GROUP BY signal_id) AS recent ON recent.signal_id=s.id "
+            "JOIN rakurs_samples AS m ON m.device_id=%s "
+            "AND m.signal_id=recent.signal_id "
+            "AND m.observed_at_utc=recent.latest_at "
             "WHERE s.signal_key IN (" + placeholders + ") "
             "ORDER BY s.signal_key",
-            (selected,) + keys,
+            (selected, selected) + keys,
         )
     latest = {item["signal_key"]: item for item in readings}
     cards = []
@@ -242,12 +244,13 @@ def deye_snapshot():
         result = rows(
             "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,"
             "m.quality,m.observed_at_utc FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.device_id=%s AND m.signal_id=s.id "
-            "AND m.observed_at_utc=("
-            "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id) "
+            "JOIN (SELECT signal_id,MAX(observed_at_utc) AS latest_at "
+            "FROM rakurs_samples WHERE device_id=%s GROUP BY signal_id) AS recent "
+            "ON recent.signal_id=s.id "
+            "JOIN rakurs_samples AS m ON m.device_id=%s "
+            "AND m.signal_id=recent.signal_id AND m.observed_at_utc=recent.latest_at "
             "ORDER BY s.label_uk LIMIT 500",
-            (device_id,),
+            (device_id, device_id),
         )
     lookup = {item["signal_key"]: item for item in result}
     summary = [{
@@ -272,12 +275,12 @@ def deye_modbus_snapshot():
         "SELECT f.field_key,f.group_name,f.field_name,f.unit,"
         "f.registers_json,m.value_decimal,m.value_text,m.quality "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m "
-        "ON m.device_id=%s AND m.field_id=f.id "
-        "AND m.observed_at_utc=("
-        "SELECT MAX(mx.observed_at_utc) FROM rakurs_modbus_field_samples AS mx "
-        "WHERE mx.device_id=m.device_id AND mx.field_id=m.field_id) "
-        "ORDER BY f.id LIMIT 700", params,
+        "LEFT JOIN (SELECT field_id,MAX(observed_at_utc) AS latest_at "
+        "FROM rakurs_modbus_field_samples WHERE device_id=%s GROUP BY field_id) "
+        "AS recent ON recent.field_id=f.id "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.device_id=%s "
+        "AND m.field_id=recent.field_id AND m.observed_at_utc=recent.latest_at "
+        "ORDER BY f.id LIMIT 700", (params[0], params[0]),
     )
     for item in result:
         addresses = json.loads(item["registers_json"] or "[]")
@@ -952,13 +955,13 @@ def parallel_device_modbus():
         "f.registers_json, m.value_decimal, m.value_text, "
         "m.quality, m.observed_at_utc "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m "
-        "ON m.device_id=%s AND m.field_id=f.id "
-        "AND m.observed_at_utc=("
-        "SELECT MAX(ms.observed_at_utc) FROM rakurs_modbus_field_samples AS ms "
-        "WHERE ms.device_id=m.device_id AND ms.field_id=m.field_id) "
+        "LEFT JOIN (SELECT field_id,MAX(observed_at_utc) AS latest_at "
+        "FROM rakurs_modbus_field_samples WHERE device_id=%s GROUP BY field_id) "
+        "AS recent ON recent.field_id=f.id "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.device_id=%s "
+        "AND m.field_id=recent.field_id AND m.observed_at_utc=recent.latest_at "
         "ORDER BY f.id LIMIT 700",
-        (selected["id"],),
+        (selected["id"], selected["id"]),
     )
     return jsonify({
         "data_source": "mysql", "device_key": selected["device_key"],
@@ -976,13 +979,13 @@ def modbus_fields():
         "f.unit,f.registers_json,f.derived,f.verified,"
         "m.value_decimal,m.value_text,m.quality,m.observed_at_utc "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m "
-        "ON m.device_id=%s AND m.field_id=f.id "
-        "AND m.observed_at_utc=("
-        "SELECT MAX(ms.observed_at_utc) FROM rakurs_modbus_field_samples AS ms "
-        "WHERE ms.device_id=m.device_id AND ms.field_id=m.field_id) "
+        "LEFT JOIN (SELECT field_id,MAX(observed_at_utc) AS latest_at "
+        "FROM rakurs_modbus_field_samples WHERE device_id=%s GROUP BY field_id) "
+        "AS recent ON recent.field_id=f.id "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.device_id=%s "
+        "AND m.field_id=recent.field_id AND m.observed_at_utc=recent.latest_at "
         "ORDER BY f.id LIMIT 700",
-        (device_id,),
+        (device_id, device_id),
     )
     found = one("SELECT COUNT(*) AS n FROM rakurs_modbus_register_inventory")
     return jsonify({

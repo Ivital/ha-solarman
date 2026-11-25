@@ -72,8 +72,10 @@ class PublicPresentationTests(unittest.TestCase):
         ):
             with self.subTest(invalid=invalid):
                 self.assertNotIn(invalid, code)
-        self.assertIn("SELECT MAX(mx.observed_at_utc)", code)
-        self.assertIn("SELECT MAX(ms.observed_at_utc)", code)
+        self.assertIn("FROM rakurs_samples WHERE device_id=%s GROUP BY signal_id", code)
+        self.assertIn("AS recent ON recent.signal_id=s.id", code)
+        self.assertIn("FROM rakurs_modbus_field_samples WHERE device_id=%s GROUP BY field_id", code)
+        self.assertIn("AS recent ON recent.field_id=f.id", code)
 
 if __name__ == "__main__":
     unittest.main()
