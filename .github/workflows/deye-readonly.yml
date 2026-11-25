@@ -75,6 +75,19 @@ jobs:
           python -m py_compile deploy/rakurs/mysql_archive_tls_diagnose.py
           sh -n deploy/rakurs/renewal-nginx-reload.sh
           python -m unittest discover -s tests -p 'test_rakurs_proxy.py' -v
+      - name: Validate Windows MySQL retirement script syntax (no execution)
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $issues = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            "deploy/rakurs/standalone/retire_legacy_deye_windows.ps1",
+            [ref]$tokens, [ref]$issues
+          ) | Out-Null
+          if ($issues.Count -ne 0) {
+            $issues | Out-String | Write-Error
+            exit 1
+          }
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
       - name: RAKURS dashboard YAML and zero-fabrication tests
