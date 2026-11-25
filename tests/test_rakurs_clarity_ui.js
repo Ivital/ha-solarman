@@ -82,7 +82,8 @@ function prepare(mode = "seeded") {
   const elements = {
     content: main, nav, connection: new Node("span"),
     updated: new Node("span"), "view-title": new Node("h1"),
-    "mode-indicator": new Node("span")
+    "mode-indicator": new Node("span"),
+    "device-select": new Node("select")
   };
   const actions = new Node("div");
   const doc = {
@@ -211,6 +212,17 @@ async function run() {
   assert(descendants(app.main).some(x =>
     String(x.textContent || "").includes("Останні показники · Deye №2")));
   console.log("CLARITY_SWITCH_DEYE_1_2=PASS");
+  const globalPicker=app.elements["device-select"];
+  assert.equal(globalPicker.childNodes.length,2);
+  assert.equal(globalPicker.value,"sim_deye20k_parallel_1",
+    "Boot global selector defaults to Deye 1 before home selection");
+  // Home-card selector chooses Deye 2, while global control can switch back.
+  globalPicker.value="sim_deye20k_parallel_1";
+  await globalPicker.listeners.change();
+  await settle();
+  assert(descendants(app.main).some(x =>
+    String(x.textContent||"").includes("Останні показники · Deye №1")));
+  console.log("CLARITY_GLOBAL_DEYE_PICKER=PASS");
   console.log("CLARITY_UNIFIED_MYSQL_OVERVIEW=PASS");
 
   app.loc.hash="#/trends";
