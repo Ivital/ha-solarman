@@ -3,7 +3,7 @@ on:
   push:
     branches: [main, "feature/**"]
   pull_request:
-    branches: [main]
+    branches: [main, "feature/**"]
   workflow_dispatch:
 permissions:
   contents: read
@@ -92,6 +92,8 @@ jobs:
           python -m unittest discover -s tests -p 'test_rakurs_modbus_full_archive.py' -v
           python -m unittest discover -s tests -p 'test_rakurs_modbus_wire.py' -v
           python -m unittest discover -s tests -p 'test_rakurs_security_upgrade.py' -v
+          # Include newly added and future regression files in every CI run.
+          python -m unittest discover -s tests -p 'test_*.py' -v
           node --check deploy/rakurs/standalone/static/app.js
           node tests/test_rakurs_ssr_guard.js
           node --check deploy/rakurs/standalone/static/app-clarity-20261124.js
