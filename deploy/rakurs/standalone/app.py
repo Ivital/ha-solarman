@@ -436,6 +436,47 @@ def history():
     })
 
 
+@app.get("/api/v1/history/range")
+def history_range():
+    """Bounded historical export, preserving the selected Deye device."""
+    key = checked_key()
+    def utc_arg(name):
+        value = request.args.get(name, "")
+        if len(value) > 40:
+            abort(400, description="Некоректний часовий інтервал")
+        try:
+            date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            abort(400, description="Неправильна дата " + name)
+        if date.tzinfo is None or date.utcoffset() is None:
+            abort(400, description="Дата має містити часову зону")
+        return date.astimezone(timezone.utc).replace(tzinfo=None)
+    start = utc_arg("start")
+    end = utc_arg("end")
+    seconds = (end-start).total_seconds()
+    if seconds <= 0 or seconds > 31*86400:
+        abort(400, description="Діапазон має бути 1 секунда — 31 доба")
+    selected = selected_overview_device_id()
+    if selected is None:
+        return jsonify({"data_source":"mysql","signal_key":key,
+                        "points":[],"truncated":False})
+    data=rows(
+        "SELECT m.observed_at_utc,m.value_decimal,m.raw_value,m.quality "
+        "FROM rakurs_samples AS m "
+        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+        "WHERE m.device_id=%s AND s.signal_key=%s "
+        "AND m.observed_at_utc >= %s AND m.observed_at_utc <= %s "
+        "ORDER BY m.observed_at_utc DESC LIMIT %s",
+        (selected,key,start,end,MAX_HISTORY+1))
+    truncated=len(data)>MAX_HISTORY
+    result=data[:MAX_HISTORY]
+    result.reverse()
+    return jsonify({"data_source":"mysql","signal_key":key,
+                    "points":serialize(result),"truncated":truncated,
+                    "primary_device_id":selected,
+                    "start":serialize(start),"end":serialize(end)})
+
+
 @app.get("/api/v1/events")
 def events():
     result = rows(
