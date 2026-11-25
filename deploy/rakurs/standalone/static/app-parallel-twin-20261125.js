@@ -1,8 +1,6 @@
 "use strict";
 // Rakurs standalone: the ONLY data API is this app's /api/v1/* backed by MySQL.
 const base = "/api/v1";
-const DEMO_MODE = false;
-const FORCE_REAL_MODE = false;
 const views = [
   ["overview", "Огляд", "◈"],
   ["pv", "Сонце", "☀"],
@@ -159,7 +157,7 @@ function addStatusMessage() {
     message("Підключення до MySQL не підтверджено",
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
   } else if (!state.status.has_real_samples) {
-    message("Очікування реальних вимірювань Deye",
+    message("Очікування показників Deye",
       "Структура бази rakurs готова, але даних із підтвердженого пристрою ще немає. «—» означає відсутність даних, не нуль.");
   }
 }
@@ -269,6 +267,10 @@ function detailMetric(label, key, values, icon = "◦") {
   add(val, element("strong", "", pretty(value)), element("small", "",
     value !== null && record ? (record.unit || "") : ""));
   cell.appendChild(val);
+  if (record && record.observed_at_utc) {
+    cell.appendChild(element("time","subtle metric-timestamp",
+      "Запис: "+time(record.observed_at_utc)));
+  }
   return cell;
 }
 function panel(title, description) {
@@ -330,7 +332,7 @@ async function renderOverview(cycle, primedValues = null) {
   if (!current(cycle)) return;
   const footer = element("div", "overview-footer");
   const statusText = state.status ?
-    (state.status.displayed_signals || state.status.simulated_signals ||
+    (state.status.displayed_signals ||
       state.status.verified_signals || 0) + " показників у базі" :
     "Джерело даних: MySQL";
   add(footer, element("span", "", statusText),
@@ -462,7 +464,10 @@ async function renderGroup(groups, title, cycle) {
     const row = element("article", "metric");
     const info = element("div", "metric-info");
     add(info, element("strong", "", metric.label),
-      element("small", "", metric.key));
+      element("small", "", metric.key),
+      element("time","subtle metric-timestamp",
+        record && record.observed_at_utc ?
+          time(record.observed_at_utc) : "Час відсутній"));
     const val = element("div", "metric-reading");
     add(val, element("span", "number" + (hasValue ? "" : " unknown"),
         hasValue ? pretty(Number(record.value_decimal), 3) : "—"),
@@ -629,7 +634,7 @@ async function renderHistory(cycle, archived) {
       const head = element("div", "history-table-head");
       head.appendChild(element("h3", "", "Останні вимірювання"));
       head.appendChild(element("span", "subtle", "Час Київ · " +
-        (DEMO_MODE ? "архів MySQL" : "MySQL")));
+        "MySQL"));
       tableArea.appendChild(head);
       const wrapper = element("div", "table-wrap");
       const table = element("table", "data-table");
@@ -664,9 +669,8 @@ async function renderHistory(cycle, archived) {
 }
 function displayDeviceKey(value) {
   const key = String(value || "");
-  if (key === "simulated_deye_sg05lp3") return "Deye · основний профіль";
-  if (key === "sim_deye20k_parallel_1") return "Deye №1";
-  if (key === "sim_deye20k_parallel_2") return "Deye №2";
+  if (key === "deye_inverter_1" || key.endsWith("_parallel_1")) return "Deye №1";
+  if (key === "deye_inverter_2" || key.endsWith("_parallel_2")) return "Deye №2";
   return key || "—";
 }
 function deviceLabel(device, index = 0) {
@@ -972,7 +976,7 @@ async function renderEvents(cycle) {
     for (const batch of items) {
       const row = element("article", "event-row event-batch");
       const code = String(batch.error_code || "");
-      const imported = batch.status === "simulated";
+      const imported = batch.status === "generated";
       const title = code === "DEYE_HISTORY_72H_V1" ?
         "Додано історію вимірювань за 72 години" :
         imported ? "Завантажено записи MySQL" :
@@ -1000,8 +1004,7 @@ async function renderEvents(cycle) {
 
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
-  section(sectionName, DEMO_MODE ? "Архів MySQL" :
-                                        "Записи виключно з MySQL rakurs");
+  section(sectionName, "Записи з MySQL rakurs");
   const root = panel();
   main.appendChild(root);
   try {
@@ -1020,7 +1023,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
         const raw = item[field];
         const displayed = field === "commissioned_at_utc" && !raw ?
           "Не зазначено" : field.endsWith("_utc") ? time(raw) :
-          field === "kind" && (raw === "simulation" || raw === "inverter") ? "Інвертор" :
+          field === "kind" && raw === "inverter" ? "Інвертор" :
           field === "device_key" ? displayDeviceKey(raw) :
           (raw ?? "—");
         row.appendChild(element("td", "", displayed));
@@ -1069,7 +1072,7 @@ async function renderModbus(cycle) {
     const wrapper = element("div", "table-wrap");
     const table = element("table", "data-table modbus-table");
     const thead = element("thead", ""), tr = element("tr", "");
-    ["Група", "Параметр", "Регістр", "Значення", "Од."].forEach(t =>
+    ["Група", "Параметр", "Регістр", "Значення", "Од.", "Дата й час"].forEach(t =>
       tr.appendChild(element("th", "", t)));
     thead.appendChild(tr);
     const tbody = element("tbody", "");
@@ -1102,7 +1105,8 @@ async function renderModbus(cycle) {
           String(f.value_text) : f.value_decimal === null ?
           "—" : pretty(Number(f.value_decimal), 3);
         [f.group_name || "—", f.field_name || f.field_key,
-         item.addresses || "Розрахунковий", value, f.unit || "—"].forEach(x =>
+         item.addresses || "Розрахунковий", value, f.unit || "—",
+         f.observed_at_utc ? time(f.observed_at_utc) : "—"].forEach(x =>
           row.appendChild(element("td", "", x)));
         tbody.appendChild(row);
       }

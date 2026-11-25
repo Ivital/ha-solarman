@@ -82,7 +82,8 @@ jobs:
           $issues = $null
           foreach ($name in @(
             "retire_legacy_deye_windows.ps1",
-            "install_polling_config_windows.ps1"
+            "install_polling_config_windows.ps1",
+            "install_two_deye_history_windows.ps1"
           )) {
             $tokens = $null
             $issues = $null
@@ -95,6 +96,8 @@ jobs:
               exit 1
             }
           }
+      - name: Validate guarded two-Deye history in isolated MySQL 8
+        run: bash tests/run_rakurs_history_mysql_integration.sh
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
       - name: RAKURS dashboard YAML and zero-fabrication tests

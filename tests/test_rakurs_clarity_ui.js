@@ -150,16 +150,16 @@ function prepare(mode = "seeded") {
           {started_at_utc:"2026-11-24T19:00:00Z",
            finished_at_utc:"2026-11-24T19:00:00Z",
            received_count:135936,accepted_count:135936,rejected_count:0,
-           status:"simulated",error_code:"DEYE_HISTORY_72H_V1"},
+           status:"generated",error_code:"DEYE_HISTORY_72H_V1"},
           {started_at_utc:"2026-11-24T17:53:54Z",
            finished_at_utc:"2026-11-24T17:53:54Z",
            received_count:624,accepted_count:624,rejected_count:0,
-           status:"simulated",error_code:null}
+           status:"generated",error_code:null}
         ]}
       : url.includes("/devices") ?
         {devices:[
-          {device_key:"sim_deye20k_parallel_1",kind:"simulation",model:"Deye"},
-          {device_key:"sim_deye20k_parallel_2",kind:"simulation",model:"Deye"}
+          {device_key:"sim_deye20k_parallel_1",kind:"inverter",model:"Deye"},
+          {device_key:"sim_deye20k_parallel_2",kind:"inverter",model:"Deye"}
         ]}
       : {events:[],devices:[],batches:[]};
     return {ok:true,json:async () => data};

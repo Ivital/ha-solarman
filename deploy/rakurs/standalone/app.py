@@ -181,6 +181,8 @@ def primary_device_id():
             "WHERE pg.group_key=%s AND pm.slot_no IN (1,2) "
             "AND d.model LIKE %s "
             "ORDER BY pm.slot_no, "
+            "CASE WHEN pm.member_kind='physical' AND pm.member_verified=1 "
+            "THEN 0 WHEN pm.member_kind='physical' THEN 1 ELSE 2 END, "
             "CASE WHEN d.kind='inverter' THEN 0 ELSE 1 END, d.id LIMIT 1",
             ("deye_sun20k_parallel_shared_battery", "%" + PARALLEL_MODEL + "%"),
         )
@@ -524,7 +526,10 @@ def parallel_registered_devices():
         "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
         "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
         "WHERE d.model LIKE %s AND pg.group_key=%s "
-        "ORDER BY pm.slot_no,CASE WHEN d.kind='inverter' THEN 0 ELSE 1 END,"
+        "ORDER BY pm.slot_no,"
+        "CASE WHEN pm.member_kind='physical' AND pm.member_verified=1 THEN 0 "
+        "WHEN pm.member_kind='physical' THEN 1 ELSE 2 END,"
+        "CASE WHEN d.kind='inverter' THEN 0 ELSE 1 END,"
         "d.id LIMIT 20",
         ("%" + PARALLEL_MODEL + "%", "deye_sun20k_parallel_shared_battery"),
     )
