@@ -123,7 +123,7 @@ class LiveArchiveApiTests(unittest.TestCase):
             self.assertEqual(res.status_code,200,suffix)
             payload = res.get_json()
             self.assertEqual(payload["device_key"],"real_1")
-            self.assertFalse(payload["simulation"])
+            self.assertNotIn("simulation", payload)
             self.assertEqual(payload["total"],1)
             self.assertEqual(len(payload[field]),1)
         for sql,params in self.recorded:
