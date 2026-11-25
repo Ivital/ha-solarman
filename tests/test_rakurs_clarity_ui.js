@@ -101,10 +101,10 @@ function prepare(mode = "seeded") {
   const slotKeys = mode === "two" ?
     ["inverter_1", "inverter_2"] :
     ["sim_deye20k_parallel_1", "sim_deye20k_parallel_2"];
-  const active = ["two", "seeded", "partial-seeded"].includes(mode);
+  const active = ["two", "seeded", "partial-seeded", "single", "admin"].includes(mode);
   const stored = active ? slotKeys.map((device_key, i) =>
     ({device_key, slot_no:i + 1, model:"SUN-20K-SG05LP3-EU-SM2"})) : [];
-  async function fetch(url) {
+  async function fetch(url, options = {}) {
     fetchCalls.push(url);
     if (mode === "fail") throw Error("Unreachable");
     if ((mode === "partial" || mode === "partial-seeded") &&
@@ -118,10 +118,10 @@ function prepare(mode = "seeded") {
          has_real_samples:true,collector_active:false}
       : url.includes("/signals") ?
         {signals:[{signal_key:"pv_power",label_uk:"PV power",unit:"кВт"}]}
-      : url.includes("/auth") ? {authenticated:false}
+      : url.includes("/auth") ? mode === "admin" ? {authenticated:true,username:"admin",role:"admin",csrf:"token"} : {authenticated:false}
       : url.includes("/parallel/latest?") ?
         {device_key:slotKeys[0],values:latest}
-      : url.includes("/parallel/history?") ? {points:history}
+      : url.includes("/parallel/history?") ? {points:mode==="single"?history.slice(0,1):history}
       : url.includes("/parallel/modbus-fields?") ?
         {device_key:slotKeys[0],fields:[
           {field_key:"p3_0001",field_name:"PV one",unit:"кВт",
@@ -139,7 +139,10 @@ function prepare(mode = "seeded") {
         {model:"SUN-20K-SG05LP3-EU-SM2",expected_inverters:2,
          registered_inverters:stored.length,devices:stored,aggregate_verified:false}
       : url.includes("/latest?") ? {values:latest}
-      : url.includes("/history?") ? {signal:{unit:"кВт"},points:history}
+      : url.includes("/history?") ? {signal:{unit:"кВт"},points:mode==="single"?history.slice(0,1):history}
+      : url.includes("/config") ? {available:true,enabled:false,interval_seconds:60,worker_online:false,
+          devices:stored.map((d,i)=>({...d,id:i+2,display_name:"Deye №"+(i+1),enabled:false,
+            transport:"unconfigured",function_code:3,register_count:1,timeout_ms:1500}))}
       : url.includes("/modbus-fields") ?
         {count:fields.length,register_count:815,fields}
       : url.includes("/batches") ? {batches:[
@@ -292,6 +295,23 @@ async function run() {
   assert(partial.main.childNodes.some(x=>x.ssr&&x.textContent===partial.ssr.textContent));
   assert.equal(byClass(partial.main,"parallel-home-device").length,2);
   console.log("PARALLEL_SURVIVES_INCOMPLETE_LEGACY_API=PASS");
+
+  const onePoint=prepare("single");
+  await settle();
+  onePoint.loc.hash="#/history";
+  await onePoint.events.hashchange();
+  assert(descendants(onePoint.main).some(x => x.tagName==="circle"),
+    "A single archived point must be visible on the SVG");
+  console.log("CLARITY_SINGLE_POINT_CHART=PASS");
+
+  const admin=prepare("admin");
+  await settle();
+  admin.loc.hash="#/settings";
+  await admin.events.hashchange();
+  assert(byClass(admin.main,"settings-save").length>=3,
+    "Admin can manage polling and at least two inverters");
+  assert(byClass(admin.main,"settings-field").length>=20);
+  console.log("CLARITY_ADMIN_SETTINGS_UI=PASS");
 
   const empty=prepare("empty");
   await settle();
