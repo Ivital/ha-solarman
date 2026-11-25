@@ -80,13 +80,20 @@ jobs:
         run: |
           $tokens = $null
           $issues = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            "deploy/rakurs/standalone/retire_legacy_deye_windows.ps1",
-            [ref]$tokens, [ref]$issues
-          ) | Out-Null
-          if ($issues.Count -ne 0) {
-            $issues | Out-String | Write-Error
-            exit 1
+          foreach ($name in @(
+            "retire_legacy_deye_windows.ps1",
+            "install_polling_config_windows.ps1"
+          )) {
+            $tokens = $null
+            $issues = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              ("deploy/rakurs/standalone/" + $name),
+              [ref]$tokens, [ref]$issues
+            ) | Out-Null
+            if ($issues.Count -ne 0) {
+              $issues | Out-String | Write-Error
+              exit 1
+            }
           }
       - name: Validate Docker Compose configuration
         run: docker compose --env-file deploy/.env.example -f deploy/compose.yaml config --quiet
