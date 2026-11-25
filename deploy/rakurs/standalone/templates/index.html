@@ -24,7 +24,7 @@
         <div class="backend-icon" aria-hidden="true">◎</div>
         <strong>Джерело показників — MySQL</strong>
         <small>База Rakurs · захищений доступ</small>
-        <small>Усі значення мають позначку походження</small>
+        <small>Усі збережені показники відображаються з MySQL</small>
       </div>
     </aside>
     <div class="workarea">
@@ -35,11 +35,11 @@
         </div>
         <div class="top-actions">
           <span id="updated" class="updated">Оновлення даних…</span>
-          <span id="mode-indicator" class="mode-indicator {{ 'mode-simulation' if initial_simulated else 'mode-real' }}">{{ 'Архів MySQL' if initial_simulated else 'Реальні вимірювання' }}</span>
+          <span id="mode-indicator" class="mode-indicator mode-real">Дані MySQL</span>
           <span id="connection" class="connection pending"><i></i> Перевірка MySQL</span>
         </div>
       </header>
-      <main id="content" class="content" data-initial-mode="{{ 'simulation' if initial_simulated else 'real' }}">
+      <main id="content" class="content" data-initial-mode="real">
         <div class="dashboard-intro">
           <div class="eyebrow">ЕНЕРГОСИСТЕМА · ОГЛЯД</div>
           <h2>Енергія під контролем</h2>
@@ -70,9 +70,7 @@
           </article>
           {% endfor %}
         </div>
-        {% if initial_simulated %}
-        <p class="subtle ssr-simulation-note">Архівні записи MySQL · фізичне походження вимірювань не підтверджене.</p>
-        {% endif %}
+
       </main>
       <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
     </div>
