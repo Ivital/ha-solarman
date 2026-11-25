@@ -119,8 +119,15 @@ actual="$(docker exec "$NAME" mysql -uroot "-p$PASS" "$DBNAME" -N -B \
   (SELECT COUNT(*) FROM rakurs_parallel_members WHERE member_kind='archive'),':',
   (SELECT COUNT(*) FROM rakurs_samples WHERE quality='generated'),':',
   (SELECT COUNT(*) FROM rakurs_poll_settings WHERE enabled=1),':',
-  (SELECT COUNT(*) FROM rakurs_modbus_field_samples WHERE value_text LIKE 'SIM-PROFILE%'))")"
-test "$actual" = '2:212984:210912:2:212984:0:0' || {
+  (SELECT COUNT(*) FROM rakurs_modbus_field_samples WHERE value_text LIKE 'SIM-PROFILE%'),':',
+  (SELECT IF(ABS(
+    (SELECT m.value_decimal FROM rakurs_samples AS m JOIN rakurs_signals AS sig
+      ON sig.id=m.signal_id WHERE m.device_id=2 AND sig.signal_key='pv_power'
+      ORDER BY m.observed_at_utc DESC LIMIT 1)-
+    (SELECT m.value_decimal FROM rakurs_samples AS m JOIN rakurs_signals AS sig
+      ON sig.id=m.signal_id WHERE m.device_id=3 AND sig.signal_key='pv_power'
+      ORDER BY m.observed_at_utc DESC LIMIT 1))>0.1,1,0))")"
+test "$actual" = '2:212984:210912:2:212984:0:0:1' || {
   echo "INTEGRATION_MYSQL_POSTVERIFY_FAIL=$actual" >&2
   exit 2
 }
