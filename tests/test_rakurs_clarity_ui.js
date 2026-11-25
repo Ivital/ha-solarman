@@ -187,8 +187,8 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=grid-picker-20261125-2"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=grid-picker-20261125-2"'));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=shared-rs485-20261125-1"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=shared-rs485-20261125-1"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
