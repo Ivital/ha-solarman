@@ -13,15 +13,15 @@
     <nav aria-label="Розділи">
       <a href="/deye" {% if section == 'overview' %}aria-current="page"{% endif %}>Огляд</a>
       <a href="/deye/modbus" {% if section == 'modbus' %}aria-current="page"{% endif %}>Modbus</a>
-      <a href="/?demo=1">Повний інтерфейс</a>
+      <a href="/">Повний інтерфейс</a>
     </nav>
   </header>
   <main>
     <div class="intro">
       <div>
-        <p class="eyebrow">DEYE · ДЕМОНСТРАЦІЙНИЙ ЗНІМОК З MYSQL</p>
+        <p class="eyebrow">DEYE · ЗБЕРЕЖЕНИЙ ЗНІМОК ІЗ MYSQL</p>
         <h1>{{ title }}</h1>
-        <p class="meta">Джерело — база <strong>rakurs</strong>, симульований пристрій.
+        <p class="meta">Джерело — база <strong>rakurs</strong>; фізичне походження архівних показників не підтверджене.
         {% if timestamp %}Час знімка (UTC): {{ timestamp }}.{% endif %}</p>
       </div>
       <div class="count"><strong>{{ count }}</strong><span>{% if section == 'overview' %}показників{% else %}параметри профілю P3{% endif %}</span></div>
