@@ -42,5 +42,38 @@ class PublicPresentationTests(unittest.TestCase):
         self.assertIn('WHERE m.device_id=%s', app)
         self.assertIn('def primary_device_id():', app)
 
+    def test_queries_follow_composite_mysql_primary_keys(self):
+        code = (ROOT / "app.py").read_text()
+        mysql_schema = (ROOT.parent / "archive_mysql_schema.sql").read_text()
+        modbus_schema = (ROOT / "modbus_full_schema.sql").read_text()
+
+        sample_definition = mysql_schema.split(
+            "CREATE TABLE IF NOT EXISTS rakurs_samples (", 1
+        )[1].split(") ENGINE=InnoDB", 1)[0]
+        field_definition = modbus_schema.split(
+            "CREATE TABLE IF NOT EXISTS rakurs_modbus_field_samples (", 1
+        )[1].split(") ENGINE=InnoDB", 1)[0]
+        self.assertIn("PRIMARY KEY (device_id, signal_id, observed_at_utc)",
+                      sample_definition)
+        self.assertIn("PRIMARY KEY (device_id, field_id, observed_at_utc)",
+                      field_definition)
+        self.assertNotRegex(sample_definition, r"(?m)^\s*id\s+BIGINT")
+        self.assertNotRegex(field_definition, r"(?m)^\s*id\s+BIGINT")
+        for invalid in (
+            "SELECT mx.id FROM rakurs_samples",
+            "SELECT ms.id FROM rakurs_modbus_field_samples",
+            "SELECT mx.id FROM rakurs_modbus_field_samples",
+            "JOIN rakurs_samples AS m ON m.id=",
+            "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=",
+            "ORDER BY m.observed_at_utc DESC,m.id DESC",
+            "ORDER BY mx.observed_at_utc DESC,mx.id DESC",
+            "ORDER BY ms.observed_at_utc DESC,ms.id DESC",
+            "FROM rakurs_samples ORDER BY id",
+        ):
+            with self.subTest(invalid=invalid):
+                self.assertNotIn(invalid, code)
+        self.assertIn("SELECT MAX(mx.observed_at_utc)", code)
+        self.assertIn("SELECT MAX(ms.observed_at_utc)", code)
+
 if __name__ == "__main__":
     unittest.main()

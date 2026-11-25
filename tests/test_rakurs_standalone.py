@@ -154,7 +154,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertNotIn("simulation", payload)
         sql = next(q for action, q, _ in self.data_calls
                    if action == "rows" and "rakurs_modbus_fields" in q)
-        self.assertIn("ms.device_id=%s", sql)
+        self.assertIn("m.device_id=%s", sql)
         self.assertNotIn("m.quality=", sql)
 
     def test_malformed_keys_no_data_queries(self):
@@ -310,7 +310,7 @@ class AuthenticationTests(unittest.TestCase):
             self.assertNotIn("/static/app.js", modbus_html)
             self.assertEqual(query.call_count, 2)
             for call in query.call_args_list:
-                self.assertIn("mx.device_id=%s", call.args[0])
+                self.assertIn("m.device_id=%s", call.args[0])
                 self.assertNotIn("m.quality=", call.args[0])
 
     def test_login_ignores_legacy_demo_query(self):

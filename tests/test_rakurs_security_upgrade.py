@@ -159,7 +159,9 @@ class LiveArchiveApiTests(unittest.TestCase):
     def test_homepage_query_is_bounded_and_parallel_is_device_scoped(self):
         # Both SQL latest paths must remain bounded regardless of archive size.
         code = (BASE / "app.py").read_text()
-        self.assertIn("ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1", code)
+        self.assertIn("SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx", code)
+        self.assertNotIn("mx.id", code)
+        self.assertNotIn("m.id", code)
         self.assertIn("ORDER BY s.signal_key LIMIT 32", code)
         self.assertIn("AND pg.group_key=%s", code)
 

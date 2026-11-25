@@ -188,7 +188,8 @@ class ParallelApiTests(unittest.TestCase):
         self.assertFalse(res.get_json()["verified_only"])
         sql = next(q for q, _ in self.db_calls
                    if "FROM rakurs_modbus_fields AS f" in q)
-        self.assertIn("ms.device_id=%s", sql)
+        self.assertIn("m.device_id=%s", sql)
+        self.assertIn("ms.device_id=m.device_id", sql)
         self.assertNotIn("f.verified=1", sql)
         self.assertNotIn("m.quality=", sql)
 
