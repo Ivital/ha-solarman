@@ -102,3 +102,10 @@
 .settings-state{font-size:13px;color:#9ce0d2}
 @media(max-width:900px){.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:550px){.settings-fields{grid-template-columns:1fr}}
+
+.device-select-wrap{display:inline-flex;align-items:center;gap:6px;color:#b5d2dc;
+  font-size:11px;white-space:nowrap}
+.device-select-wrap select{border:1px solid #3c7180;background:#163f4d;
+  padding:7px 9px;border-radius:8px;color:#dcfaf5;font:inherit;min-width:112px}
+.device-select-wrap select:focus-visible{outline:2px solid #80e1d6;outline-offset:2px}
+.device-select-wrap select[hidden]{display:none}
