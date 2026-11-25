@@ -1246,12 +1246,12 @@ async function renderSettings(cycle) {
     return;
   }
   if(!current(cycle)) return;
+  main.appendChild(renderSharedRs485Guide(cfg));
   if(!cfg.available) {
     main.appendChild(createEmpty("Модуль ще не встановлено",
       cfg.reason || "Потрібна контрольована міграція MySQL."));
     return;
   }
-  main.appendChild(renderSharedRs485Guide(cfg));
   const admin=state.role==="admin" && Boolean(state.csrf);
   if(!admin) message("Перегляд без редагування",
     "Змінювати інвертори та параметри опитування може лише адміністратор.",false);
