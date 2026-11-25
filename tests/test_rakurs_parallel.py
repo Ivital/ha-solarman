@@ -243,6 +243,53 @@ class ParallelApiTests(unittest.TestCase):
             self.assertIn("m.device_id=%s", latest_sql)
             self.assertNotIn("quality='good'", latest_sql)
 
+    def test_overview_uses_parallel_first_slot_not_old_single_device(self):
+        observed = []
+        original_devices = [
+            {"id": 21, "device_key": "inverter_1", "slot_no": 1,
+             "model": MODEL, "kind": "inverter"},
+            {"id": 22, "device_key": "inverter_2", "slot_no": 2,
+             "model": MODEL, "kind": "inverter"},
+        ]
+        self.fake_devices = original_devices
+        def one_choice(sql, params=()):
+            observed.append((sql, params))
+            if "FROM rakurs_users WHERE id=%s" in sql:
+                return {"id":123,"username":"tester","role":"admin",
+                        "is_active":1,"session_version":1}
+            if "SELECT d.id AS id" in sql:
+                return {"id":21}
+            if "FROM rakurs_samples AS m" in sql:
+                return {"signal_key":"pv_power","unit":"кВт",
+                        "value_decimal":Decimal("5.1"),"quality":"good"}
+            if "COUNT(*)" in sql:
+                return {"n":0}
+            return None
+        with patch.object(module, "one", side_effect=one_choice):
+            home=self.client.get("/")
+            self.assertEqual(home.status_code,200)
+            d1=self.client.get("/api/v1/latest?keys=pv_power").get_json()
+            self.assertEqual(d1["primary_device_id"],21)
+            d2=self.client.get(
+                "/api/v1/latest?keys=pv_power&device=inverter_2").get_json()
+            self.assertEqual(d2["primary_device_id"],22)
+            self.assertEqual(self.client.get(
+                "/api/v1/history?key=pv_power&device=inverter_2"
+                ).get_json()["primary_device_id"],22)
+            self.assertEqual(self.client.get(
+                "/api/v1/modbus-fields?device=inverter_2"
+                ).get_json()["primary_device_id"],22)
+            self.assertEqual(self.client.get(
+                "/api/v1/latest?keys=pv_power&device=simulated_deye_sg05lp3"
+                ).status_code,404)
+            self.assertEqual(self.client.get(
+                "/api/v1/latest?keys=pv_power&device=x%27%3BDROP"
+                ).status_code,400)
+        sql = next(sql for sql,_ in observed if "SELECT d.id AS id" in sql)
+        self.assertIn("JOIN rakurs_parallel_members",sql)
+        self.assertIn("pm.slot_no IN (1,2)",sql)
+        self.assertNotIn("FROM rakurs_samples ORDER BY device_id",sql)
+
     def test_requires_authenticated_access(self):
         module.app.config.update(SECRET_KEY="parallel-testing-key")
         guest = module.app.test_client()
