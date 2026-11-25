@@ -192,11 +192,11 @@ def index():
         readings = rows(
             "SELECT s.signal_key,s.unit,m.value_decimal,m.quality "
             "FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
-            "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
-            "AND m.id=(SELECT mx.id FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id "
+            "JOIN rakurs_samples AS m ON m.id=("
+            "SELECT mx.id FROM rakurs_samples AS mx "
+            "WHERE mx.device_id=%s AND mx.signal_id=s.id "
             "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
+            "WHERE s.signal_key IN (" + placeholders + ") "
             "ORDER BY s.signal_key",
             (selected,) + keys,
         )
@@ -242,10 +242,9 @@ def deye_snapshot():
         result = rows(
             "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,"
             "m.quality,m.observed_at_utc FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.signal_id=s.id "
-            "WHERE m.device_id=%s AND m.id=("
+            "JOIN rakurs_samples AS m ON m.id=("
             "SELECT mx.id FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id "
+            "WHERE mx.device_id=%s AND mx.signal_id=s.id "
             "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
             "ORDER BY s.label_uk LIMIT 500",
             (device_id,),
@@ -273,10 +272,9 @@ def deye_modbus_snapshot():
         "SELECT f.field_key,f.group_name,f.field_name,f.unit,"
         "f.registers_json,m.value_decimal,m.value_text,m.quality "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m "
-        "ON m.field_id=f.id AND m.device_id=%s "
-        "AND m.id=(SELECT mx.id FROM rakurs_modbus_field_samples AS mx "
-        "WHERE mx.device_id=m.device_id AND mx.field_id=m.field_id "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
+        "SELECT mx.id FROM rakurs_modbus_field_samples AS mx "
+        "WHERE mx.device_id=%s AND mx.field_id=f.id "
         "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
         "ORDER BY f.id LIMIT 700", params,
     )
@@ -951,66 +949,42 @@ def parallel_device_modbus():
         "f.registers_json, m.value_decimal, m.value_text, "
         "m.quality, m.observed_at_utc "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m "
-        "ON m.field_id=f.id AND m.device_id=%s "
-        ""
-        "AND m.observed_at_utc=("
-        "SELECT MAX(ms.observed_at_utc) "
-        "FROM rakurs_modbus_field_samples AS ms "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
+        "SELECT ms.id FROM rakurs_modbus_field_samples AS ms "
         "WHERE ms.device_id=%s AND ms.field_id=f.id "
-        ") "
-        "WHERE f.verified=1 ORDER BY f.id LIMIT 700",
-        (selected["id"], selected["id"]),
+        "ORDER BY ms.observed_at_utc DESC,ms.id DESC LIMIT 1) "
+        "ORDER BY f.id LIMIT 700",
+        (selected["id"],),
     )
     return jsonify({
         "data_source": "mysql", "device_key": selected["device_key"],
         "fields": serialize(data), "count": len(data),
-        "verified_only": True, "aggregation_verified": False,
+        "verified_only": False, "aggregation_verified": False,
     })
 
 
 @app.get("/api/v1/modbus-fields")
 def modbus_fields():
-    if not demo_mode() and parallel_aggregate_requires_device_selection():
-        return jsonify({
-            "data_source": "mysql", "simulation": False,
-            "fields": [], "register_count": 0,
-            "aggregate_verified": False, "device_selection_required": True,
-        })
-    if demo_mode():
-        sample_join = (
-            "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
-            "AND m.quality='simulated' AND m.ingest_source=%s "
-            "AND m.device_id=(SELECT id FROM rakurs_devices WHERE device_key=%s) "
-            "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
-            "FROM rakurs_modbus_field_samples AS ms "
-            "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
-            "AND ms.quality='simulated' AND ms.ingest_source=%s)"
-        )
-        params = (DEMO_INGEST_SOURCE, DEMO_DEVICE_KEY, DEMO_INGEST_SOURCE)
-    else:
-        sample_join = (
-            "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
-            ""
-            "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
-            "FROM rakurs_modbus_field_samples AS ms "
-            "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
-            ")"
-        )
-        params = ()
+    selected = primary_device_id()
+    device_id = selected if selected is not None else -1
     data = rows(
-        "SELECT f.field_key, f.group_name, f.field_name, f.platform, "
-        "f.unit, f.registers_json, f.derived, f.verified, "
-        "m.value_decimal, m.value_text, m.quality, m.observed_at_utc "
-        "FROM rakurs_modbus_fields AS f " + sample_join +
-        " ORDER BY f.id LIMIT 700",
-        params
+        "SELECT f.field_key,f.group_name,f.field_name,f.platform,"
+        "f.unit,f.registers_json,f.derived,f.verified,"
+        "m.value_decimal,m.value_text,m.quality,m.observed_at_utc "
+        "FROM rakurs_modbus_fields AS f "
+        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
+        "SELECT ms.id FROM rakurs_modbus_field_samples AS ms "
+        "WHERE ms.device_id=%s AND ms.field_id=f.id "
+        "ORDER BY ms.observed_at_utc DESC,ms.id DESC LIMIT 1) "
+        "ORDER BY f.id LIMIT 700",
+        (device_id,),
     )
-    reg_count = one("SELECT COUNT(*) AS n FROM rakurs_modbus_register_inventory")
+    found = one("SELECT COUNT(*) AS n FROM rakurs_modbus_register_inventory")
     return jsonify({
-        "data_source": "mysql", "simulation": demo_mode(),
-        "count": len(data), "register_count": reg_count["n"],
-        "fields": serialize(data),
+        "data_source": "mysql", "count": len(data),
+        "register_count": found["n"] if found else 0,
+        "fields": serialize(data), "primary_device_id": selected,
+        "aggregate_verified": False,
     })
 
 
