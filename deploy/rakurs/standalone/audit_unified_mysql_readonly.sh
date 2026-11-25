@@ -30,6 +30,27 @@ import time
 m=import_module("standalone.app")
 with m.open_db() as db:
     with db.cursor() as cur:
+        cur.execute(
+            "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA=DATABASE() "
+            "AND TABLE_NAME IN ('rakurs_samples','rakurs_modbus_field_samples')"
+        )
+        columns = {}
+        for row in cur.fetchall():
+            columns.setdefault(row["TABLE_NAME"], set()).add(row["COLUMN_NAME"])
+        expected = {
+            "rakurs_samples": {"device_id", "signal_id", "observed_at_utc"},
+            "rakurs_modbus_field_samples":
+                {"device_id", "field_id", "observed_at_utc"},
+        }
+        for table, keys in expected.items():
+            actual = columns.get(table, set())
+            if not keys <= actual or "id" in actual:
+                raise AssertionError(
+                    f"MYSQL_COMPOSITE_PK_MISMATCH={table} "
+                    f"missing={sorted(keys - actual)} unexpected_id={'id' in actual}"
+                )
+        print("MYSQL_COMPOSITE_KEY_COLUMNS=PASS")
         cur.execute("SELECT id,session_version FROM rakurs_users "
                     "WHERE is_active=1 ORDER BY id LIMIT 1")
         user=cur.fetchone()
