@@ -1398,6 +1398,10 @@ async function render() {
   const cycle = ++state.cycle;
   state.route = activeRoute();
   buildNav();
+  const picker=document.getElementById("device-select");
+  if(picker && picker.childNodes && picker.childNodes.length){
+    picker.value=state.selectedDeviceKey || picker.childNodes[0].value;
+  }
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
   let primedValues = null;
   if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey) {
