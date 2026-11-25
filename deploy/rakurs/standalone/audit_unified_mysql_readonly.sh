@@ -9,7 +9,7 @@ WORK="$(mktemp -d /tmp/rakurs-new-code-check-XXXXXXXX)"
 trap 'rm -rf "$WORK"' EXIT
 chmod 0755 "$WORK"
 install -d -m 0755 "$WORK/standalone" "$WORK/standalone/templates" "$WORK/standalone/static"
-for file in __init__.py app.py auth.py parallel_support.py modbus_archive.py modbus_wire.py mysql_transport.py; do
+for file in __init__.py app.py auth.py config_api.py poll_worker.py parallel_support.py modbus_archive.py modbus_wire.py mysql_transport.py; do
   install -m 0644 "$HERE/$file" "$WORK/standalone/$file"
 done
 install -m 0644 "$ROOT/signal_catalog.json" "$WORK/signal_catalog.json"
@@ -103,7 +103,8 @@ for path in ("/","/deye","/deye/modbus",
              "/api/v1/latest?keys=pv_power,load_power,battery_soc",
              "/api/v1/history?key=pv_power&hours=24",
              "/api/v1/events","/api/v1/batches",
-             "/api/v1/modbus-fields","/api/v1/parallel/health"):
+             "/api/v1/modbus-fields","/api/v1/parallel/health",
+             "/api/v1/config"):
     get(path)
 status=get("/api/v1/status")
 devices=get("/api/v1/devices")
