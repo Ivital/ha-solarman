@@ -158,10 +158,15 @@ def register(app, *, rows, one, conn):
                     raise ValueError("Схема опитування не встановлена")
                 if enabled:
                     cur.execute(
-                        "SELECT COUNT(*) AS n FROM rakurs_device_settings "
-                        "WHERE enabled=1 AND verified_connection=1 "
-                        "AND transport<>'unconfigured' AND gateway_ip IS NOT NULL "
-                        "AND slave_id IS NOT NULL")
+                        "SELECT COUNT(*) AS n FROM rakurs_device_settings AS c "
+                        "JOIN rakurs_devices AS d ON d.id=c.device_id "
+                        "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
+                        "WHERE c.enabled=1 AND c.verified_connection=1 "
+                        "AND d.kind='inverter' AND pm.member_kind='physical' "
+                        "AND pm.member_verified=1 AND pm.transport_verified=1 "
+                        "AND pm.modbus_address=c.slave_id "
+                        "AND c.transport<>'unconfigured' AND c.gateway_ip IS NOT NULL "
+                        "AND c.slave_id IS NOT NULL")
                     if cur.fetchone()["n"]<1:
                         raise ValueError("Немає підтвердженого інвертора для опитування")
                     cur.execute(
