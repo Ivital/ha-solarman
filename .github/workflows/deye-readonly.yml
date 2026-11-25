@@ -50,6 +50,7 @@ jobs:
           # acceptance runs in deploy_parallel_ui.sh --check.
           bash -n deploy/rakurs/standalone/deploy_parallel_ui.sh
           bash -n deploy/rakurs/standalone/audit_site_full_readonly.sh
+          bash -n deploy/rakurs/standalone/audit_unified_mysql_readonly.sh
           bash deploy/rakurs/standalone/deploy_parallel_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_full_modbus_archive.sh
           bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --check
