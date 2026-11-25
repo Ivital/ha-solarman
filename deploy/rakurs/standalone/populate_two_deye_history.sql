@@ -148,6 +148,42 @@ INSERT INTO rakurs_history_assert(ok) VALUES (
  IF(@insert_fields=209664,1,NULL));
 SELECT 'HISTORY_MODBUS_FIELD_ROWS_ADDED=209664' AS result;
 
+-- The original snapshots were generated with identical values on both
+-- slots. Keep original timestamps, but differentiate continuous preview
+-- metrics for Deye 2. Do NOT change firmware, serial, status or identifiers.
+UPDATE rakurs_samples AS m
+JOIN rakurs_signals AS sig ON sig.id=m.signal_id
+SET m.value_decimal = CASE
+  WHEN sig.signal_key IN ('pv_power','pv1_power','pv2_power',
+       'load_power','output_power','battery_power',
+       'pv_energy_today','load_energy_today') THEN
+    ROUND(m.value_decimal*1.065,5)
+  WHEN sig.signal_key IN ('battery_soc','bms_soc') THEN
+    LEAST(100,ROUND(m.value_decimal+1.8,5))
+  WHEN sig.signal_key IN ('inverter_temperature','battery_temperature',
+       'dc_temperature') THEN ROUND(m.value_decimal+0.55,5)
+  ELSE m.value_decimal
+END
+WHERE m.device_id=3 AND m.quality='simulated'
+  AND m.ingest_source='rakurs_parallel_sim_seed_v1'
+  AND m.value_decimal IS NOT NULL;
+
+UPDATE rakurs_modbus_field_samples AS m
+JOIN rakurs_modbus_fields AS f ON f.id=m.field_id
+SET m.value_decimal = CASE
+  WHEN (f.field_key LIKE '%power%' OR f.field_key LIKE '%current%')
+       AND f.field_key NOT LIKE '%rated%'
+       AND f.field_name NOT LIKE '%Rated%' THEN
+    ROUND(m.value_decimal*1.065,5)
+  WHEN f.field_key LIKE '%soc%' OR f.field_name LIKE '%SOC%' THEN
+    LEAST(100,ROUND(m.value_decimal+1.8,5))
+  WHEN f.field_key LIKE '%temperature%' THEN ROUND(m.value_decimal+0.55,5)
+  ELSE m.value_decimal
+END
+WHERE m.device_id=3 AND m.quality='simulated'
+  AND m.ingest_source='rakurs_parallel_sim_seed_v1'
+  AND m.value_decimal IS NOT NULL;
+
 -- Retire all textual *simulation* / *test* identity markers without claiming
 -- physical commissioning. The recorded quality remains explicitly generated.
 UPDATE rakurs_modbus_field_samples
