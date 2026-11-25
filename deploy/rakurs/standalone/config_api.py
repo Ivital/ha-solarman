@@ -287,6 +287,13 @@ def register(app, *, rows, one, conn):
                     db.rollback()
                     return jsonify({"error":"Пристрій не знайдено"}),404
                 cur.execute(
+                    "SELECT 1 AS linked FROM rakurs_parallel_members AS pm "
+                    "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
+                    "WHERE pm.device_id=%s AND pg.group_key=%s LIMIT 1",
+                    (device_id,GROUP))
+                if cur.fetchone() and config["model"] != MODEL:
+                    raise ValueError("Модель учасника паралельної системи має відповідати профілю Deye")
+                cur.execute(
                     "SELECT transport,gateway_ip,gateway_port,slave_id,"
                     "function_code,register_address,register_count "
                     "FROM rakurs_device_settings WHERE device_id=%s FOR UPDATE",
@@ -323,6 +330,9 @@ def register(app, *, rows, one, conn):
                     cur.execute("UPDATE rakurs_poll_settings SET enabled=0,"
                                 "updated_at_utc=UTC_TIMESTAMP(6) WHERE id=1")
             db.commit()
+        except ValueError as error:
+            db.rollback()
+            return jsonify({"error":str(error)}),409
         except Exception:
             db.rollback()
             raise
