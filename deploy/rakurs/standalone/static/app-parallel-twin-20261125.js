@@ -696,8 +696,15 @@ async function renderParallel(cycle) {
   section("Два інвертори — одна система",
     "Deye SUN-20K-SG05LP3-EU-SM2 · спільна акумуляторна батарея");
   // Show populated database data BEFORE unconnected physical placeholders.
-  await renderParallelDemo(cycle);
+  const archiveReady = await renderParallelDemo(cycle);
   if (!current(cycle)) return;
+  let cachedTopology = null;
+  try { cachedTopology = await api("/parallel"); } catch (_error) {}
+  if (archiveReady && cachedTopology?.registered_inverters === 0) {
+    message("Фізичне підключення не підтверджене",
+      "Показано два збережені профілі MySQL без дублювання порожніх карток інверторів.");
+    return;
+  }
   section("Фізичні інвертори — ще не підключені",
     "Профілі фізичних Deye · підтверджених вимірювань поки немає");
   const intro = panel("Паралельна система · 2 × 20 кВт",
@@ -725,7 +732,7 @@ async function renderParallel(cycle) {
   systemNote.appendChild(aggregate);
   main.appendChild(systemNote);
   try {
-    const response = await api("/parallel");
+    const response = cachedTopology || await api("/parallel");
     if (!current(cycle)) return;
     const devices = response.devices || [];
     aggregate.textContent = "Поточна сумарна потужність: — · Зареєстровано інверторів: " +
@@ -983,6 +990,7 @@ async function renderParallelDemo(cycle) {
     });
     card.appendChild(decoded);
   }
+  return true;
 }
 
 async function renderEvents(cycle) {
