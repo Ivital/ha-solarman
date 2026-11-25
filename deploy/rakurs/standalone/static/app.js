@@ -148,7 +148,7 @@ function metricCard(label, icon, key, values) {
   if (actual && data.unit) val.appendChild(element("span", "unit", data.unit));
   add(card, element("div", "card-icon", icon), element("h3", "", label), val,
       element("div", "detail" + (actual ? " verified" : ""),
-        actual ? (DEMO_MODE ? "СИМУЛЬОВАНО · " : "З MySQL · ") +
+        actual ? (DEMO_MODE ? "АРХІВ MYSQL · " : "З MySQL · ") +
           time(data.observed_at_utc) + " · " + (data.quality || "якість не вказана")
           : "Підтвердженого вимірювання немає"));
   return card;
@@ -169,7 +169,7 @@ async function renderOverview(cycle, primedValues = null) {
     ["Заряд АКБ", "▣"], ["Потужність АКБ", "↯"], ["Температура інвертора", "♨"],
     ["Виробіток за добу", "◉"], ["Споживання за добу", "▥"]
   ];
-  section("Оперативні показники", DEMO_MODE ? "Збережені показники MySQL · симуляція" :
+  section("Оперативні показники", DEMO_MODE ? "Збережені показники MySQL · архів" :
                                                     "Фактичні показники MySQL");
   const deck = element("div", "cards");
   main.appendChild(deck);
@@ -205,12 +205,12 @@ async function renderOverview(cycle, primedValues = null) {
       "Показники генерації, АКБ, мережі та навантаження не моделюються."));
   }
   const quality = panel("Повнота обліку", DEMO_MODE ?
-      "Параметри поточного тестового знімка" :
+      "Параметри збереженого знімка" :
       "Обліковуємо лише перевірені сигнали та реальні вимірювання.");
   const info = element("div", "kv");
   [
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Симульовані сигнали" : "Підтверджені сигнали",
+    [DEMO_MODE ? "Архівні сигнали" : "Підтверджені сигнали",
       state.status ? (DEMO_MODE ? state.status.simulated_signals : state.status.verified_signals) : "—"],
     ["Планові сигнали", planCount()]
   ].forEach(pair => {
@@ -225,7 +225,7 @@ async function renderOverview(cycle, primedValues = null) {
   // Trend charts live on the existing Rakurs homepage. They read the same
   // authenticated MySQL archive as the dedicated History and Archive views.
   section("Динаміка за 24 години", DEMO_MODE ?
-    "Історичні значення MySQL · симуляція" : "Підтверджені вимірювання MySQL");
+    "Історичні значення MySQL · архів" : "Підтверджені вимірювання MySQL");
   const trends = element("div", "trend-grid");
   main.appendChild(trends);
   const series = [
@@ -262,7 +262,7 @@ async function renderOverview(cycle, primedValues = null) {
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title, DEMO_MODE ? "Демо · " + items.length + " полів каталогу" :
+  section(title, DEMO_MODE ? "Архів · " + items.length + " полів каталогу" :
                                               items.length + " запланованих полів · без вигаданих даних");
   const tags = element("div", "tags");
   add(tags, element("span", "tag", "Джерело: MySQL rakurs"));
@@ -291,7 +291,7 @@ async function renderGroup(groups, title, cycle) {
     const info = element("div", "");
     add(info, element("strong", "", metric.label),
       element("small", "", verified.has(metric.key)
-        ? (DEMO_MODE ? "СИМУЛЬОВАНИЙ сигнал" : "Підтверджений сигнал") :
+        ? (DEMO_MODE ? "АРХІВНИЙ сигнал" : "Підтверджений сигнал") :
           "Плановий · ще не перевірено"));
     const value = element("div", "number" + (hasValue ? "" : " unknown"),
       hasValue ? number(record.value_decimal) + " " + (record.unit || "") : "—");
@@ -338,12 +338,12 @@ function svgChart(points, unit) {
 async function renderHistory(cycle, archived) {
   addStatusMessage();
   section(archived ? "Архів вимірювань" : "Історія показників",
-          DEMO_MODE ? "Збережені часові ряди · симуляція · час Київ" :
+          DEMO_MODE ? "Збережені часові ряди · час Київ" :
                       "Час даних — UTC; відображення — Київ");
   const available = state.verified;
   if (!available.length) {
     main.appendChild(createEmpty("Немає підтверджених сигналів",
-      "Щоб будувати історію, потрібно підключити Deye та підтвердити його регістри. Порожня БД не підміняється тестовими даними."));
+      "Щоб будувати історію, потрібно підключити Deye та підтвердити його регістри. Порожня БД не підміняється вигаданими значеннями."));
     return;
   }
   const controls = element("div", "controls");
@@ -368,7 +368,7 @@ async function renderHistory(cycle, archived) {
   async function refresh() {
     clear(body);
     add(body, element("h2", "", archived ? "Історичні записи MySQL" :
-      DEMO_MODE ? "Динаміка збережених симульованих значень" : "Графік фактичних вимірювань"));
+      DEMO_MODE ? "Динаміка збережених архівних значень" : "Графік фактичних вимірювань"));
     try {
       const result = await api("/history?key=" + encodeURIComponent(picker.value) + "&hours=" + range.value);
       if (!current(cycle)) return;
@@ -401,7 +401,7 @@ async function renderHistory(cycle, archived) {
 }
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
-  section(sectionName, DEMO_MODE ? "Демо · MySQL" :
+  section(sectionName, DEMO_MODE ? "Архів MySQL" :
                                         "Записи виключно з MySQL rakurs");
   const root = panel(sectionName);
   main.appendChild(root);
@@ -409,7 +409,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
     const payload = await api(path);
     if (!current(cycle)) return;
     const source = payload.events || payload.devices || payload.batches || [];
-    if (!source.length) { root.appendChild(createEmpty("Записів поки немає", "Дані не вигадуються й не генеруються для демонстрації.")); return; }
+    if (!source.length) { root.appendChild(createEmpty("Записів поки немає", "Наявні записи відображаються без підстановки значень.")); return; }
     const wrap = element("div", "table-wrap"), table = element("table", "data-table");
     const thead = element("thead", ""), tr = element("tr", "");
     headings.forEach(t => tr.appendChild(element("th", "", t)));
@@ -426,7 +426,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
 async function renderModbus(cycle) {
   addStatusMessage();
   section("Повний перелік Modbus", DEMO_MODE ?
-    "Профіль P3 · один тестовий знімок" : "Профіль P3 · довідник регістрів");
+    "Профіль P3 · збережений знімок" : "Профіль P3 · довідник регістрів");
   const pane = panel("Параметри Deye", "Найменування, адреси, значення та одиниці");
   main.appendChild(pane);
   try {
@@ -466,16 +466,16 @@ async function renderModbus(cycle) {
 
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", DEMO_MODE ? "Демо режим" :
+  section("Конфігурація системи", DEMO_MODE ? "Архівні дані" :
                                                       "Статус незалежного Rakurs");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
-    ["Джерело", DEMO_MODE ? "MySQL · СИМУЛЯЦІЯ" : "MySQL"],
+    ["Джерело", DEMO_MODE ? "MySQL · походження не підтверджене" : "MySQL"],
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Тестові параметри" : "Підтверджені сигнали",
+    [DEMO_MODE ? "Параметри архіву" : "Підтверджені сигнали",
       state.status ? (DEMO_MODE ? state.status.simulated_signals :
                                   state.status.verified_signals) : "—"],
     ["Колектор Deye", "Не запущений"]
@@ -557,13 +557,8 @@ async function boot() {
   DEMO_MODE = state.status ? state.status.mode === "simulation" :
     (SSR_MODE === "simulation" && !FORCE_REAL_MODE);
 
-  const switcher = element("a", "tag",
-      FORCE_REAL_MODE ? "Показати наявні дані" :
-      DEMO_MODE ? "Реальні вимірювання" : "Дані Deye");
-  switcher.href = FORCE_REAL_MODE ? "/" :
-      DEMO_MODE ? "/?real=1" : "/?demo=1";
-  switcher.title = DEMO_MODE ? "Показувати лише показники реального інвертора" :
-      "Показати наявні записи MySQL";
+  const switcher = element("span", "tag", "Архів MySQL");
+  switcher.title = "Збережені записи MySQL; походження фізичних вимірювань не підтверджено";
   const actions = document.querySelector(".top-actions");
   if (actions) actions.appendChild(switcher);
   if (DEMO_MODE) document.body.classList.add("demo-mode");
