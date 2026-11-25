@@ -634,7 +634,7 @@ def parallel_demo_storage_ready():
 def parallel_demo_selected():
     key = request.args.get("device", "")
     if key not in PARALLEL_DEMO_KEYS:
-        abort(404, description="Невідомий тестовий інвертор")
+        abort(404, description="Невідомий архівний профіль інвертора")
     if not parallel_demo_storage_ready():
         abort(404, description="Архів двох інверторів ще не створено")
     result = one(
@@ -646,7 +646,7 @@ def parallel_demo_selected():
         (key, PARALLEL_MODEL),
     )
     if result is None:
-        abort(404, description="Тестовий інвертор не завантажено")
+        abort(404, description="Архівний профіль інвертора не знайдено")
     return result
 
 
@@ -679,7 +679,7 @@ def parallel_simulation_overview():
         "storage_ready": True, "devices": serialize(result),
         "expected_devices": 2, "profile_register_addresses": 815,
         "physical_inverters_registered_here": 0,
-        "warning": "Значення вигадані для тестування і не є показниками Deye",
+        "warning": "Походження архівних значень із фізичного Deye не підтверджене",
     })
 
 
@@ -740,7 +740,7 @@ def parallel_simulation_raw():
         "data_source": "mysql", "simulation": True,
         "device_key": selected["device_key"], "total": count["n"],
         "offset": offset, "limit": limit, "raw_registers": serialize(readings),
-        "note": "Синтетичні тестові слова, НЕ фактичний обмін Modbus",
+        "note": "Архівні регістри; походження з фізичного Modbus не підтверджене",
     })
 
 
@@ -786,7 +786,7 @@ def parallel_simulation_fields():
         "device_key": selected["device_key"],
         "offset": offset, "limit": limit, "total": total["n"] if total else 0,
         "fields": serialize(records),
-        "warning": "Значення є тестовими та не походять від фізичного Deye",
+        "warning": "Походження значень із фізичного Deye не підтверджене",
     })
 
 
