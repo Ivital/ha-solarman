@@ -34,6 +34,8 @@ class PublicPresentationTests(unittest.TestCase):
         self.assertIn("Походження цих значень не підтверджене", js)
         self.assertIn('item.quality === "simulated"', js)
         self.assertIn('mode.textContent = DEMO_MODE ? "Архів MySQL"', js)
+        self.assertIn('raw === "simulation" ? "Архівний профіль"', js)
+        self.assertIn('"Профілі у MySQL"', js)
 
 if __name__ == "__main__":
     unittest.main()
