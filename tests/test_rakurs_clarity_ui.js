@@ -114,7 +114,7 @@ function prepare(mode = "seeded") {
       url.includes("/catalog") ?
         {groups:{pv:[{key:"pv_power",label:"PV power"}]},all_metric_count:316}
       : url.includes("/status") ?
-        {mode:"real",displayed_signals:316,registered_devices:3,
+        {mode:"real",displayed_signals:316,registered_devices:2,
          has_real_samples:true,collector_active:false}
       : url.includes("/signals") ?
         {signals:[{signal_key:"pv_power",label_uk:"PV power",unit:"кВт"}]}
@@ -154,7 +154,6 @@ function prepare(mode = "seeded") {
         ]}
       : url.includes("/devices") ?
         {devices:[
-          {device_key:"simulated_deye_sg05lp3",kind:"simulation",model:"Deye"},
           {device_key:"sim_deye20k_parallel_1",kind:"simulation",model:"Deye"},
           {device_key:"sim_deye20k_parallel_2",kind:"simulation",model:"Deye"}
         ]}
@@ -258,6 +257,7 @@ async function run() {
   const systemText=descendants(app.main).map(x=>x.textContent||"").join("|");
   assert(systemText.includes("Пристрої у базі"));
   assert(systemText.includes("Показники у базі"));
+  assert(systemText.includes("2"), "Only two Deye devices remain after cleanup");
   assert(!systemText.includes("sim_deye20k"));
   assert(!systemText.includes("simulated"));
   console.log("CLARITY_MYSQL_SYSTEM=PASS");
