@@ -54,14 +54,20 @@
   .parallel-demo-counter strong{font-size:17px}
   .parallel-raw-row{gap:4px}}
 
-/* Two test devices appear first on both the overview and the parallel page. */
+/* Both registered Deye devices are visible on overview and parallel pages. */
 .parallel-home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;
   margin:14px 0 12px}
 .parallel-home-device{border-color:#357c8a}
 .parallel-home-foot{display:flex;flex-wrap:wrap;justify-content:space-between;
   align-items:center;gap:12px;margin-top:16px;color:#aac6d5;font-size:11px}
-.parallel-open-link{color:#7ce6e7;text-decoration:underline;text-underline-offset:3px}
-.parallel-open-link:hover{color:#d7ffff}
+.parallel-open-link{color:#7ce6e7;text-decoration:none;display:inline-flex;
+  margin:12px 8px 0 0;align-items:center;min-height:34px;padding:7px 12px;
+  border:1px solid #39798a;border-radius:9px;background:#183f50;font:inherit;
+  font-size:12px;cursor:pointer}
+.parallel-open-link:hover,.parallel-open-link:focus-visible{color:#fff;
+  background:#24596a;outline:2px solid #77dfde;outline-offset:2px}
+.parallel-open-link[aria-pressed="true"]{border-color:#77dfde;
+  box-shadow:inset 3px 0 0 #77dfde;background:#205565}
 .parallel-field-viewer{margin-top:16px}
 .parallel-field-row{display:grid;grid-template-columns:105px minmax(0,1fr) 145px 74px;
   align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid #29445a;
@@ -76,3 +82,23 @@
   .parallel-field-row{grid-template-columns:80px minmax(0,1fr);gap:4px}
   .parallel-field-row strong,.parallel-field-row small{text-align:left}
 }
+
+/* Configuration plane: bounded, accessible controls and clear disabled state. */
+.settings-panel{margin:12px 0 20px}
+.settings-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:13px;margin:15px 0}
+.settings-field{display:flex;flex-direction:column;gap:6px;min-width:0;
+  font-size:12px;color:#bcd6e4}
+.settings-field input,.settings-field select{min-width:0;width:100%;
+  padding:10px 11px;background:#162e43;border:1px solid #3b6079;
+  border-radius:9px;color:#e1f4f5;font-size:13px}
+.settings-field input[type="checkbox"]{height:20px;width:20px;accent-color:#73dcd0}
+.settings-field :focus-visible{outline:2px solid #86e0d5;outline-offset:2px}
+.settings-field :disabled{opacity:.66;cursor:not-allowed}
+.settings-save{border:1px solid #70cfc3;background:#1b645e;color:#f5ffff;
+  border-radius:10px;padding:10px 15px;font:inherit;font-weight:700;
+  cursor:pointer}
+.settings-save:disabled{opacity:.5;cursor:wait}
+.settings-state{font-size:13px;color:#9ce0d2}
+@media(max-width:900px){.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.settings-fields{grid-template-columns:1fr}}
