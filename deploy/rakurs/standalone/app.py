@@ -187,9 +187,30 @@ def primary_device_id():
         g.primary_device = found["id"] if found else None
     return g.primary_device
 
+def selected_overview_device_id():
+    """Select one of the two registered Deye slots for legacy metrics APIs.
+
+    A missing parameter means slot 1. No other database device may be
+    selected, so an old standalone Deye is never mixed into these views.
+    """
+    key = request.args.get("device", "").strip()
+    if not key:
+        return primary_device_id()
+    if not KEY_RE.fullmatch(key):
+        abort(400, description="Некоректний ключ інвертора")
+    candidate = next(
+        (item for item in parallel_registered_devices()
+         if item["device_key"] == key),
+        None,
+    )
+    if candidate is None:
+        abort(404, description="Інвертор відсутній у парі Deye")
+    return candidate["id"]
+
+
 @app.get("/")
 def index():
-    selected = primary_device_id()
+    selected = selected_overview_device_id()
     readings = []
     if selected is not None:
         keys = tuple(key for key, _, _ in HOME_METRICS)
@@ -243,7 +264,7 @@ def _display_decimal(value):
 
 @app.get("/deye")
 def deye_snapshot():
-    device_id = primary_device_id()
+    device_id = selected_overview_device_id()
     result = []
     if device_id is not None:
         result = rows(
@@ -274,7 +295,7 @@ def deye_snapshot():
 
 @app.get("/deye/modbus")
 def deye_modbus_snapshot():
-    device_id = primary_device_id()
+    device_id = selected_overview_device_id()
     params = (device_id,) if device_id is not None else (-1,)
     result = rows(
         "SELECT f.field_key,f.group_name,f.field_name,f.unit,"
@@ -345,7 +366,7 @@ def latest():
     keys = list(dict.fromkeys(k.strip() for k in value.split(",") if k.strip()))
     if not keys or len(keys) > MAX_KEYS or any(not KEY_RE.fullmatch(k) for k in keys):
         return jsonify({"error": "Некоректний перелік сигналів"}), 400
-    device_id = primary_device_id()
+    device_id = selected_overview_device_id()
     found = {}
     if device_id is not None:
         for key in keys:
@@ -381,7 +402,7 @@ def history():
         return jsonify({"error": "Некоректний проміжок часу"}), 400
     if not 1 <= hours <= 168:
         return jsonify({"error": "Доступно 1–168 годин"}), 400
-    device_id = primary_device_id()
+    device_id = selected_overview_device_id()
     if device_id is None:
         return jsonify({"data_source": "mysql", "signal": None,
                         "hours": hours, "points": [], "truncated": False})
@@ -796,7 +817,7 @@ def parallel_device_modbus():
 
 @app.get("/api/v1/modbus-fields")
 def modbus_fields():
-    selected = primary_device_id()
+    selected = selected_overview_device_id()
     device_id = selected if selected is not None else -1
     data = rows(
         "SELECT f.field_key,f.group_name,f.field_name,f.platform,"
