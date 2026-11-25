@@ -83,6 +83,7 @@ class HistoricalPreviewSafetyTests(unittest.TestCase):
         self.assertIn("m.device_id IN (2,3)",sql)
         self.assertIn("deye_inverter_1",sql)
         self.assertIn("deye_inverter_2",sql)
+        self.assertIn("ROUND(m.value_decimal*1.065,5)",sql)
         self.assertIn("HISTORY_UI_ROWS_ADDED=212352",sql)
         self.assertIn("HISTORY_MODBUS_FIELD_ROWS_ADDED=209664",sql)
 
