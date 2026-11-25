@@ -12,8 +12,10 @@ from flask import Flask, g
 
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.insert(0,str(ROOT / "deploy" / "rakurs"))
-from standalone.config_api import validate_ip, valid_device, register
-from standalone.poll_worker import make_read, poll_probe, ready_devices
+from standalone.config_api import (validate_ip, valid_device, register,
+    shared_gateway_groups, ensure_unique_gateway_units)
+from standalone.poll_worker import (make_read, poll_probe, ready_devices,
+    exclude_conflicting_buses)
 from standalone.modbus_wire import crc16
 from standalone.modbus_archive import normalize
 
@@ -251,6 +253,74 @@ class ArchiveRangeTests(unittest.TestCase):
         self.assertEqual(self.queries,[])
 
 
+
+
+class SharedRs485BusTests(unittest.TestCase):
+    """Offline regression tests: two devices, one RS485 port, no hardware I/O."""
+
+    def physical(self, slot, slave, mode="modbus_tcp"):
+        return dict(config_payload(slave_id=slave, transport=mode),
+                    id=slot, slot_no=slot, member_kind="physical",
+                    device_key="deye_%s" % slot, kind="inverter",
+                    member_verified=1, transport_verified=1,
+                    verified_connection=1, modbus_address=slave)
+
+    def test_two_unique_ids_are_routed_on_one_endpoint(self):
+        units=[self.physical(1,1),self.physical(2,2)]
+        buses=shared_gateway_groups(units)
+        self.assertEqual(len(buses),1)
+        self.assertEqual(buses[0]["slave_ids"],[1,2])
+        self.assertTrue(buses[0]["ready"])
+        self.assertEqual(len(exclude_conflicting_buses(units)),2)
+
+    def test_duplicate_unit_id_is_blocked_before_polling(self):
+        units=[self.physical(1,1),self.physical(2,1)]
+        self.assertFalse(shared_gateway_groups(units)[0]["ready"])
+        self.assertEqual(exclude_conflicting_buses(units),[])
+
+    def test_mixed_tcp_and_rtu_modes_fail_closed(self):
+        units=[self.physical(1,1),self.physical(2,2,"rtu_tcp")]
+        self.assertFalse(shared_gateway_groups(units)[0]["ready"])
+        self.assertEqual(exclude_conflicting_buses(units),[])
+
+    def test_missing_second_inverter_cannot_claim_two_verified_devices(self):
+        buses=shared_gateway_groups([self.physical(1,1)])
+        self.assertFalse(buses[0]["ready"])
+        self.assertTrue(any("Не обидва" in x for x in buses[0]["issues"]))
+
+    def test_two_different_gateways_may_both_have_unit_id_one(self):
+        first=self.physical(1,1)
+        second=self.physical(2,1)
+        second["gateway_ip"]="192.168.5.22"
+        self.assertEqual(len(exclude_conflicting_buses([first,second])),2)
+
+    def test_admin_cannot_assign_duplicate_unit_id_on_same_gateway(self):
+        class Cursor:
+            def execute(self,sql,params):
+                self.sql=sql
+                self.params=params
+            def fetchall(self):
+                return [{"device_id":13,"slave_id":1,"transport":"modbus_tcp"}]
+        cursor=Cursor()
+        with self.assertRaisesRegex(ValueError,"Modbus Unit ID"):
+            ensure_unique_gateway_units(cursor,config_payload(slave_id=1),2)
+        self.assertIn("pm.member_kind='physical'",cursor.sql)
+        self.assertEqual(cursor.params[2],2)
+
+    def test_admin_cannot_mix_transport_modes_on_same_gateway(self):
+        class Cursor:
+            def execute(self,sql,params):pass
+            def fetchall(self):
+                return [{"device_id":12,"slave_id":1,"transport":"rtu_tcp"}]
+        with self.assertRaisesRegex(ValueError,"змішувати"):
+            ensure_unique_gateway_units(Cursor(),config_payload(slave_id=2))
+
+    def test_valid_distinct_gateway_unit_is_accepted(self):
+        class Cursor:
+            def execute(self,sql,params):pass
+            def fetchall(self):
+                return [{"device_id":12,"slave_id":1,"transport":"modbus_tcp"}]
+        ensure_unique_gateway_units(Cursor(),config_payload(slave_id=2))
 
 if __name__=="__main__":
     unittest.main()
