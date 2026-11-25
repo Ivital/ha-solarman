@@ -98,6 +98,8 @@ def shared_gateway_groups(devices):
         issues = []
         if not ip or not port:
             issues.append("Адресу або порт шлюзу ще не налаштовано")
+        if len(ids) != len(members):
+            issues.append("Не всі Modbus Unit ID задані")
         if len(set(ids)) != len(ids):
             issues.append("Однакові Modbus Unit ID на спільній шині")
         if len(transports) > 1:
