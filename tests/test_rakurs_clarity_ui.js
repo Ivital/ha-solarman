@@ -197,6 +197,18 @@ async function run() {
   assert.equal(byClass(app.nav,"nav-group-label").length,3);
   assert.equal(app.elements["mode-indicator"].textContent,"Дані MySQL");
   assert(app.fetchCalls.some(x=>x.includes("/api/v1/history?key=pv_power")));
+  const selectors = byClass(app.main, "parallel-open-link")
+    .filter(item => item.tagName === "button");
+  assert.equal(selectors.length, 2);
+  assert.equal(selectors[0].attributes["aria-pressed"], "true");
+  selectors[1].listeners.click();
+  await settle();
+  assert(app.fetchCalls.some(x =>
+    x.includes("/latest?keys=") &&
+    x.includes("&device=sim_deye20k_parallel_2")));
+  assert(descendants(app.main).some(x =>
+    String(x.textContent || "").includes("Останні показники · Deye №2")));
+  console.log("CLARITY_SWITCH_DEYE_1_2=PASS");
   console.log("CLARITY_UNIFIED_MYSQL_OVERVIEW=PASS");
 
   app.loc.hash="#/trends";
