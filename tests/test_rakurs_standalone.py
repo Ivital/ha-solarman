@@ -279,7 +279,8 @@ class AuthenticationTests(unittest.TestCase):
             sess["ver"] = AUTH_ACCOUNT["session_version"]
             sess["at"] = int(time.time())
         self.data_one = lambda sql, params: (
-            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql else None
+            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql
+            else {"id": 7} if "SELECT device_id AS id" in sql else None
         )
         ui = {
             "signal_key": "pv_power", "label_uk": "Генерація PV",
@@ -309,52 +310,18 @@ class AuthenticationTests(unittest.TestCase):
             self.assertNotIn("/static/app.js", modbus_html)
             self.assertEqual(query.call_count, 2)
             for call in query.call_args_list:
-                self.assertIn("m.quality='simulated'", call.args[0])
-                self.assertIn("m.ingest_source=%s", call.args[0])
+                self.assertIn("mx.device_id=%s", call.args[0])
+                self.assertNotIn("m.quality=", call.args[0])
 
-    def test_demo_login_redirect_preserves_explicit_selection(self):
-        from werkzeug.security import generate_password_hash
-        username = "demo_account"
-        password = "unshared-test-password-for-simulation"
-        account = {
-            "id": 79, "username": username, "role": "admin",
-            "password_hash": generate_password_hash(password, method="scrypt:32768:8:1"),
-            "is_active": 1, "session_version": 1,
-        }
-        self.data_one = lambda sql, _params: (
-            account if "FROM rakurs_users WHERE username=%s" in sql
-            else None
-        )
-        anonymous = self.client.get("/?demo=1")
-        self.assertEqual(anonymous.status_code, 303)
-        self.assertTrue(anonymous.headers["Location"].endswith("/login?demo=1"))
-        response = self.client.get("/login?demo=1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('name="demo" value="1"', response.get_data(as_text=True))
-        with self.client.session_transaction() as sess:
-            csrf = sess["csrf"]
-
-        class FakeCursor:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-            def execute(self, *args):
-                return 1
-
-        class FakeConn:
-            def cursor(self):
-                return FakeCursor()
-
-        with patch.object(module, "conn", return_value=FakeConn()):
-            posted = self.client.post("/login", data={
-                "username": username, "password": password,
-                "csrf": csrf, "demo": "1"
-            })
-        self.assertEqual(posted.status_code, 303)
-        self.assertTrue(posted.headers["Location"].endswith("/?demo=1"))
+    def test_login_ignores_legacy_demo_query(self):
+        login = self.client.get("/login?demo=1")
+        self.assertEqual(login.status_code, 200)
+        self.assertNotIn('name="demo"', login.get_data(as_text=True))
+        self.assertIn('action="/login" method="post"', login.get_data(as_text=True))
+        login = self.client.get("/login?next=/deye")
+        self.assertIn('name="next" value="/deye"', login.get_data(as_text=True))
+        unsafe = self.client.get("/login?next=https://example.org")
+        self.assertNotIn('name="next"', unsafe.get_data(as_text=True))
 
     def test_versioned_js_prevents_stale_dashboard_after_ha_migration(self):
         html = (RAKURS / "standalone/templates/index.html").read_text()
@@ -375,7 +342,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(stable, js)
         self.assertIn('restoreServerReadings()', stable)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
-        self.assertIn("let DEMO_MODE = new URLSearchParams(", js)
+        self.assertIn("const DEMO_MODE = false;", js)
         self.assertIn("sha256sum", script)
         self.assertIn('https://$DOMAIN$ASSET_PATH', script)
         self.assertIn("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS", script)
@@ -386,11 +353,11 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_primary_dashboard_displays_existing_samples_without_demo_url(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('DEMO_MODE = state.status ? state.status.mode === "simulation"', js)
+        self.assertIn('const DEMO_MODE = false;', js)
         self.assertIn('restoreServerReadings();', js)
         self.assertIn('critical.every(key => values[key]', js)
         self.assertIn('const FORCE_REAL_MODE =', js)
-        self.assertIn('const selection = FORCE_REAL_MODE ? "real=1"', js)
+        self.assertIn('const url = base + path;', js)
         self.assertNotIn('window.location.replace(', js)
         self.assertNotIn('message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ"', js)
         html = (RAKURS / "standalone/templates/index.html").read_text()
