@@ -50,6 +50,7 @@ jobs:
           bash deploy/rakurs/standalone/deploy_events_ui.sh --check
           bash -n deploy/rakurs/standalone/audit_parallel_host_readonly.sh
           bash -n deploy/rakurs/standalone/deploy_parallel_ui.sh
+          bash -n deploy/rakurs/standalone/audit_site_full_readonly.sh
           bash deploy/rakurs/standalone/deploy_parallel_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_full_modbus_archive.sh
           bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --check
