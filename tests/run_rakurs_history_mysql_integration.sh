@@ -126,7 +126,7 @@ actual="$(docker exec "$NAME" mysql -uroot "-p$PASS" "$DBNAME" -N -B \
       ORDER BY m.observed_at_utc DESC LIMIT 1)-
     (SELECT m.value_decimal FROM rakurs_samples AS m JOIN rakurs_signals AS sig
       ON sig.id=m.signal_id WHERE m.device_id=3 AND sig.signal_key='pv_power'
-      ORDER BY m.observed_at_utc DESC LIMIT 1))>0.1,1,0))")"
+      ORDER BY m.observed_at_utc DESC LIMIT 1))>0.1,1,0)))")"
 test "$actual" = '2:212984:210912:2:212984:0:0:1' || {
   echo "INTEGRATION_MYSQL_POSTVERIFY_FAIL=$actual" >&2
   exit 2
