@@ -75,7 +75,7 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path, options = {}) {
-  const scoped = /^\/(latest|history|modbus-fields)(\?|$)/.test(path);
+  const scoped = /^\/(latest|history(?:\/range)?|modbus-fields)(\?|$)/.test(path);
   const suffix = scoped && state.selectedDeviceKey ?
     (path.includes("?") ? "&" : "?") +
     "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
@@ -1002,7 +1002,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
   section(sectionName, DEMO_MODE ? "Архів MySQL" :
                                         "Записи виключно з MySQL rakurs");
-  const root = panel(sectionName);
+  const root = panel();
   main.appendChild(root);
   try {
     const payload = await api(path);
@@ -1018,7 +1018,8 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
       const row = element("tr", "");
       fields.forEach(field => {
         const raw = item[field];
-        const displayed = field.endsWith("_utc") ? time(raw) :
+        const displayed = field === "commissioned_at_utc" && !raw ?
+          "Не зазначено" : field.endsWith("_utc") ? time(raw) :
           field === "kind" && (raw === "simulation" || raw === "inverter") ? "Інвертор" :
           field === "device_key" ? displayDeviceKey(raw) :
           (raw ?? "—");
@@ -1273,9 +1274,105 @@ async function renderSettings(cycle) {
     "Налаштування не змінюють інвертор. Фізичне опитування можливе лише після "+
     "підтвердження порту, Modbus ID, окремого агента та дозволеного шлюза."));
 }
+async function renderArchive(cycle) {
+  section("Архів · Deye №"+state.selectedSlotNo,
+    "Точний часовий інтервал і експорт лише фактично повернених MySQL записів");
+  const root=panel("Пошук в архіві","Діапазон до 31 доби, максимум 1000 значень на запит.");
+  root.className+=" history-workspace";
+  const controls=element("div","settings-fields");
+  const signals=state.verified || [];
+  if(!signals.length){
+    main.appendChild(createEmpty("Каталог порожній","Немає доступних сигналів для архіву."));
+    return;
+  }
+  const picker=settingsField(controls,"Показник","pv_power","select",
+    signals.map(x=>[x.signal_key,x.label_uk+" · "+x.signal_key]));
+  const now=new Date();
+  const localValue=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000)
+    .toISOString().slice(0,16);
+  const start=settingsField(controls,"Від (місцевий час)",
+    localValue(new Date(now.getTime()-72*3600*1000)),"datetime-local");
+  const end=settingsField(controls,"До (місцевий час)",
+    localValue(now),"datetime-local");
+  root.appendChild(controls);
+  const button=element("button","settings-save","Знайти в архіві");
+  button.type="button";
+  root.appendChild(button);
+  const resultArea=element("div","history-records");
+  root.appendChild(resultArea);
+  main.appendChild(root);
+  let request=0;
+  async function refresh(){
+    const token=++request;
+    clear(resultArea);
+    resultArea.appendChild(element("p","subtle","Читання архіву MySQL…"));
+    try{
+      const from=new Date(start.value),to=new Date(end.value);
+      if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||
+         from>=to||(to-from)>31*86400*1000)
+        throw Error("Вкажіть коректний інтервал тривалістю до 31 доби");
+      const response=await api("/history/range?key="+encodeURIComponent(picker.value)+
+        "&start="+encodeURIComponent(from.toISOString())+
+        "&end="+encodeURIComponent(to.toISOString()));
+      if(!current(cycle)||token!==request)return;
+      clear(resultArea);
+      const points=response.points||[];
+      resultArea.appendChild(element("p","subtle",points.length+
+        " записів"+(response.truncated?" · не всі записи помістилися в ліміт":"")));
+      if(!points.length){
+        resultArea.appendChild(createEmpty("Вимірювань немає",
+          "Виберіть іншу дату або інший показник."));
+        return;
+      }
+      resultArea.appendChild(svgChart(points,""));
+      const exportButton=element("button","settings-save","Експорт CSV");
+      exportButton.type="button";
+      exportButton.disabled=Boolean(response.truncated);
+      exportButton.title=response.truncated?"Звузьте інтервал: ліміт 1000 записів":"";
+      exportButton.addEventListener("click",()=>{
+        const lines=["observed_at_utc,value_decimal,quality"];
+        for(const p of points) lines.push([
+          p.observed_at_utc||"",p.value_decimal??"",p.quality||""].join(","));
+        const blob=new Blob(["\ufeff"+lines.join("\r\n")],
+          {type:"text/csv;charset=utf-8"});
+        const url=URL.createObjectURL(blob);
+        const link=document.createElement("a");
+        link.href=url;link.download="rakurs-"+picker.value+"-Deye"+
+          state.selectedSlotNo+".csv";
+        document.body.appendChild(link);
+        link.click();link.remove();URL.revokeObjectURL(url);
+      });
+      resultArea.appendChild(exportButton);
+      const wrap=element("div","table-wrap");
+      const table=element("table","data-table");
+      const th=element("tr","");
+      ["Дата й час","Значення","Якість запису"].forEach(x=>
+        th.appendChild(element("th","",x)));
+      const head=element("thead","");head.appendChild(th);table.appendChild(head);
+      const body=element("tbody","");
+      for(const p of points.slice(-50).reverse()){
+        const row=element("tr","");
+        [time(p.observed_at_utc),p.value_decimal??"—",p.quality||"—"]
+          .forEach(x=>row.appendChild(element("td","",x)));
+        body.appendChild(row);
+      }
+      table.appendChild(body);wrap.appendChild(table);resultArea.appendChild(wrap);
+    }catch(error){
+      if(current(cycle)&&token===request){
+        clear(resultArea);
+        resultArea.appendChild(createEmpty("Архів не відкрито",error.message));
+      }
+    }
+  }
+  button.addEventListener("click",refresh);
+  await refresh();
+}
 async function renderSystem(cycle) {
   addStatusMessage();
   section("Конфігурація системи", "Показники та пристрої MySQL");
+  let polling=null;
+  try { polling=await api("/config"); } catch(_error) {}
+  if(!current(cycle)) return;
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
@@ -1284,7 +1381,7 @@ async function renderSystem(cycle) {
     ["Джерело", "MySQL"],
     ["Пристрої у базі", state.status ? state.status.registered_devices : "—"],
     ["Показники у базі", state.status ? state.status.displayed_signals : "—"],
-    ["Автоматичне опитування", state.status?.collector_active ? "Увімкнено" : "Не запущено"]
+    ["Автоматичне опитування", polling?.actively_polling ? "Виконується" : polling?.enabled ? "Увімкнено, агент не підтверджений" : "Вимкнено"]
   ].forEach(pair => {
     const item = element("div", "");
     add(item, element("strong", "", pair[1]), element("small", "", pair[0]));
@@ -1354,7 +1451,7 @@ async function render() {
     case "trends": await renderTrends(cycle); break;
     case "history": await renderHistory(cycle, false); break;
     case "events": await renderEvents(cycle); break;
-    case "archive": await renderHistory(cycle, true); break;
+    case "archive": await renderArchive(cycle); break;
     case "modbus": await renderModbus(cycle); break;
     case "system": await renderSystem(cycle); break;
     case "settings": await renderSettings(cycle); break;
