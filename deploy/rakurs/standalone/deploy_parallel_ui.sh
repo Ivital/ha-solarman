@@ -29,8 +29,8 @@ grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
 grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
-grep -Fq 'ЗБЕРЕЖЕНИЙ ЗНІМОК' "$HERE/templates/deye_server.html"
+grep -Fq 'Дані MySQL' "$HERE/templates/index.html"
+grep -Fq 'ПОКАЗНИКИ З MYSQL' "$HERE/templates/deye_server.html"
 grep -Fq 'aggregate_verified": False' "$HERE/parallel_support.py"
 if command -v node >/dev/null 2>&1; then
   node --check "$HERE/static/app-parallel-twin-20261125.js"
@@ -141,7 +141,7 @@ assert home.status_code == 200
 html = home.get_data(as_text=True)
 for fragment in ("/static/app-parallel-twin-20261125.js",
                  "/static/parallel-twin-20261125.css",
-                 'Показники Deye з бази даних'):
+                 'Показники Deye з бази даних'): 
     assert fragment in html, "Missing HTML/DB content: " + fragment
 print("PARALLEL_EXISTING_HOME=PASS")
 deye_page = c.get("/deye", base_url="https://localhost")
@@ -162,6 +162,8 @@ assert profile["aggregate_verified"] is False
 assert profile["battery_soc_percent"] is None
 assert profile["aggregate_values"] == {}
 assert len(profile["devices"]) == profile["registered_inverters"]
+assert profile["registered_inverters"] == len(profile["devices"])
+assert profile["registered_inverters"] == 2
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
 print("PHYSICAL_INVERTERS_REGISTERED=" + str(profile["registered_inverters"]))
 rejected = c.get("/api/v1/parallel/latest?device=simulated_deye_sg05lp3",
@@ -176,7 +178,7 @@ assert demo_response.status_code == 200, demo_response.status_code
 demo = demo_response.get_json()
 assert demo["simulation"] is True
 assert demo["storage_ready"] is True, "Two-inverter MySQL archive schema missing"
-assert len(demo["devices"]) == 2, "Both simulated inverter records must exist"
+assert len(demo["devices"]) == 2, "Both stored inverter records must exist"
 for device in demo["devices"]:
     key = device["device_key"]
     assert (device["raw_registers"],device["decoded_fields"],device["ui_fields"]) == (
