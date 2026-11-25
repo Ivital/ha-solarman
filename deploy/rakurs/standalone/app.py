@@ -841,6 +841,11 @@ def modbus_fields():
     })
 
 
-# Register MySQL-backed authorization only after all read-only routes exist.
+# Administrative configuration writes are restricted to dedicated config
+# tables; the web service never writes measurement or Modbus register tables.
+from .config_api import register as register_config_api
+register_config_api(app, rows=rows, one=one, conn=conn)
+
+# Register MySQL-backed authorization after all application routes exist.
 from .auth import init_auth
 init_auth(app, lambda sql, params=(): one(sql, params), lambda: conn())
