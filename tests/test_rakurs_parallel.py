@@ -33,6 +33,16 @@ class ParallelPureTests(unittest.TestCase):
         self.assertTrue(all(i["modbus_address"] is None for i in p["devices"]))
         self.assertIsNone(p["battery_soc_percent"])
 
+    def test_topology_api_preserves_real_slot_numbers(self):
+        p = describe_topology([
+            {"device_key": "deye_inverter_1", "slot_no": 1, "model": MODEL},
+            {"device_key": "deye_inverter_2", "slot_no": 2, "model": MODEL},
+        ])
+        self.assertEqual(
+            [(item["device_key"], item["slot_no"]) for item in p["devices"]],
+            [("deye_inverter_1", 1), ("deye_inverter_2", 2)],
+        )
+
     def test_power_sum_needs_explicit_provenance_and_two_fresh_unique_sources(self):
         t = datetime(2026, 11, 24, 18, 0, tzinfo=timezone.utc)
         two = [
@@ -118,6 +128,21 @@ class ParallelApiTests(unittest.TestCase):
         sql, params = self.db_calls[0]
         self.assertIn("pg.group_key=%s", sql)
         self.assertIn("deye_sun20k_parallel_shared_battery", params)
+
+    def test_api_exposes_slot_one_and_two_for_real_picker(self):
+        self.fake_devices = [
+            {"id": 2, "device_key": "deye_inverter_1",
+             "slot_no": 1, "model": MODEL, "kind": "inverter"},
+            {"id": 3, "device_key": "deye_inverter_2",
+             "slot_no": 2, "model": MODEL, "kind": "inverter"},
+        ]
+        response = self.client.get("/api/v1/parallel")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [(d["device_key"], d["slot_no"])
+             for d in response.get_json()["devices"]],
+            [("deye_inverter_1", 1), ("deye_inverter_2", 2)],
+        )
 
     def test_device_readings_are_scoped_and_never_aggregated(self):
         self.fake_devices = [
