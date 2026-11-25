@@ -207,7 +207,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertIn("Генерація PV", html)
         self.assertIn("5.1", html)
         self.assertIn('data-initial-mode="simulation"', html)
-        self.assertIn("Тестові дані", html)
+        self.assertIn("Архів MySQL", html)
         self.assertIn("rakurs-history-72h-v1", html)
 
         status = self.client.get("/api/v1/status").get_json()
