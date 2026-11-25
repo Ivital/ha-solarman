@@ -769,6 +769,9 @@ async function renderParallel(cycle) {
   addStatusMessage();
   section("Паралельна система Deye",
     "SUN-20K-SG05LP3-EU-SM2 · два інвертори · спільна АКБ");
+  const howto=element("a","parallel-open-link","Схема RS485, Unit ID і налаштування TRB145");
+  howto.href="#/settings";
+  main.appendChild(howto);
   let devices;
   try { devices = await fetchParallelDevices(cycle); }
   catch (_error) {
@@ -1172,6 +1175,67 @@ function settingsField(form, label, value, kind = "text", choices = []) {
   form.appendChild(wrap);
   return control;
 }
+
+function renderSharedRs485Guide(cfg) {
+  const root=panel("Одна шина RS485 · два Deye · один TRB145",
+    "Modbus Unit ID адресує інвертор. Parallel A/B (CAN), BMS і Meter-485 — окремі інтерфейси.");
+  root.className+=" settings-panel shared-bus-guide";
+  const chain=element("div","shared-bus-chain");
+  for(const label of ["Rakurs · один Modbus master","VPN → Teltonika TRB145",
+                      "Одна шина RS485 A/B","Deye №1 і Deye №2"])
+    chain.appendChild(element("div","shared-bus-node",label));
+  root.appendChild(chain);
+  const buses=cfg.shared_rs485_buses||[];
+  const physical=(cfg.devices||[]).filter(d=>d.member_kind==="physical" &&
+    [1,2].includes(Number(d.slot_no)));
+  root.appendChild(element("h3","","Підключення з конфігурації MySQL"));
+  if(!physical.length) root.appendChild(element("p","parallel-warning",
+    "Реальні інвертори ще не підтверджені. Історичні записи MySQL не підтверджують зв'язок з RS485."));
+  const cards=element("div","shared-bus-inverters");
+  for(const slot of [1,2]){
+    const d=physical.find(item=>Number(item.slot_no)===slot);
+    const card=element("div","shared-bus-inverter");
+    card.appendChild(element("strong","","Deye №"+slot));
+    card.appendChild(element("span","",d?(d.display_name||d.device_key):
+      "Фізичний інвертор не зареєстрований"));
+    card.appendChild(element("span","",
+      "Modbus ID: "+(d?.slave_id??"не вказано")+" · "+(d?.parallel_role||"роль невідома")));
+    card.appendChild(element("small","",d?.member_verified && d?.transport_verified &&
+      d?.verified_connection ? "Конфігурацію каналу підтверджено" :
+      "Фізичний канал ще не підтверджений"));
+    cards.appendChild(card);
+  }
+  root.appendChild(cards);
+  for(const bus of buses){
+    const card=element("div","shared-bus-result");
+    card.appendChild(element("strong","",
+      (bus.gateway_ip||"Шлюз не вказано")+":"+(bus.gateway_port||"—")+
+      " · "+(bus.transports.join(", ")||"Режим не налаштовано")));
+    card.appendChild(element("span","",
+      "Слоти: "+(bus.slots.join(", ")||"—")+
+      " · Modbus ID: "+(bus.slave_ids.join(", ")||"—")));
+    card.appendChild(element("small",bus.ready?"shared-bus-valid":"shared-bus-alert",
+      bus.ready ? "Записи каналу підтверджені; фізичний тест потрібен окремо" :
+      bus.issues.join("; ")));
+    root.appendChild(card);
+  }
+  const rules=element("ul","shared-bus-rules");
+  for(const rule of [
+    "Два кабелі моніторингового Modbus RS485 з'єднуються паралельно на спільній шині A/B; Parallel A/B (CAN), BMS і Meter-485 не використовувати для цього.",
+    "Для спільного TRB145 задайте однакові IP-адресу, TCP-порт і транспорт, але різні Modbus Unit ID. Адреси 01/02 — лише приклад до звірки з LCD Modbus SN.",
+    "Режим Modbus TCP шлюзу: Unit ID у заголовку MBAP, а на TRB145 перевірити «Server ID obtained from TCP». Для прозорого RTU-over-TCP потрібен цілий RTU-кадр із CRC.",
+    "Реальний порт, прошивку, полярність A/B, термінування шини та обидві відповіді FC03 потрібно перевірити перед запуском.",
+    "Колектор Rakurs дозволяє тільки FC03/FC04. Ніяких записів FC06/FC16, перемикань Master/Slave або зміни налаштувань батареї.",
+    "Карта Developer089 охоплює інші SG05LP3 до 12 кВт, тому для SUN-20K-SG05LP3-EU-SM2 її ще треба перевірити. Не подвоювати спільні SOC, CT і мережеві значення."
+  ]) rules.appendChild(element("li","",rule));
+  root.appendChild(rules);
+  const manual=element("a","parallel-open-link","Офіційний посібник Deye 14–20 кВт");
+  manual.href="https://www.deyeinverter.com/deyeinverter/2024/10/08/%E5%82%A8%E8%83%BD%E4%B8%89%E7%9B%B8-sun-14-20k-sg05lp3-eu-sm2.pdf";
+  manual.target="_blank"; manual.rel="noopener noreferrer";
+  root.appendChild(manual);
+  return root;
+}
+
 async function renderSettings(cycle) {
   section("Керування інверторами та опитуванням",
     "Налаштування зберігаються в MySQL · лише читання FC03/FC04");
@@ -1187,6 +1251,7 @@ async function renderSettings(cycle) {
       cfg.reason || "Потрібна контрольована міграція MySQL."));
     return;
   }
+  main.appendChild(renderSharedRs485Guide(cfg));
   const admin=state.role==="admin" && Boolean(state.csrf);
   if(!admin) message("Перегляд без редагування",
     "Змінювати інвертори та параметри опитування може лише адміністратор.",false);
@@ -1246,7 +1311,7 @@ async function renderSettings(cycle) {
       ["unconfigured","Не налаштовано"],["modbus_tcp","Modbus TCP"],["rtu_tcp","Modbus RTU через TCP-шлюз"]]);
     inputs.gateway_ip=settingsField(fields,"IPv4 шлюза",d.gateway_ip||"");
     inputs.gateway_port=settingsField(fields,"TCP порт",d.gateway_port||"", "number");
-    inputs.slave_id=settingsField(fields,"Modbus ID (1–247)",d.slave_id||"", "number");
+    inputs.slave_id=settingsField(fields,"Modbus Unit ID / Modbus SN (1–247)",d.slave_id||"", "number");
     inputs.function_code=settingsField(fields,"Функція читання",d.function_code||3,"select",
       [[3,"FC03 Holding Registers"],[4,"FC04 Input Registers"]]);
     inputs.register_address=settingsField(fields,"Початкова адреса регістрів",
@@ -1258,6 +1323,9 @@ async function renderSettings(cycle) {
     inputs.enabled=settingsField(fields,"Дозволити опитування цього інвертора",
       d.enabled||false,"checkbox");
     root.appendChild(fields);
+    root.appendChild(element("p","subtle",
+      "Спільний TRB145: однакові IP, TCP-порт і транспорт, різні Modbus Unit ID. "+
+      "Зміна параметрів вимагає повторної фізичної перевірки."));
     if(admin) {
       const button=element("button","settings-save",
         adding?"Створити інвертор":"Зберегти інвертор");
