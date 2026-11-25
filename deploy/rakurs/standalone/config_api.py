@@ -81,6 +81,66 @@ def valid_device(payload):
     }
 
 
+
+def shared_gateway_groups(devices):
+    """Read-only topology diagnostics; database settings are not physical proof."""
+    physical = [d for d in devices if d.get("member_kind") == "physical"
+                and d.get("slot_no") in (1, 2)]
+    groups = {}
+    for d in physical:
+        key = (d.get("gateway_ip") or "", d.get("gateway_port") or 0)
+        groups.setdefault(key, []).append(d)
+    result = []
+    for (ip, port), members in sorted(groups.items()):
+        ids = [d.get("slave_id") for d in members if d.get("slave_id") is not None]
+        transports = sorted({d.get("transport") for d in members
+                             if d.get("transport") not in (None, "unconfigured")})
+        issues = []
+        if not ip or not port:
+            issues.append("Адресу або порт шлюзу ще не налаштовано")
+        if len(set(ids)) != len(ids):
+            issues.append("Однакові Modbus Unit ID на спільній шині")
+        if len(transports) > 1:
+            issues.append("Різні режими Modbus TCP та RTU-over-TCP на одному порту")
+        if len(members) != 2:
+            issues.append("Не обидва фізичні інвертори прив'язані до цього шлюзу")
+        if not all(d.get("member_verified") and d.get("transport_verified")
+                   and d.get("verified_connection") for d in members):
+            issues.append("Фізичне підключення не підтверджено")
+        result.append({
+            "gateway_ip": ip or None, "gateway_port": port or None,
+            "transports": transports, "slave_ids": ids,
+            "slots": sorted(d.get("slot_no") for d in members),
+            "member_count": len(members), "issues": issues,
+            "ready": not issues
+        })
+    return result
+
+
+def ensure_unique_gateway_units(cur, config, exclude_device_id=None):
+    """Reject conflicting addresses or transport modes on one shared port.
+
+    The caller holds a transaction and the parallel-group row lock.
+    """
+    if not (config["gateway_ip"] and config["gateway_port"] and
+            config["transport"] != "unconfigured"):
+        return
+    cur.execute(
+        "SELECT DISTINCT c.device_id,c.slave_id,c.transport "
+        "FROM rakurs_device_settings AS c "
+        "JOIN rakurs_parallel_members AS pm ON pm.device_id=c.device_id "
+        "WHERE pm.member_kind='physical' AND c.gateway_ip=%s "
+        "AND c.gateway_port=%s AND c.device_id<>%s",
+        (config["gateway_ip"], config["gateway_port"], exclude_device_id or 0))
+    for other in cur.fetchall():
+        if other["transport"] != config["transport"]:
+            raise ValueError("На одному TCP-порту шлюзу не можна змішувати "
+                             "Modbus TCP і RTU-over-TCP")
+        if other["slave_id"] == config["slave_id"]:
+            raise ValueError("Modbus Unit ID вже належить іншому Deye "
+                             "на цьому шлюзі. Використайте різні адреси.")
+
+
 def register(app, *, rows, one, conn):
     def administrator():
         if g.rakurs_user.get("role") != "admin":
@@ -113,7 +173,8 @@ def register(app, *, rows, one, conn):
                 "c.display_name,c.enabled,c.transport,c.gateway_ip,c.gateway_port,"
                 "c.slave_id,c.function_code,c.register_address,c.register_count,"
                 "c.timeout_ms,c.verified_connection,c.updated_at_utc,"
-                "pm.slot_no FROM rakurs_devices AS d "
+                "pm.slot_no,pm.member_kind,pm.parallel_role,pm.member_verified,"
+                "pm.transport_verified,pm.modbus_address FROM rakurs_devices AS d "
                 "LEFT JOIN rakurs_device_settings AS c ON c.device_id=d.id "
                 "LEFT JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
                 "ORDER BY d.id LIMIT 100")
@@ -147,6 +208,7 @@ def register(app, *, rows, one, conn):
             "last_success_recent":success_recent,
             "runtime":{k:iso(v) for k,v in (runtime or {}).items()},
             "devices":[{k:iso(v) for k,v in d.items()} for d in devices],
+            "shared_rs485_buses":shared_gateway_groups(devices),
         })
 
     @app.post("/api/v1/config/polling")
@@ -233,6 +295,7 @@ def register(app, *, rows, one, conn):
                         (group_id,slot))
                     if cur.fetchone():
                         raise ValueError("Цей слот Deye вже зайнятий")
+                    ensure_unique_gateway_units(cur, config)
                 cur.execute(
                     "INSERT INTO rakurs_devices "
                     "(device_key,kind,model,serial_number,created_at_utc) "
@@ -291,8 +354,13 @@ def register(app, *, rows, one, conn):
                     "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
                     "WHERE pm.device_id=%s AND pg.group_key=%s LIMIT 1",
                     (device_id,GROUP))
-                if cur.fetchone() and config["model"] != MODEL:
+                linked = cur.fetchone()
+                if linked and config["model"] != MODEL:
                     raise ValueError("Модель учасника паралельної системи має відповідати профілю Deye")
+                if linked:
+                    cur.execute("SELECT id FROM rakurs_parallel_groups "
+                                "WHERE group_key=%s FOR UPDATE",(GROUP,))
+                    ensure_unique_gateway_units(cur, config, device_id)
                 cur.execute(
                     "SELECT transport,gateway_ip,gateway_port,slave_id,"
                     "function_code,register_address,register_count "
