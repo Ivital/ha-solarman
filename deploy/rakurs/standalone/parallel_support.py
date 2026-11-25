@@ -27,6 +27,9 @@ def describe_topology(registered: list[dict]) -> dict:
     for item in registered:
         devices.append({
             "device_key": str(item["device_key"]),
+            # The UI needs the DB's *actual* parallel slot number. Dropping
+            # this field made both dropdown choices render as "Deye №1".
+            "slot_no": item.get("slot_no"),
             "model": str(item.get("model") or MODEL),
             "kind": str(item.get("kind") or "unknown"),
             "serial_number": item.get("serial_number"),

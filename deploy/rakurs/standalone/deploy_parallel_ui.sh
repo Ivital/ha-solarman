@@ -23,8 +23,8 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js"' "$HERE/templates/index.html"
-grep -Fq 'href="/static/parallel-twin-20261125.css?v=fullwidth-20261125-1"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=grid-picker-20261125-2"' "$HERE/templates/index.html"
+grep -Fq 'href="/static/parallel-twin-20261125.css?v=grid-picker-20261125-2"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
 grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
@@ -166,6 +166,8 @@ assert profile["aggregate_verified"] is False
 assert profile["battery_soc_percent"] is None
 assert profile["aggregate_values"] == {}
 assert len(profile["devices"]) == profile["registered_inverters"]
+assert [int(d["slot_no"]) for d in profile["devices"]]==[1,2]
+print("PARALLEL_PUBLIC_SLOT_LABELS=PASS")
 assert profile["registered_inverters"] == len(profile["devices"])
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
 print("MYSQL_DEYE_DEVICE_SLOTS=" + str(profile["registered_inverters"]))

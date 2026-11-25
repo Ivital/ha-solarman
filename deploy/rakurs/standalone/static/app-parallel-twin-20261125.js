@@ -375,7 +375,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     ["pv_power", "Сонячна генерація", "кВт", "solar"],
     ["load_power", "Навантаження", "кВт", "load"],
     ["battery_soc", "Заряд акумулятора", "%", "battery"],
-    ["grid_power", "Обмін із мережею", "кВт", "grid"]
+    ["grid_power", "Обмін із мережею", "кВт", "network"]
   ];
   const bodies = series.map(([key, label, unit, tone]) => {
     const chartCard = element("article", "trend-card trend-" + tone);
@@ -673,6 +673,21 @@ function displayDeviceKey(value) {
   if (key === "deye_inverter_2" || key.endsWith("_parallel_2")) return "Deye №2";
   return key || "—";
 }
+function normalizedTwinDevices(raw) {
+  // Legacy API versions omitted slot_no; never label both choices Deye №1.
+  const devices = Array.isArray(raw) ? raw : [];
+  const assigned = new Set();
+  return devices.map((device, index) => {
+    const reported = Number(device.slot_no);
+    let slot = Number.isInteger(reported) && reported > 0 &&
+      !assigned.has(reported) ? reported : null;
+    if (slot === null) {
+      slot = [1, 2].find(candidate => !assigned.has(candidate)) || index + 1;
+    }
+    assigned.add(slot);
+    return {...device, slot_no: slot};
+  });
+}
 function deviceLabel(device, index = 0) {
   const slot = Number(device.slot_no || index + 1);
   return "Deye №" + (Number.isInteger(slot) && slot > 0 ? slot : index + 1);
@@ -689,12 +704,12 @@ function storedDeviceNote(reading) {
 async function fetchParallelDevices(cycle) {
   const profile = await api("/parallel");
   if (!current(cycle)) return null;
-  const devices = Array.isArray(profile.devices) ? profile.devices : [];
+  const devices = normalizedTwinDevices(profile.devices);
   const responses = await Promise.allSettled(devices.map(d =>
     api("/parallel/latest?device=" + encodeURIComponent(d.device_key))));
   if (!current(cycle)) return null;
   return devices.map((d, i) => ({
-    ...d, slot_no: Number(d.slot_no || i + 1),
+    ...d, slot_no: d.slot_no,
     values: responses[i].status === "fulfilled" ? (responses[i].value.values || {}) : {},
   }));
 }
@@ -1489,18 +1504,19 @@ async function boot() {
     state.role=auth.role || "viewer";state.csrf=auth.csrf || null;
     createLogout(auth);
   }
-  const pair=results[4].status === "fulfilled" ? results[4].value.devices : [];
+  const pair=normalizedTwinDevices(
+    results[4].status === "fulfilled" ? results[4].value.devices : []);
   try {
     const stored=typeof localStorage !== "undefined" ?
       localStorage.getItem("rakurs.selectedDeye") : null;
     const found=(pair||[]).find(x=>x.device_key===stored);
-    if(found){state.selectedDeviceKey=stored;state.selectedSlotNo=Number(found.slot_no||1);}
+    if(found){state.selectedDeviceKey=stored;state.selectedSlotNo=found.slot_no;}
   }catch(_error){}
   const choice=document.getElementById("device-select");
   if(choice && (pair||[]).length) {
     clear(choice);
     for(const d of pair) {
-      const option=element("option","","Deye №"+Number(d.slot_no||1));
+      const option=element("option","",deviceLabel(d));
       option.value=d.device_key;
       choice.appendChild(option);
     }
@@ -1510,7 +1526,7 @@ async function boot() {
       const picked=pair.find(d=>d.device_key===choice.value);
       if(!picked)return;
       state.selectedDeviceKey=picked.device_key;
-      state.selectedSlotNo=Number(picked.slot_no||1);
+      state.selectedSlotNo=picked.slot_no;
       try {if(typeof localStorage!=="undefined")
         localStorage.setItem("rakurs.selectedDeye",picked.device_key);
       } catch(_error) {}

@@ -110,13 +110,16 @@
 .device-select-wrap select:focus-visible{outline:2px solid #80e1d6;outline-offset:2px}
 .device-select-wrap select[hidden]{display:none}
 
-/* CHART WIDTH FIX: the dedicated charts route is an analytics page, not
-   a two-column card dashboard. A 900:280 viewBox inside half-width cards
-   scales the plotted curves down and leaves the panel visually underfilled.
-   Give each plot its entire content row, including at large breakpoints. */
+/* Chart tiles: overview and dedicated charts both use a balanced 2×2
+   desktop layout. The network tile has its own distinct "trend-network"
+   class: do NOT use "trend-grid" for a tile (it is a grid container). */
+.trend-network .chart polyline {stroke:var(--grid,#bbb0f3)}
+.trend-card.trend-network {
+  display:block;
+  min-width:0;
+}
 .trend-section.full-trends,
 .trend-section.full-trends .trend-grid,
-.trend-section.full-trends .trend-card,
 .trend-content,
 .history-chart,
 .history-records,
@@ -126,12 +129,8 @@
   max-width:none;
 }
 .trend-section.full-trends .trend-grid {
-  grid-template-columns:minmax(0,1fr);
+  grid-template-columns:repeat(2,minmax(0,1fr));
   align-items:stretch;
-}
-.trend-section.full-trends .trend-card {
-  box-sizing:border-box;
-  padding:19px clamp(14px,2vw,30px);
 }
 .trend-content .chart,
 .history-chart .chart,
@@ -143,10 +142,8 @@
   max-width:none;
   height:auto;
 }
-/* The overview retains two compact cards per row only when both cards
-   have enough width for readable date and axis labels. */
-@media(max-width:1250px) {
-  .trend-section:not(.full-trends) .trend-grid {
+@media(max-width:760px) {
+  .trend-section.full-trends .trend-grid {
     grid-template-columns:minmax(0,1fr);
   }
 }
