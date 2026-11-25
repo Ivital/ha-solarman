@@ -112,7 +112,7 @@ class StandaloneMySqlTests(unittest.TestCase):
             .get_json()["values"], {}
         )
         self.assertEqual(len(self.data_calls), 1)
-        self.assertIn("SELECT device_id AS id", self.data_calls[0][1])
+        self.assertIn("SELECT d.id AS id", self.data_calls[0][1])
 
     def test_latest_returns_any_stored_mysql_measurement(self):
         val = {
@@ -122,7 +122,7 @@ class StandaloneMySqlTests(unittest.TestCase):
             "observed_at_utc": datetime(2026, 11, 24, 14, 30),
         }
         self.data_one = lambda sql, _: (
-            {"id": 5} if "SELECT device_id AS id" in sql else val
+            {"id": 5} if "SELECT d.id AS id" in sql else val
         )
         res = self.client.get("/api/v1/latest?keys=pv_power")
         self.assertEqual(res.status_code, 200)
@@ -143,7 +143,7 @@ class StandaloneMySqlTests(unittest.TestCase):
             "observed_at_utc": datetime(2026, 11, 24, 17, 0),
         }]
         self.data_one = lambda sql, params: (
-            {"id": 5} if "SELECT device_id AS id" in sql else {"n": 815}
+            {"id": 5} if "SELECT d.id AS id" in sql else {"n": 815}
         )
         response = self.client.get("/api/v1/modbus-fields")
         self.assertEqual(response.status_code, 200)
@@ -181,7 +181,7 @@ class StandaloneMySqlTests(unittest.TestCase):
             "observed_at_utc": datetime(2026, 11, 24, 17, 0),
         }
         def lookup(sql, params):
-            if "SELECT device_id AS id" in sql:
+            if "SELECT d.id AS id" in sql:
                 return {"id": 7}
             if "COUNT(*) AS n FROM rakurs_devices" in sql:
                 return {"n": 3}
@@ -280,7 +280,7 @@ class AuthenticationTests(unittest.TestCase):
             sess["at"] = int(time.time())
         self.data_one = lambda sql, params: (
             AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql
-            else {"id": 7} if "SELECT device_id AS id" in sql else None
+            else {"id": 7} if "SELECT d.id AS id" in sql else None
         )
         ui = {
             "signal_key": "pv_power", "label_uk": "Генерація PV",
