@@ -84,7 +84,8 @@ class ParallelApiTests(unittest.TestCase):
         def fake_rows(sql, params=()):
             self.db_calls.append((sql, params))
             if "FROM rakurs_devices AS d" in sql:
-                return self.fake_devices
+                return [dict(item, slot_no=item.get("slot_no", i + 1))
+                        for i, item in enumerate(self.fake_devices)]
             if "FROM rakurs_samples AS m" in sql:
                 return [{
                     "signal_key": "pv_power", "label_uk": "Генерація PV",
@@ -115,8 +116,8 @@ class ParallelApiTests(unittest.TestCase):
         self.assertIsNone(payload["battery_soc_percent"])
         self.assertEqual(len(self.db_calls), 1)
         sql, params = self.db_calls[0]
-        self.assertIn("d.device_key<>%s", sql)
-        self.assertEqual(params[0], module.DEMO_DEVICE_KEY)
+        self.assertIn("pg.group_key=%s", sql)
+        self.assertIn("deye_sun20k_parallel_shared_battery", params)
 
     def test_device_readings_are_scoped_and_never_aggregated(self):
         self.fake_devices = [
@@ -135,8 +136,8 @@ class ParallelApiTests(unittest.TestCase):
         query = next((q for q, params in self.db_calls
                       if "FROM rakurs_samples AS m" in q), "")
         self.assertIn("m.device_id=%s", query)
-        self.assertIn("m.quality='good'", query)
-        self.assertIn("s.verified=1", query)
+        self.assertNotIn("m.quality=", query)
+        self.assertIn("m.device_id=%s", query)
         self.assertFalse(any("INSERT " in sql or "UPDATE " in sql
                              for sql, params in self.db_calls))
 
@@ -170,7 +171,7 @@ class ParallelApiTests(unittest.TestCase):
                    if "FROM rakurs_samples AS m" in q)
         self.assertIn("WHERE m.device_id=%s", sql)
         self.assertIn("s.signal_key=%s", sql)
-        self.assertIn("m.quality='good'", sql)
+        self.assertNotIn("m.quality=", sql)
         self.assertEqual(self.client.get(
             "/api/v1/parallel/history?device=inverter_1&key=unknown_metric").status_code, 400)
         self.assertEqual(self.client.get(
@@ -184,13 +185,12 @@ class ParallelApiTests(unittest.TestCase):
             "/api/v1/parallel/modbus-fields?device=inverter_2")
         self.assertEqual(res.status_code, 200)
         self.assertEqual(res.get_json()["count"], 0)
-        self.assertTrue(res.get_json()["verified_only"])
+        self.assertFalse(res.get_json()["verified_only"])
         sql = next(q for q, _ in self.db_calls
                    if "FROM rakurs_modbus_fields AS f" in q)
-        self.assertIn("m.device_id=%s", sql)
         self.assertIn("ms.device_id=%s", sql)
-        self.assertIn("f.verified=1", sql)
-        self.assertIn("m.quality='good'", sql)
+        self.assertNotIn("f.verified=1", sql)
+        self.assertNotIn("m.quality=", sql)
 
     def test_simulated_two_device_archive_only_exposes_simulated_data(self):
         queries = []
@@ -277,38 +277,44 @@ class ParallelApiTests(unittest.TestCase):
                              404)
         self.assertTrue(all("INSERT " not in q and "UPDATE " not in q for q, _ in queries))
 
-    def test_two_real_inverters_never_mix_global_readings(self):
+    def test_global_reads_are_scoped_to_one_stable_mysql_device(self):
+        observed = []
         def one_real(sql, params=()):
+            observed.append((sql, params))
             if "FROM rakurs_users WHERE id=%s" in sql:
                 return {"id":123,"username":"tester","role":"admin",
                         "is_active":1,"session_version":1}
-            if "WHERE quality<>'simulated' LIMIT 1" in sql:
-                return {"n":1}
-            if "WHERE kind='inverter' AND model LIKE" in sql:
-                return {"n":2}
-            return {"n":0} if "COUNT(*)" in sql else None
+            if "SELECT device_id AS id" in sql:
+                return {"id":21}
+            if "m.value_decimal" in sql:
+                return {"signal_key":"pv_power","unit":"кВт",
+                        "quality":"simulated","value_decimal":Decimal("5.1")}
+            if "SELECT COUNT(*)" in sql:
+                return {"n":0}
+            return None
 
         def mixed_rows(sql, params=()):
-            return [{"signal_key":"pv_power","unit":"кВт","quality":"good",
-                     "value_decimal":Decimal("5.1")}] if "FROM rakurs_signals" in sql else []
+            return [{"signal_key":"pv_power","unit":"кВт","quality":"simulated",
+                     "value_decimal":Decimal("5.1")}] if "m.value_decimal" in sql else []
 
         with patch.object(module, "one", side_effect=one_real), \
              patch.object(module, "rows", side_effect=mixed_rows):
             r = self.client.get("/api/v1/latest?keys=pv_power")
             self.assertEqual(r.status_code, 200)
-            self.assertEqual(r.get_json()["values"], {})
-            self.assertTrue(r.get_json()["device_selection_required"])
+            self.assertEqual(r.get_json()["primary_device_id"], 21)
+            self.assertEqual(r.get_json()["values"]["pv_power"]["value_decimal"], "5.1")
             h = self.client.get("/api/v1/history?key=pv_power&hours=24")
             self.assertEqual(h.status_code, 200)
-            self.assertEqual(h.get_json()["points"], [])
-            self.assertTrue(h.get_json()["device_selection_required"])
+            self.assertEqual(h.get_json()["primary_device_id"], 21)
             m = self.client.get("/api/v1/modbus-fields")
             self.assertEqual(m.status_code, 200)
-            self.assertEqual(m.get_json()["fields"], [])
-            self.assertTrue(m.get_json()["device_selection_required"])
+            self.assertEqual(m.get_json()["primary_device_id"], 21)
             home = self.client.get("/")
             self.assertEqual(home.status_code, 200)
-            self.assertNotIn('>5.1<', home.get_data(as_text=True))
+            self.assertIn(">5.1<", home.get_data(as_text=True))
+            latest_sql = next(q for q, _ in observed if "m.value_decimal" in q)
+            self.assertIn("m.device_id=%s", latest_sql)
+            self.assertNotIn("quality='good'", latest_sql)
 
     def test_requires_authenticated_access(self):
         module.app.config.update(SECRET_KEY="parallel-testing-key")

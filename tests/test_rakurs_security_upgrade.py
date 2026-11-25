@@ -91,7 +91,7 @@ class LiveArchiveApiTests(unittest.TestCase):
         def rows(sql, params=()):
             self.recorded.append((sql, params))
             if "FROM rakurs_devices AS d" in sql:
-                return [{"id":21,"device_key":"real_1","kind":"inverter",
+                return [{"id":21,"slot_no":1,"device_key":"real_1","kind":"inverter",
                          "model":app_module.PARALLEL_MODEL}]
             if "FROM rakurs_modbus_poll_runs" in sql:
                 return [{"poll_uid":"poll_real_2026","quality":"good",
@@ -159,7 +159,7 @@ class LiveArchiveApiTests(unittest.TestCase):
     def test_homepage_query_is_bounded_and_parallel_is_device_scoped(self):
         # Both SQL latest paths must remain bounded regardless of archive size.
         code = (BASE / "app.py").read_text()
-        self.assertIn("ORDER BY m.observed_at_utc DESC LIMIT 16", code)
+        self.assertIn("ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1", code)
         self.assertIn("ORDER BY s.signal_key LIMIT 32", code)
         self.assertIn("AND pg.group_key=%s", code)
 

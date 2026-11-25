@@ -89,52 +89,51 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertFalse(obj["has_real_samples"])
         self.assertFalse(obj["home_assistant_dependency"])
 
-    def test_status_counts_provenance_specific_devices(self):
+    def test_status_counts_all_mysql_devices_without_quality_filter(self):
         def lookup(sql, params):
-            if "FROM rakurs_devices WHERE kind='simulation'" in sql:
+            if "COUNT(*) AS n FROM rakurs_devices" in sql:
                 return {"n": 3}
-            if "FROM rakurs_devices WHERE kind='inverter'" in sql:
-                return {"n": 0}
-            if "COUNT(DISTINCT m.signal_id)" in sql:
+            if "COUNT(DISTINCT signal_id)" in sql:
                 return {"n": 316}
-            if "COUNT(*) AS n FROM rakurs_signals" in sql:
-                return {"n": 0}
-            if "SELECT 1 AS n" in sql:
-                return None
+            if "SELECT 1 AS n FROM rakurs_samples LIMIT 1" in sql:
+                return {"n": 1}
             raise AssertionError("Unexpected SQL in status: " + sql)
         self.data_one = lookup
-        demo = self.client.get("/api/v1/status?demo=1").get_json()
-        self.assertEqual(demo["registered_devices"], 3)
-        self.assertEqual(demo["mode"], "simulation")
-        real = self.client.get("/api/v1/status?real=1").get_json()
-        self.assertEqual(real["registered_devices"], 0)
-        self.assertFalse(real["has_real_samples"])
+        for suffix in ("", "?real=1", "?demo=1"):
+            status = self.client.get("/api/v1/status" + suffix).get_json()
+            self.assertEqual(status["registered_devices"], 3)
+            self.assertEqual(status["mode"], "real")
+            self.assertEqual(status["displayed_signals"], 316)
+            self.assertTrue(status["has_real_samples"])
 
     def test_missing_latest_is_empty(self):
         self.assertEqual(
-            self.client.get("/api/v1/latest?keys=pv_power,battery_soc").get_json()["values"], {}
+            self.client.get("/api/v1/latest?keys=pv_power,battery_soc")
+            .get_json()["values"], {}
         )
-        self.assertEqual(len(self.data_calls), 5)
-        self.assertEqual(self.data_calls[-1][-1], ("battery_soc",))
+        self.assertEqual(len(self.data_calls), 1)
+        self.assertIn("SELECT device_id AS id", self.data_calls[0][1])
 
-    def test_latest_returns_only_verified_measurements(self):
+    def test_latest_returns_any_stored_mysql_measurement(self):
         val = {
             "signal_key": "pv_power", "label_uk": "Генерація",
             "unit": "кВт", "value_decimal": Decimal("2.500000000"),
-            "raw_value": 2500, "quality": "good",
+            "raw_value": 2500, "quality": "simulated",
             "observed_at_utc": datetime(2026, 11, 24, 14, 30),
         }
-        self.data_one = lambda sql, _params: (
-            {"n": 0} if "WHERE kind='inverter' AND model LIKE" in sql
-            else None if "quality='simulated' AND ingest_source=%s" in sql
-            else val)
+        self.data_one = lambda sql, _: (
+            {"id": 5} if "SELECT device_id AS id" in sql else val
+        )
         res = self.client.get("/api/v1/latest?keys=pv_power")
         self.assertEqual(res.status_code, 200)
         obj = res.get_json()["values"]["pv_power"]
         self.assertEqual(obj["value_decimal"], "2.500000000")
         self.assertEqual(obj["observed_at_utc"], "2026-11-24T14:30:00Z")
+        query = self.data_calls[-1][1]
+        self.assertIn("m.device_id=%s", query)
+        self.assertNotIn("m.quality=", query)
 
-    def test_full_modbus_fields_api_is_authenticated_and_demo_scoped(self):
+    def test_full_modbus_fields_api_displays_all_stored_values(self):
         self.data_rows = lambda sql, params: [{
             "field_key": "p3_0001", "group_name": "Info", "field_name": "Device",
             "platform": "sensor", "unit": None,
@@ -143,22 +142,20 @@ class StandaloneMySqlTests(unittest.TestCase):
             "quality": "simulated",
             "observed_at_utc": datetime(2026, 11, 24, 17, 0),
         }]
-        self.data_one = lambda sql, params: ({"n": 0}
-            if "WHERE kind='inverter' AND model LIKE" in sql else {"n": 815})
-        response = self.client.get("/api/v1/modbus-fields?demo=1")
+        self.data_one = lambda sql, params: (
+            {"id": 5} if "SELECT device_id AS id" in sql else {"n": 815}
+        )
+        response = self.client.get("/api/v1/modbus-fields")
         self.assertEqual(response.status_code, 200)
         payload = response.get_json()
-        self.assertTrue(payload["simulation"])
         self.assertEqual(payload["register_count"], 815)
         self.assertEqual(payload["fields"][0]["field_key"], "p3_0001")
         self.assertEqual(payload["fields"][0]["quality"], "simulated")
-        self.assertIn("m.quality='simulated'", self.data_calls[0][1])
-        self.data_calls.clear()
-        normal = self.client.get("/api/v1/modbus-fields")
-        self.assertEqual(normal.status_code, 200)
-        self.assertFalse(normal.get_json()["simulation"])
-        self.assertTrue(any("m.quality='good'" in call[1]
-                            for call in self.data_calls))
+        self.assertNotIn("simulation", payload)
+        sql = next(q for action, q, _ in self.data_calls
+                   if action == "rows" and "rakurs_modbus_fields" in q)
+        self.assertIn("ms.device_id=%s", sql)
+        self.assertNotIn("m.quality=", sql)
 
     def test_malformed_keys_no_data_queries(self):
         for p in ("/api/v1/latest?keys=", "/api/v1/latest?keys=pv%27%3Bdrop",
@@ -166,17 +163,17 @@ class StandaloneMySqlTests(unittest.TestCase):
             self.assertEqual(self.client.get(p).status_code, 400)
         self.assertEqual(self.data_calls, [])
 
-    def test_history_bounds_and_empty_verified_signal(self):
+    def test_history_bounds_and_missing_primary_device(self):
         r = self.client.get("/api/v1/history?key=pv_power&hours=24")
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["points"], [])
-        self.assertEqual(len(self.data_calls), 4)
+        self.assertEqual(len(self.data_calls), 1)
         for value in ("0", "169", "abc"):
             self.assertEqual(
                 self.client.get("/api/v1/history?key=pv_power&hours="+value).status_code, 400
             )
 
-    def test_primary_homepage_and_default_api_show_seeded_mysql_without_query_flag(self):
+    def test_primary_homepage_and_api_use_stored_mysql_data(self):
         value = {
             "signal_key": "pv_power", "unit": "кВт",
             "value_decimal": Decimal("5.100000000"), "quality": "simulated",
@@ -184,42 +181,34 @@ class StandaloneMySqlTests(unittest.TestCase):
             "observed_at_utc": datetime(2026, 11, 24, 17, 0),
         }
         def lookup(sql, params):
-            if "WHERE quality<>'simulated' LIMIT 1" in sql:
-                return None
-            if "WHERE quality='simulated' AND ingest_source=%s" in sql:
-                return {"n": 1}
-            if "COUNT(DISTINCT m.signal_id)" in sql:
+            if "SELECT device_id AS id" in sql:
+                return {"id": 7}
+            if "COUNT(*) AS n FROM rakurs_devices" in sql:
+                return {"n": 3}
+            if "COUNT(DISTINCT signal_id)" in sql:
                 return {"n": 316}
-            if "COUNT(*)" in sql:
-                return {"n": 1}
-            if "SELECT 1 AS n" in sql:
+            if "SELECT 1 AS n FROM rakurs_samples LIMIT 1" in sql:
                 return {"n": 1}
             if "m.value_decimal" in sql:
                 return value
             return None
         self.data_one = lookup
-        self.data_rows = lambda sql, params: (
-            [value] if "FROM rakurs_signals AS s" in sql else []
-        )
+        self.data_rows = lambda sql, params: [value] if "m.value_decimal" in sql else []
         homepage = self.client.get("/")
         self.assertEqual(homepage.status_code, 200)
         html = homepage.get_data(as_text=True)
         self.assertIn("Генерація PV", html)
         self.assertIn("5.1", html)
-        self.assertIn('data-initial-mode="simulation"', html)
-        self.assertIn("Архів MySQL", html)
+        self.assertIn('data-initial-mode="real"', html)
+        self.assertIn("Дані MySQL", html)
         self.assertIn("rakurs-history-72h-v1", html)
-
         status = self.client.get("/api/v1/status").get_json()
-        self.assertEqual(status["mode"], "simulation")
-        self.assertEqual(status["simulated_signals"], 316)
-        self.assertEqual(status["verified_signals"], 0)
+        self.assertEqual(status["mode"], "real")
+        self.assertEqual(status["registered_devices"], 3)
+        self.assertEqual(status["displayed_signals"], 316)
         latest = self.client.get("/api/v1/latest?keys=pv_power").get_json()
-        self.assertTrue(latest["simulation"])
         self.assertEqual(latest["values"]["pv_power"]["value_decimal"], "5.100000000")
-
-        real = self.client.get("/api/v1/status?real=1").get_json()
-        self.assertEqual(real["mode"], "real")
+        self.assertEqual(latest["primary_device_id"], 7)
 
     def test_password_file_mode_and_ownership(self):
         with patch.dict(os.environ, {}, clear=True):
@@ -290,7 +279,8 @@ class AuthenticationTests(unittest.TestCase):
             sess["ver"] = AUTH_ACCOUNT["session_version"]
             sess["at"] = int(time.time())
         self.data_one = lambda sql, params: (
-            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql else None
+            AUTH_ACCOUNT if "FROM rakurs_users WHERE id=%s" in sql
+            else {"id": 7} if "SELECT device_id AS id" in sql else None
         )
         ui = {
             "signal_key": "pv_power", "label_uk": "Генерація PV",
@@ -320,52 +310,18 @@ class AuthenticationTests(unittest.TestCase):
             self.assertNotIn("/static/app.js", modbus_html)
             self.assertEqual(query.call_count, 2)
             for call in query.call_args_list:
-                self.assertIn("m.quality='simulated'", call.args[0])
-                self.assertIn("m.ingest_source=%s", call.args[0])
+                self.assertIn("mx.device_id=%s", call.args[0])
+                self.assertNotIn("m.quality=", call.args[0])
 
-    def test_demo_login_redirect_preserves_explicit_selection(self):
-        from werkzeug.security import generate_password_hash
-        username = "demo_account"
-        password = "unshared-test-password-for-simulation"
-        account = {
-            "id": 79, "username": username, "role": "admin",
-            "password_hash": generate_password_hash(password, method="scrypt:32768:8:1"),
-            "is_active": 1, "session_version": 1,
-        }
-        self.data_one = lambda sql, _params: (
-            account if "FROM rakurs_users WHERE username=%s" in sql
-            else None
-        )
-        anonymous = self.client.get("/?demo=1")
-        self.assertEqual(anonymous.status_code, 303)
-        self.assertTrue(anonymous.headers["Location"].endswith("/login?demo=1"))
-        response = self.client.get("/login?demo=1")
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('name="demo" value="1"', response.get_data(as_text=True))
-        with self.client.session_transaction() as sess:
-            csrf = sess["csrf"]
-
-        class FakeCursor:
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *args):
-                return False
-
-            def execute(self, *args):
-                return 1
-
-        class FakeConn:
-            def cursor(self):
-                return FakeCursor()
-
-        with patch.object(module, "conn", return_value=FakeConn()):
-            posted = self.client.post("/login", data={
-                "username": username, "password": password,
-                "csrf": csrf, "demo": "1"
-            })
-        self.assertEqual(posted.status_code, 303)
-        self.assertTrue(posted.headers["Location"].endswith("/?demo=1"))
+    def test_login_ignores_legacy_demo_query(self):
+        login = self.client.get("/login?demo=1")
+        self.assertEqual(login.status_code, 200)
+        self.assertNotIn('name="demo"', login.get_data(as_text=True))
+        self.assertIn('action="/login" method="post"', login.get_data(as_text=True))
+        login = self.client.get("/login?next=/deye")
+        self.assertIn('name="next" value="/deye"', login.get_data(as_text=True))
+        unsafe = self.client.get("/login?next=https://example.org")
+        self.assertNotIn('name="next"', unsafe.get_data(as_text=True))
 
     def test_versioned_js_prevents_stale_dashboard_after_ha_migration(self):
         html = (RAKURS / "standalone/templates/index.html").read_text()
@@ -386,7 +342,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(stable, js)
         self.assertIn('restoreServerReadings()', stable)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
-        self.assertIn("let DEMO_MODE = new URLSearchParams(", js)
+        self.assertIn("const DEMO_MODE = false;", js)
         self.assertIn("sha256sum", script)
         self.assertIn('https://$DOMAIN$ASSET_PATH', script)
         self.assertIn("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS", script)
@@ -397,11 +353,11 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_primary_dashboard_displays_existing_samples_without_demo_url(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('DEMO_MODE = state.status ? state.status.mode === "simulation"', js)
+        self.assertIn('const DEMO_MODE = false;', js)
         self.assertIn('restoreServerReadings();', js)
         self.assertIn('critical.every(key => values[key]', js)
         self.assertIn('const FORCE_REAL_MODE =', js)
-        self.assertIn('const selection = FORCE_REAL_MODE ? "real=1"', js)
+        self.assertIn('const url = base + path;', js)
         self.assertNotIn('window.location.replace(', js)
         self.assertNotIn('message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ"', js)
         html = (RAKURS / "standalone/templates/index.html").read_text()

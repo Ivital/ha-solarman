@@ -89,11 +89,11 @@ class SimulatedHistoryTests(unittest.TestCase):
 
     def test_main_dashboard_has_dynamic_charts_and_initial_state(self):
         js = (STANDALONE / "static" / "app.js").read_text()
-        self.assertIn("Динаміка за 24 години", js)
-        self.assertIn('["pv_power", "Сонячна генерація", "кВт"]', js)
-        self.assertIn('["load_power", "Навантаження", "кВт"]', js)
-        self.assertIn('["battery_soc", "Заряд акумулятора", "%"]', js)
-        self.assertIn('if (s.signal_key === "pv_power") option.selected = true', js)
+        self.assertIn("Динаміка показників", js)
+        self.assertIn('["pv_power", "Сонячна генерація", "кВт", "solar"]', js)
+        self.assertIn('["load_power", "Навантаження", "кВт", "load"]', js)
+        self.assertIn('["battery_soc", "Заряд акумулятора", "%", "battery"]', js)
+        self.assertIn('if (sig.signal_key === "pv_power") option.selected = true', js)
         self.assertIn("Promise.allSettled(series.map", js)
 
 

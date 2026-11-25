@@ -39,18 +39,18 @@ jobs:
           bash -n deploy/rakurs/standalone/repair_dashboard_assets.sh
           bash -n deploy/rakurs/standalone/deploy_deye_server_view.sh
           bash -n deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh
-          bash deploy/rakurs/standalone/deploy_primary_mysql_dashboard.sh --check
           bash -n deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh
           bash -n deploy/rakurs/standalone/audit_browser_delivery.sh
           bash -n deploy/rakurs/standalone/deploy_stable_dashboard.sh
-          bash deploy/rakurs/standalone/deploy_stable_dashboard.sh --check
           bash -n deploy/rakurs/standalone/deploy_clarity_ui.sh
-          bash deploy/rakurs/standalone/deploy_clarity_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_events_ui.sh
-          bash deploy/rakurs/standalone/deploy_events_ui.sh --check
           bash -n deploy/rakurs/standalone/audit_parallel_host_readonly.sh
+          # Historical one-time installers are not valid acceptance checks
+          # for the unified MySQL release. Test syntax only; current release
+          # acceptance runs in deploy_parallel_ui.sh --check.
           bash -n deploy/rakurs/standalone/deploy_parallel_ui.sh
           bash -n deploy/rakurs/standalone/audit_site_full_readonly.sh
+          bash -n deploy/rakurs/standalone/audit_unified_mysql_readonly.sh
           bash deploy/rakurs/standalone/deploy_parallel_ui.sh --check
           bash -n deploy/rakurs/standalone/deploy_full_modbus_archive.sh
           bash deploy/rakurs/standalone/deploy_full_modbus_archive.sh --check
@@ -58,10 +58,6 @@ jobs:
           python deploy/rakurs/standalone/harden_mysql_grants.py
           python3 deploy/rakurs/standalone/seed_two_parallel_demo.py
           python3 -m py_compile deploy/rakurs/standalone/modbus_archive.py
-          bash deploy/rakurs/standalone/deploy_deye_history_and_dashboard.sh --check
-          bash deploy/rakurs/standalone/deploy_deye_server_view.sh --check
-          bash deploy/rakurs/standalone/repair_dashboard_assets.sh --check
-          bash deploy/rakurs/standalone/fix_demo_visibility.sh --check
           python -m py_compile deploy/rakurs/standalone/simulate_deye_once.py
           python deploy/rakurs/standalone/simulate_deye_once.py
           bash deploy/rakurs/standalone/stage_standalone.sh --check

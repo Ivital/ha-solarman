@@ -1,8 +1,4 @@
-"""Regression: RAKURS UI describes stored DB records without false source claims.
-
-Internal simulator provenance in API and MySQL must remain intact; these
-assertions cover only user-visible active pages and their bundled JS.
-"""
+"""RAKURS must show one operational MySQL view, without legacy test copy."""
 from pathlib import Path
 import re
 import unittest
@@ -18,24 +14,33 @@ class PublicPresentationTests(unittest.TestCase):
         "static/app-stable-20261124.js",
     )
 
-    def test_no_simulator_presentation_copy_in_active_site(self):
+    def test_no_test_or_simulation_presentation_in_active_site(self):
         for relative in self.VISIBLE_FILES:
             with self.subTest(path=relative):
                 content = (ROOT / relative).read_text(encoding="utf-8")
-                # Internal JSON provenance keys and CSS selectors are not UI copy.
-                self.assertIsNone(
-                    re.search(r"симуляц|симуль|демонстрац|тестов|синтетич", content, re.I)
-                )
+                # Technical DB fields and legacy device identifiers are not
+                # displayed directly; UI copy must never expose test labels.
+                self.assertNotRegex(content,
+                    r"Тестові дані|Тестовий інвертор|СИМУЛЯЦІЯ|ДЕМО РЕЖИМ")
 
-    def test_archive_display_does_not_assert_physical_origin(self):
-        template = (ROOT / "templates/index.html").read_text(encoding="utf-8")
-        js = (ROOT / "static/app-parallel-twin-20261125.js").read_text(encoding="utf-8")
-        self.assertIn("фізичне походження вимірювань не підтверджене", template)
-        self.assertIn("Походження цих значень не підтверджене", js)
-        self.assertIn('item.quality === "simulated"', js)
-        self.assertIn('mode.textContent = DEMO_MODE ? "Архів MySQL"', js)
-        self.assertIn('raw === "simulation" ? "Архівний профіль"', js)
-        self.assertIn('"Профілі у MySQL"', js)
+    def test_all_js_entrypoints_share_single_mode(self):
+        active = (ROOT / "static/app-parallel-twin-20261125.js").read_text()
+        self.assertIn('const DEMO_MODE = false;', active)
+        self.assertIn('const url = base + path;', active)
+        self.assertIn('mode.textContent = empty ? "Очікування показників" : "Дані MySQL";', active)
+        self.assertIn('api("/parallel/latest?device="', active)
+        self.assertIn('api("/parallel/raw"', active)
+        self.assertNotIn('api("/parallel/simulation', active)
+        for relative in ("static/app.js", "static/app-stable-20261124.js"):
+            self.assertEqual((ROOT / relative).read_text(), active)
+
+    def test_server_uses_one_operational_data_mode(self):
+        app = (ROOT / "app.py").read_text()
+        self.assertIn('"mode": "real"', app)
+        self.assertIn('SELECT COUNT(*) AS n FROM rakurs_devices', app)
+        self.assertIn('SELECT COUNT(DISTINCT signal_id) AS n FROM rakurs_samples', app)
+        self.assertIn('WHERE m.device_id=%s', app)
+        self.assertIn('def primary_device_id():', app)
 
 if __name__ == "__main__":
     unittest.main()

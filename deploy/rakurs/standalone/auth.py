@@ -163,15 +163,13 @@ def init_auth(app, one, conn):
     @app.route("/login", methods=["GET", "POST"])
     def login():
         if request.method == "GET":
-            demo = request.args.get("demo") == "1"
             next_path = request.args.get("next", "")
             next_path = next_path if next_path in ("/deye", "/deye/modbus") else ""
             if session.get("uid"):
-                return redirect(next_path or ("/?demo=1" if demo else "/"), code=303)
+                return redirect(next_path or "/", code=303)
             return render_template("login.html", csrf=_csrf(), error=None,
-                                   demo=demo, next_path=next_path)
+                                   next_path=next_path)
 
-        demo = request.form.get("demo") == "1"
         next_path = request.form.get("next", "")
         next_path = next_path if next_path in ("/deye", "/deye/modbus") else ""
         if not _csrf_valid():
@@ -185,7 +183,7 @@ def init_auth(app, one, conn):
                 _attempt_key("source", _client_addr()))
         if blocked(keys):
             return render_template(
-                "login.html", csrf=_csrf(), demo=demo, next_path=next_path,
+                "login.html", csrf=_csrf(), next_path=next_path,
                 error="Тимчасове блокування після невдалих спроб. Спробуйте через 15 хвилин."
             ), 429
 
@@ -202,7 +200,7 @@ def init_auth(app, one, conn):
             record_failure(keys)
             LOG.warning("Invalid Rakurs login attempt")
             return render_template(
-                "login.html", csrf=_csrf(), demo=demo, next_path=next_path, error="Неправильний логін або пароль."
+                "login.html", csrf=_csrf(), next_path=next_path, error="Неправильний логін або пароль."
             ), 401
 
         # Successful authentication rotates the signed browser session.
@@ -222,7 +220,7 @@ def init_auth(app, one, conn):
                 "SET failure_count=0, locked_until_utc=NULL "
                 "WHERE attempt_key IN (%s,%s)", keys
             )
-        return redirect(next_path or ("/?demo=1" if demo else "/"), code=303)
+        return redirect(next_path or "/", code=303)
 
     @app.post("/logout")
     def logout():

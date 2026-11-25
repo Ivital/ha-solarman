@@ -14,8 +14,8 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
-  app.py parallel_support.py modbus_archive.py modbus_wire.py
-  mysql_transport.py templates/index.html templates/deye_server.html
+  app.py auth.py parallel_support.py modbus_archive.py modbus_wire.py
+  mysql_transport.py templates/index.html templates/login.html templates/deye_server.html
   static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
 )
@@ -29,8 +29,9 @@ grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
 grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
-grep -Fq 'ЗБЕРЕЖЕНИЙ ЗНІМОК' "$HERE/templates/deye_server.html"
+grep -Fq 'Дані MySQL' "$HERE/templates/index.html"
+grep -Fq 'ПОКАЗНИКИ З MYSQL' "$HERE/templates/deye_server.html"
+! grep -Fq 'name="demo"' "$HERE/templates/login.html"
 grep -Fq 'aggregate_verified": False' "$HERE/parallel_support.py"
 if command -v node >/dev/null 2>&1; then
   node --check "$HERE/static/app-parallel-twin-20261125.js"
@@ -49,6 +50,8 @@ if [[ "$MODE" == "--check" ]]; then
 fi
 
 sudo -v
+echo '=== READ-ONLY NEW-CODE MYSQL ACCEPTANCE ==='
+bash "$HERE/audit_unified_mysql_readonly.sh" --check
 [[ "$(git branch --show-current)" == "feature/deye-trb145-monitoring" ]] || {
   echo 'STOP: unexpected git branch' >&2; exit 2
 }
@@ -141,12 +144,12 @@ assert home.status_code == 200
 html = home.get_data(as_text=True)
 for fragment in ("/static/app-parallel-twin-20261125.js",
                  "/static/parallel-twin-20261125.css",
-                 'Показники Deye з бази даних'):
+                 'Показники Deye з бази даних'): 
     assert fragment in html, "Missing HTML/DB content: " + fragment
 print("PARALLEL_EXISTING_HOME=PASS")
 deye_page = c.get("/deye", base_url="https://localhost")
 assert deye_page.status_code == 200
-assert "ЗБЕРЕЖЕНИЙ ЗНІМОК" in deye_page.get_data(as_text=True)
+assert "ПОКАЗНИКИ З MYSQL" in deye_page.get_data(as_text=True)
 modbus_page = c.get("/deye/modbus", base_url="https://localhost")
 assert modbus_page.status_code == 200
 print("DEYE_ARCHIVE_HTML=PASS")
@@ -162,41 +165,31 @@ assert profile["aggregate_verified"] is False
 assert profile["battery_soc_percent"] is None
 assert profile["aggregate_values"] == {}
 assert len(profile["devices"]) == profile["registered_inverters"]
+assert profile["registered_inverters"] == len(profile["devices"])
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
-print("PHYSICAL_INVERTERS_REGISTERED=" + str(profile["registered_inverters"]))
+print("MYSQL_DEYE_DEVICE_SLOTS=" + str(profile["registered_inverters"]))
 rejected = c.get("/api/v1/parallel/latest?device=simulated_deye_sg05lp3",
                  base_url="https://localhost")
 assert rejected.status_code == 404
-print("SIMULATED_DEVICE_NOT_TREATED_AS_REAL=PASS")
+print("UNREGISTERED_DEVICE_NOT_IN_PARALLEL_GROUP=PASS")
 events = c.get("/api/v1/events", base_url="https://localhost")
 assert events.status_code == 200
 print("EXISTING_EVENTS=PASS")
-demo_response = c.get("/api/v1/parallel/simulation", base_url="https://localhost")
-assert demo_response.status_code == 200, demo_response.status_code
-demo = demo_response.get_json()
-assert demo["simulation"] is True
-assert demo["storage_ready"] is True, "Two-inverter MySQL archive schema missing"
-assert len(demo["devices"]) == 2, "Both simulated inverter records must exist"
-for device in demo["devices"]:
-    key = device["device_key"]
-    assert (device["raw_registers"],device["decoded_fields"],device["ui_fields"]) == (
-        815, 624, 316), "Missing complete twin archive: " + key
-    latest = c.get("/api/v1/parallel/simulation/latest?device=" + key,
+status = c.get("/api/v1/status", base_url="https://localhost")
+assert status.status_code == 200
+state = status.get_json()
+assert state["mode"] == "real"
+devices_response = c.get("/api/v1/devices", base_url="https://localhost")
+assert devices_response.status_code == 200
+assert state["registered_devices"] == len(devices_response.get_json()["devices"])
+for item in profile["devices"]:
+    device = item["device_key"]
+    latest = c.get("/api/v1/parallel/latest?device=" + device,
                    base_url="https://localhost")
-    assert latest.status_code == 200 and latest.get_json()["simulation"] is True
-    values = latest.get_json()["values"]
-    assert "pv_power" in values and values["pv_power"]["quality"] == "simulated"
-    decoded = c.get("/api/v1/parallel/simulation/fields?device=" + key +
-                    "&limit=80", base_url="https://localhost")
-    assert decoded.status_code == 200
-    assert decoded.get_json()["total"] == 624
-    assert decoded.get_json()["simulation"] is True
-    raw = c.get("/api/v1/parallel/simulation/raw?device=" + key + "&limit=200",
-                base_url="https://localhost")
-    assert raw.status_code == 200
-    assert raw.get_json()["total"] == 815
-    assert raw.get_json()["simulation"] is True
-print("TWO_SIMULATED_INVERTERS_VISIBLE_API=PASS")
+    assert latest.status_code == 200
+    assert latest.get_json()["device_key"] == device
+print("ALL_MYSQL_DEVICES_VISIBLE=PASS")
+print("EMPTY_MYSQL_COMPATIBLE=YES")
 print("MYSQL_READ_ONLY=PASS")
 PY
 
