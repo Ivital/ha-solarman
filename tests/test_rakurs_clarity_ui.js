@@ -7,6 +7,7 @@ const assert = require("node:assert/strict");
 const root = path.join(__dirname, "../deploy/rakurs/standalone");
 const js = fs.readFileSync(path.join(root, "static/app-parallel-twin-20261125.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
+const chartCss = fs.readFileSync(path.join(root, "static/parallel-twin-20261125.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 
 class Node {
@@ -184,6 +185,15 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=fullwidth-20261125-1"'));
+  assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*minmax\(0,1fr\)/.test(chartCss),
+    "The dedicated charts route must use full-width cards");
+  assert(chartCss.includes(".history-chart .chart") &&
+         chartCss.includes(".parallel-device-chart .chart") &&
+         chartCss.includes("width:100%") &&
+         chartCss.includes("max-width:none"),
+    "All SVG chart surfaces must occupy available card width");
+  console.log("CLARITY_FULL_WIDTH_CHART_CSS=PASS");
   assert(!/Тестові дані|СИМУЛЯЦІЯ|ДЕМО/i.test(html));
   for(const scenario of ["fail","partial"]) {
     const app=prepare(scenario);
@@ -228,6 +238,7 @@ async function run() {
   app.loc.hash="#/trends";
   await app.events.hashchange();
   assert.equal(byClass(app.main,"trend-card").length,4);
+  assert.equal(byClass(app.main,"full-trends").length,1,"Charts route uses expanded panel layout");
   const ranges=byClass(app.main,"range-control")[0].childNodes;
   assert.equal(ranges.length,3);
   ranges[2].listeners.click();
