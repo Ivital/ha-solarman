@@ -1,8 +1,8 @@
 "use strict";
 // Rakurs standalone: the ONLY data API is this app's /api/v1/* backed by MySQL.
 const base = "/api/v1";
-let DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
-const FORCE_REAL_MODE = new URLSearchParams(window.location.search).get("real") === "1";
+const DEMO_MODE = false;
+const FORCE_REAL_MODE = false;
 const views = [
   ["overview", "Огляд", "◈"],
   ["pv", "Сонце", "☀"],
@@ -10,7 +10,9 @@ const views = [
   ["grid", "Мережа", "⌁"],
   ["load", "Навантаження", "⌂"],
   ["inverter", "Інвертор", "▤"],
-  ["history", "Історія", "▥"],
+  ["parallel", "Паралельна система", "⧉"],
+  ["trends", "Графіки", "▥"],
+  ["history", "Історія", "◷"],
   ["events", "Події", "◇"],
   ["archive", "Архів", "▦"],
   ["modbus", "Modbus", "▤"],
@@ -71,8 +73,7 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path) {
-  const selection = FORCE_REAL_MODE ? "real=1" : (DEMO_MODE ? "demo=1" : "");
-  const url = base + path + (selection ? (path.includes("?") ? "&" : "?") + selection : "");
+  const url = base + path;
   const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
@@ -101,12 +102,22 @@ function activeRoute() {
 }
 function buildNav() {
   clear(navigation);
-  for (const view of views) {
-    const item = element("a", state.route === view[0] ? "active" : "");
-    item.href = "#/" + view[0];
-    add(item, element("span", "symbol", view[2]), element("span", "", view[1]));
-    item.title = view[1];
-    navigation.appendChild(item);
+  const sections = [
+    ["МОНІТОРИНГ", ["overview", "parallel", "pv", "battery", "grid", "load", "inverter"]],
+    ["АНАЛІТИКА", ["trends", "history", "archive", "events"]],
+    ["НАЛАШТУВАННЯ", ["modbus", "system"]]
+  ];
+  for (const [label, names] of sections) {
+    navigation.appendChild(element("div", "nav-group-label", label));
+    for (const name of names) {
+      const view = views.find(v => v[0] === name);
+      const item = element("a", state.route === name ? "active" : "");
+      item.href = "#/" + name;
+      if (state.route === name) item.setAttribute("aria-current", "page");
+      item.title = view[1];
+      add(item, element("span", "symbol", view[2]), element("span", "", view[1]));
+      navigation.appendChild(item);
+    }
   }
 }
 function updateConnection(connected) {
@@ -114,7 +125,7 @@ function updateConnection(connected) {
   node.className = "connection " + (connected ? "ok" : "error");
   node.replaceChildren();
   add(node, element("i", ""), document.createTextNode(connected ? "MySQL доступна" : "MySQL недоступна"));
-  document.getElementById("updated").textContent = "Оновлено: " + time(new Date().toISOString());
+  document.getElementById("updated").textContent = "З’єднання перевірено: " + time(new Date().toISOString());
 }
 function planCount() {
   return state.catalog ? state.catalog.all_metric_count : 0;
@@ -131,8 +142,7 @@ function verifiedKeys() {
   return new Set(state.verified.map(s => s.signal_key));
 }
 function addStatusMessage() {
-  if (DEMO_MODE) return;
-  if (!state.status) {
+    if (!state.status) {
     message("Підключення до MySQL не підтверджено",
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
   } else if (!state.status.has_real_samples) {
@@ -140,18 +150,110 @@ function addStatusMessage() {
       "Структура бази rakurs готова, але даних із підтвердженого пристрою ще немає. «—» означає відсутність даних, не нуль.");
   }
 }
-function metricCard(label, icon, key, values) {
-  const card = element("article", "card");
+function reading(values, key) {
+  const item = values[key];
+  return item && item.value_decimal !== null && item.value_decimal !== undefined ?
+    Number(item.value_decimal) : null;
+}
+function pretty(value, decimals = 1) {
+  return value === null || !Number.isFinite(value) ? "—" :
+    value.toLocaleString("uk-UA", {minimumFractionDigits: 0, maximumFractionDigits: decimals});
+}
+function metricCard(label, icon, key, values, tone = "neutral", subtitle = "") {
   const data = values[key];
-  const actual = data && data.value_decimal !== null;
-  const val = element("div", "value", actual ? number(data.value_decimal) : "—");
-  if (actual && data.unit) val.appendChild(element("span", "unit", data.unit));
-  add(card, element("div", "card-icon", icon), element("h3", "", label), val,
-      element("div", "detail" + (actual ? " verified" : ""),
-        actual ? (DEMO_MODE ? "АРХІВ MYSQL · " : "З MySQL · ") +
-          time(data.observed_at_utc) + " · " + (data.quality || "якість не вказана")
-          : "Підтвердженого вимірювання немає"));
+  const value = reading(values, key);
+  const card = element("article", "card kpi kpi-" + tone);
+  const head = element("div", "kpi-head");
+  add(head, element("span", "kpi-icon", icon), element("span", "kpi-state",
+    value === null ? "Немає даних" : "Є запис"));
+  card.appendChild(head);
+  card.appendChild(element("h3", "", label));
+  const numberRow = element("div", "kpi-reading");
+  add(numberRow, element("strong", "", pretty(value)),
+    element("span", "unit", value !== null ? (data.unit || "") : ""));
+  card.appendChild(numberRow);
+  if (key === "battery_soc" && value !== null) {
+    const meter = element("progress", "soc-meter");
+    meter.setAttribute("aria-label", "Рівень заряду акумулятора");
+    meter.max = 100;
+    meter.value = Math.min(100, Math.max(0, value));
+    card.appendChild(meter);
+  }
+  const description = key === "grid_power" && value !== null ?
+    value > 0 ? "Імпорт з мережі" : value < 0 ? "Експорт у мережу" : "Обмін із мережею: 0" :
+    key === "battery_soc" ? "Рівень заряду накопичувача" :
+    subtitle;
+  card.appendChild(element("p", "kpi-caption", description));
+  if (data && data.observed_at_utc) {
+    card.appendChild(element("span", "kpi-time", "Вимір: " + time(data.observed_at_utc)));
+  }
   return card;
+}
+function flowNode(label, icon, value, unit, tone, detail) {
+  const node = element("div", "energy-node energy-" + tone);
+  add(node, element("span", "energy-icon", icon),
+    element("span", "energy-name", label),
+    element("strong", "energy-value", pretty(value) + (value === null ? "" : " " + unit)),
+    element("span", "energy-caption", detail));
+  return node;
+}
+function energyFlow(values) {
+  const root = panel("Як рухається енергія", "Поточний баланс потужності · значення з MySQL");
+  root.className += " energy-panel";
+  const pv = reading(values, "pv_power");
+  const load = reading(values, "load_power");
+  const battery = reading(values, "battery_power");
+  const grid = reading(values, "grid_power");
+  if ([pv, load, battery, grid].some(v => v === null)) {
+    root.appendChild(createEmpty("Поки що немає повного балансу",
+      "Для схеми потрібні потужності сонця, навантаження, акумулятора і мережі."));
+    return root;
+  }
+  const diagram = element("div", "energy-diagram");
+  const center = element("div", "energy-hub");
+  add(center, element("span", "hub-symbol", "↗"),
+    element("strong", "", "ІНВЕРТОР"),
+    element("small", "", "Енергетичний вузол"));
+  const solar = flowNode("Сонце", "☀", pv, "кВт", "solar", "Генерує");
+  const accumulator = flowNode("Акумулятор", "▣", Math.abs(battery), "кВт",
+    "battery", battery > 0 ? "Розряджається → система" :
+               battery < 0 ? "Заряджається ← система" : "Без обміну");
+  const utility = flowNode("Мережа", "⌁", Math.abs(grid), "кВт",
+    "grid", grid > 0 ? "Імпорт → система" :
+            grid < 0 ? "Експорт ← система" : "Обміну немає");
+  const consumer = flowNode("Споживання", "⌂", load, "кВт",
+    "load", "Навантаження будинку");
+  const arrow = (label, direction, tone) => {
+    const link = element("div", "flow-link flow-" + tone);
+    add(link, element("span", "flow-label", label),
+      element("span", "flow-arrow", direction));
+    return link;
+  };
+  add(diagram, solar, arrow("Генерація", "→", "solar"), center,
+    arrow("Споживання", "→", "load"), consumer,
+    utility, arrow(grid >= 0 ? "Імпорт" : "Експорт", grid >= 0 ? "→" : "←", "grid"),
+    element("div", "energy-spacer"),
+    arrow(battery >= 0 ? "Розряд" : "Заряд", battery >= 0 ? "←" : "→", "battery"),
+    accumulator);
+  root.appendChild(diagram);
+  const note = element("p", "energy-note",
+    "Напрямки відповідають знаку потужності у збережених даних. " +
+    "Схема показує збережені показники одного пристрою, не суму двох інверторів.");
+  root.appendChild(note);
+  return root;
+}
+function detailMetric(label, key, values, icon = "◦") {
+  const record = values[key];
+  const cell = element("div", "detail-tile");
+  const header = element("div", "detail-head");
+  add(header, element("span", "", icon), element("span", "", label));
+  cell.appendChild(header);
+  const value = reading(values, key);
+  const val = element("div", "detail-value");
+  add(val, element("strong", "", pretty(value)), element("small", "",
+    value !== null && record ? (record.unit || "") : ""));
+  cell.appendChild(val);
+  return cell;
 }
 function panel(title, description) {
   const p = element("section", "panel");
@@ -164,143 +266,209 @@ async function renderOverview(cycle, primedValues = null) {
   addStatusMessage();
   const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
     "battery_power", "inverter_temperature", "pv_energy_today", "load_energy_today"];
-  const descriptors = [
-    ["Генерація PV", "☀"], ["Навантаження", "⌂"], ["Потужність мережі", "⌁"],
-    ["Заряд АКБ", "▣"], ["Потужність АКБ", "↯"], ["Температура інвертора", "♨"],
-    ["Виробіток за добу", "◉"], ["Споживання за добу", "▥"]
-  ];
-  section("Оперативні показники", DEMO_MODE ? "Збережені показники MySQL · архів" :
-                                                    "Фактичні показники MySQL");
-  const deck = element("div", "cards");
-  main.appendChild(deck);
-  let values = primedValues || {};
-  if (!primedValues) {
+  let values = primedValues;
+  if (!values) {
     try {
-      values = (await api("/latest?keys=" + encodeURIComponent(keys.join(",")))).values || {};
+      values = (await api("/latest?keys=" + keys.join(","))).values || {};
     } catch (_error) {
-      if (current(cycle)) message("Показники недоступні", "Не вдалося прочитати останні вимірювання з MySQL.", true);
+      if (current(cycle)) message("Дані тимчасово недоступні",
+        "Останні відомі значення залишаються на сервері.", true);
+      return;
     }
   }
   if (!current(cycle)) return;
-  keys.forEach((key, i) => deck.appendChild(metricCard(descriptors[i][0], descriptors[i][1], key, values)));
-  const grid = element("div", "grid-two");
-  const flow = panel("Енергетичний баланс", DEMO_MODE ?
-    "Потоки за останніми записаними значеннями" :
-    "Напрямки потоків покажемо після підтвердження регістрів Deye.");
-  if (DEMO_MODE) {
-    const balance = element("div", "kv");
-    for (const pair of [
-      ["Сонце", "pv_power"], ["Акумулятор", "battery_power"],
-      ["Мережа", "grid_power"], ["Навантаження", "load_power"]
-    ]) {
-      const item = element("div", "");
-      const reading = values[pair[1]];
-      add(item, element("strong", "", reading ? number(reading.value_decimal) : "—"),
-        element("small", "", pair[0] + " · кВт"));
-      balance.appendChild(item);
-    }
-    flow.appendChild(balance);
-  } else {
-    flow.appendChild(createEmpty("Схема очікує телеметрію",
-      "Показники генерації, АКБ, мережі та навантаження не моделюються."));
-  }
-  const quality = panel("Повнота обліку", DEMO_MODE ?
-      "Параметри збереженого знімка" :
-      "Обліковуємо лише перевірені сигнали та реальні вимірювання.");
-  const info = element("div", "kv");
-  [
-    [DEMO_MODE ? "Профілі у MySQL" : "Фізичні інвертори",
-      state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Архівні сигнали" : "Підтверджені сигнали",
-      state.status ? (DEMO_MODE ? state.status.simulated_signals : state.status.verified_signals) : "—"],
-    ["Планові сигнали", planCount()]
-  ].forEach(pair => {
-    const item = element("div", "");
-    add(item, element("strong", "", pair[1]), element("small", "", pair[0]));
-    info.appendChild(item);
-  });
-  quality.appendChild(info);
-  add(grid, flow, quality);
-  main.appendChild(grid);
 
-  // Trend charts live on the existing Rakurs homepage. They read the same
-  // authenticated MySQL archive as the dedicated History and Archive views.
-  section("Динаміка за 24 години", DEMO_MODE ?
-    "Історичні значення MySQL · архів" : "Підтверджені вимірювання MySQL");
-  const trends = element("div", "trend-grid");
-  main.appendChild(trends);
-  const series = [
-    ["pv_power", "Сонячна генерація", "кВт"],
-    ["load_power", "Навантаження", "кВт"],
-    ["battery_soc", "Заряд акумулятора", "%"]
-  ];
-  const chartBodies = series.map(([key, label, unit]) => {
-    const box = panel(label, "Останні 24 години · " + unit);
-    const body = element("div", "trend-content");
-    box.appendChild(body);
-    trends.appendChild(box);
-    return body;
-  });
-  const responses = await Promise.allSettled(series.map(([key]) =>
-    api("/history?key=" + encodeURIComponent(key) + "&hours=24")));
+  const intro = element("div", "dashboard-intro");
+  add(intro, element("div", "eyebrow", "ЕНЕРГОСИСТЕМА · ОГЛЯД"),
+    element("h2", "", "Енергія під контролем"),
+    element("p", "", "Основні показники, напрямки потоків та зміни за часом — на одному екрані."));
+  main.appendChild(intro);
+  await renderTwinSummary(cycle);
   if (!current(cycle)) return;
-  responses.forEach((response, index) => {
-    const body = chartBodies[index];
-    if (response.status !== "fulfilled") {
-      body.appendChild(createEmpty("Динаміка недоступна", "Помилка читання MySQL."));
-      return;
-    }
-    const points = response.value.points || [];
-    if (points.filter(x => x.value_decimal !== null).length < 2) {
-      body.appendChild(createEmpty("Недостатньо точок",
-        "Для графіка необхідно щонайменше два часові значення."));
-      return;
-    }
-    body.appendChild(svgChart(points, series[index][2]));
-    body.appendChild(element("p", "subtle", "Точок у MySQL: " + points.length));
-  });
+  section("Останні показники", "Один пристрій з MySQL · без сумування двох інверторів");
+  const deck = element("div", "cards cards-main");
+  const batteryPower = reading(values, "battery_power");
+  deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
+    "Потужність фотоелектричних панелей"));
+  deck.appendChild(metricCard("Навантаження", "⌂", "load_power", values, "load",
+    "Поточне споживання"));
+  deck.appendChild(metricCard("Заряд акумулятора", "▣", "battery_soc", values, "battery"));
+  const grid = metricCard("Мережа", "⌁", "grid_power", values, "grid");
+  deck.appendChild(grid);
+  main.appendChild(deck);
+
+  section("Енергетична схема", "Зрозумілий напрямок потужності");
+  main.appendChild(energyFlow(values));
+
+  section("За сьогодні", "Додаткові показники з MySQL");
+  const extras = element("div", "details-grid");
+  extras.appendChild(detailMetric("Вироблено сонцем", "pv_energy_today", values, "☀"));
+  extras.appendChild(detailMetric("Спожито", "load_energy_today", values, "⌂"));
+  extras.appendChild(detailMetric("Потужність АКБ", "battery_power", values,
+    batteryPower !== null && batteryPower < 0 ? "↙" : "↗"));
+  extras.appendChild(detailMetric("Температура інвертора", "inverter_temperature", values, "♨"));
+  main.appendChild(extras);
+
+  await renderTrendDeck(cycle, 24, true);
+  if (!current(cycle)) return;
+  const footer = element("div", "overview-footer");
+  const statusText = state.status ?
+    (state.status.displayed_signals || state.status.simulated_signals ||
+      state.status.verified_signals || 0) + " показників у базі" :
+    "Джерело даних: MySQL";
+  add(footer, element("span", "", statusText),
+    element("span", "", DEMO_MODE ?
+      "Записи MySQL · фізичне походження не підтверджене" :
+      "Дані реальних приладів"));
+  main.appendChild(footer);
 }
+async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
+  const root = element("section", compact ? "trend-section" : "trend-section full-trends");
+  const heading = element("div", "trend-section-head");
+  const title = element("div", "");
+  add(title, element("h2", "", compact ? "Динаміка показників" : "Графіки енергосистеми"),
+    element("p", "", "Історичні записи MySQL · усі години за Києвом"));
+  heading.appendChild(title);
+  const ranges = element("div", "range-control");
+  ranges.setAttribute("role", "group");
+  ranges.setAttribute("aria-label", "Період графіків");
+  const frames = [[24, "24 год"], [72, "3 доби"], [168, "7 діб"]];
+  let hours = initialHours;
+  const buttons = frames.map(([value, label]) => {
+    const btn = element("button", value === hours ? "active" : "", label);
+    btn.type = "button";
+    btn.setAttribute("aria-pressed", String(value === hours));
+    btn.addEventListener("click", () => {
+      hours = value;
+      buttons.forEach((other, i) => {
+        other.className = frames[i][0] === hours ? "active" : "";
+        other.setAttribute("aria-pressed", String(frames[i][0] === hours));
+      });
+      refresh();
+    });
+    ranges.appendChild(btn);
+    return btn;
+  });
+  heading.appendChild(ranges);
+  root.appendChild(heading);
+  const grid = element("div", "trend-grid");
+  root.appendChild(grid);
+  const series = [
+    ["pv_power", "Сонячна генерація", "кВт", "solar"],
+    ["load_power", "Навантаження", "кВт", "load"],
+    ["battery_soc", "Заряд акумулятора", "%", "battery"],
+    ["grid_power", "Обмін із мережею", "кВт", "grid"]
+  ];
+  const bodies = series.map(([key, label, unit, tone]) => {
+    const chartCard = element("article", "trend-card trend-" + tone);
+    const cap = element("div", "trend-card-caption");
+    add(cap, element("h3", "", label), element("span", "", unit));
+    chartCard.appendChild(cap);
+    const container = element("div", "trend-content");
+    chartCard.appendChild(container);
+    grid.appendChild(chartCard);
+    return container;
+  });
+  main.appendChild(root);
+  let requestIndex = 0;
+  async function refresh() {
+    const index = ++requestIndex;
+    bodies.forEach(body => body.replaceChildren(element("p", "subtle", "Завантаження графіка…")));
+    const results = await Promise.allSettled(series.map(([key]) =>
+      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours)));
+    if (!current(cycle) || index !== requestIndex) return;
+    results.forEach((result, i) => {
+      const body = bodies[i];
+      clear(body);
+      if (result.status !== "fulfilled") {
+        body.appendChild(createEmpty("Дані недоступні", "Не вдалося прочитати історію MySQL."));
+        return;
+      }
+      const points = result.value.points || [];
+      const numeric = points.filter(p => p.value_decimal !== null);
+      if (numeric.length < 2) {
+        body.appendChild(createEmpty("Недостатньо даних", "Потрібні щонайменше дві точки."));
+        return;
+      }
+      const currentValue = numeric[numeric.length - 1].value_decimal;
+      body.appendChild(element("strong", "trend-latest", pretty(Number(currentValue)) +
+        " " + series[i][2]));
+      body.appendChild(svgChart(points, series[i][2]));
+      body.appendChild(element("p", "subtle", points.length +
+        " точок · " + time(points[0].observed_at_utc) +
+        " — " + time(points[points.length - 1].observed_at_utc)));
+    });
+  }
+  await refresh();
+}
+async function renderTrends(cycle) {
+  addStatusMessage();
+  await renderTrendDeck(cycle, 72, false);
+}
+
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title, DEMO_MODE ? "Архів · " + items.length + " полів каталогу" :
-                                              items.length + " запланованих полів · без вигаданих даних");
-  const tags = element("div", "tags");
-  add(tags, element("span", "tag", "Джерело: MySQL rakurs"));
-  main.appendChild(tags);
-  if (!items.length) { main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр планових сигналів.")); return; }
-  const verified = verifiedKeys();
-  const keys = items.filter(i => verified.has(i.key)).map(i => i.key);
-  let values = {};
-  for (let offset = 0; offset < keys.length; offset += 24) {
-    const chunk = keys.slice(offset, offset + 24);
+  section(title, items.length + " параметрів · останні збережені показники");
+  if (!items.length) {
+    main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр."));
+    return;
+  }
+  const known = verifiedKeys();
+  const keys = items.filter(i => known.has(i.key)).map(i => i.key);
+  const values = {};
+  for (let i = 0; i < keys.length; i += 24) {
     try {
-      const batch = (await api("/latest?keys=" + encodeURIComponent(chunk.join(",")))).values;
-      Object.assign(values, batch);
+      const chunk = keys.slice(i, i + 24);
+      Object.assign(values, (await api("/latest?keys=" + chunk.join(","))).values || {});
     } catch (_error) {
-      if (current(cycle)) message("Дані тимчасово недоступні",
-        "Не вдалося отримати значення MySQL.", true);
+      if (current(cycle)) message("Частина показників недоступна",
+        "Останні значення з MySQL не вдалося отримати повністю.", true);
       break;
     }
   }
   if (!current(cycle)) return;
+  const controls = element("div", "catalog-controls");
+  const search = element("input", "search-field");
+  search.type = "search";
+  search.setAttribute("aria-label", "Пошук показника");
+  search.placeholder = "Знайти показник за назвою або ключем…";
+  const count = element("span", "catalog-count");
+  controls.appendChild(search);
+  controls.appendChild(count);
+  main.appendChild(controls);
   const list = element("div", "metric-list");
+  const entries = [];
   for (const metric of items) {
     const record = values[metric.key];
     const hasValue = record && record.value_decimal !== null;
-    const row = element("div", "metric");
-    const info = element("div", "");
+    const row = element("article", "metric");
+    const info = element("div", "metric-info");
     add(info, element("strong", "", metric.label),
-      element("small", "", verified.has(metric.key)
-        ? (DEMO_MODE ? "АРХІВНИЙ сигнал" : "Підтверджений сигнал") :
-          "Плановий · ще не перевірено"));
-    const value = element("div", "number" + (hasValue ? "" : " unknown"),
-      hasValue ? number(record.value_decimal) + " " + (record.unit || "") : "—");
-    value.title = hasValue ? time(record.observed_at_utc) : "Немає підтвердженого значення";
-    add(row, info, value);
+      element("small", "", metric.key));
+    const val = element("div", "metric-reading");
+    add(val, element("span", "number" + (hasValue ? "" : " unknown"),
+        hasValue ? pretty(Number(record.value_decimal), 3) : "—"),
+      element("small", "", hasValue ? record.unit || "" : "Немає значення"));
+    row.title = hasValue ? "Запис MySQL · " + time(record.observed_at_utc) :
+      "Параметр поки не має збереженого вимірювання";
+    add(row, info, val);
+    entries.push({row, text: (metric.label + " " + metric.key).toLocaleLowerCase("uk")});
     list.appendChild(row);
   }
   main.appendChild(list);
+  function filter() {
+    const q = search.value.trim().toLocaleLowerCase("uk");
+    let visible = 0;
+    for (const entry of entries) {
+      const show = entry.text.includes(q);
+      entry.row.hidden = !show;
+      if (show) visible++;
+    }
+    count.textContent = "Показано " + visible + " із " + items.length;
+  }
+  search.addEventListener("input", filter);
+  filter();
 }
 function svgChart(points, unit) {
   const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
@@ -334,72 +502,452 @@ function svgChart(points, unit) {
   }).join(" ");
   polyline.setAttribute("points", pointsString);
   svg.appendChild(polyline);
+  const first = points[real[0].index];
+  const last = points[real[real.length - 1].index];
+  if (first && last) {
+    const labels = [
+      [52, first.observed_at_utc, "start"],
+      [868, last.observed_at_utc, "end"]
+    ];
+    for (const [x, observed, anchor] of labels) {
+      const node = document.createElementNS(svg.namespaceURI, "text");
+      node.setAttribute("x", String(x));
+      node.setAttribute("y", "264");
+      node.setAttribute("text-anchor", anchor);
+      const date = new Date(observed);
+      node.textContent = Number.isNaN(date.getTime()) ? "" :
+        date.toLocaleString("uk-UA", {
+          timeZone: "Europe/Kyiv", day: "2-digit", month: "2-digit",
+          hour: "2-digit", minute: "2-digit"
+        });
+      svg.appendChild(node);
+    }
+  }
   return svg;
 }
 async function renderHistory(cycle, archived) {
   addStatusMessage();
   section(archived ? "Архів вимірювань" : "Історія показників",
-          DEMO_MODE ? "Збережені часові ряди · час Київ" :
-                      "Час даних — UTC; відображення — Київ");
+    "Графік та журнал окремого сигналу · час Київ");
   const available = state.verified;
   if (!available.length) {
-    main.appendChild(createEmpty("Немає підтверджених сигналів",
-      "Щоб будувати історію, потрібно підключити Deye та підтвердити його регістри. Порожня БД не підміняється вигаданими значеннями."));
+    main.appendChild(createEmpty("Немає збережених сигналів",
+      "База не повернула перелік доступних параметрів."));
     return;
   }
-  const controls = element("div", "controls");
+  const panelRoot = element("section", "history-workspace");
+  const controls = element("div", "history-controls");
+  const signalField = element("label", "field-label");
+  signalField.appendChild(element("span", "", "Показник"));
   const picker = element("select", "");
-  for (const s of available) {
-    const option = element("option", "", s.label_uk + " (" + s.signal_key + ")");
-    option.value = s.signal_key;
-    if (s.signal_key === "pv_power") option.selected = true;
+  picker.setAttribute("aria-label", "Показник для історії");
+  for (const sig of available) {
+    const option = element("option", "", sig.label_uk + " · " + sig.signal_key);
+    option.value = sig.signal_key;
+    if (sig.signal_key === "pv_power") option.selected = true;
     picker.appendChild(option);
   }
+  signalField.appendChild(picker);
+  const timeField = element("label", "field-label");
+  timeField.appendChild(element("span", "", "Період"));
   const range = element("select", "");
-  for (const hours of [1, 6, 12, 24, 72, 168]) {
-    const opt = element("option", "", hours + " год");
-    opt.value = String(hours);
-    if (hours === 24) opt.selected = true;
-    range.appendChild(opt);
+  range.setAttribute("aria-label", "Період історії");
+  for (const [hours, label] of [[1, "Остання година"], [6, "6 годин"],
+    [12, "12 годин"], [24, "24 години"], [72, "3 доби"], [168, "7 діб"]]) {
+    const option = element("option", "", label);
+    option.value = String(hours);
+    if (hours === 72) option.selected = true;
+    range.appendChild(option);
   }
-  add(controls, picker, range);
-  main.appendChild(controls);
-  const body = panel(archived ? "Історичні записи MySQL" : "Динаміка за вибраний період");
-  main.appendChild(body);
+  timeField.appendChild(range);
+  controls.appendChild(signalField);
+  controls.appendChild(timeField);
+  panelRoot.appendChild(controls);
+  const plot = element("div", "history-chart");
+  panelRoot.appendChild(plot);
+  const tableArea = element("div", "history-records");
+  panelRoot.appendChild(tableArea);
+  main.appendChild(panelRoot);
+  let requestId = 0;
   async function refresh() {
-    clear(body);
-    add(body, element("h2", "", archived ? "Історичні записи MySQL" :
-      DEMO_MODE ? "Динаміка збережених архівних значень" : "Графік фактичних вимірювань"));
+    const id = ++requestId;
+    plot.replaceChildren(element("p", "subtle", "Завантаження історії…"));
+    clear(tableArea);
     try {
-      const result = await api("/history?key=" + encodeURIComponent(picker.value) + "&hours=" + range.value);
-      if (!current(cycle)) return;
-      if (!result.points.length) {
-        body.appendChild(createEmpty("Немає записів", "За вибраний період значень у MySQL немає."));
+      const result = await api("/history?key=" +
+        encodeURIComponent(picker.value) + "&hours=" + range.value);
+      if (!current(cycle) || id !== requestId) return;
+      clear(plot);
+      const points = result.points || [];
+      if (!points.length) {
+        plot.appendChild(createEmpty("За цей період записів немає",
+          "Вибери інший сигнал або довший проміжок часу."));
         return;
       }
-      body.appendChild(svgChart(result.points, (result.signal && result.signal.unit) || ""));
-      body.appendChild(element("p", "subtle", "Отримано " + result.points.length +
-        (result.truncated ? " (вибірка обмежена останніми 1000 точками)" : "") + " записів з MySQL."));
-      const table = element("div", "table-wrap");
-      const head = element("thead", ""), hr = element("tr", "");
-      ["Час (Київ)", "Значення", "Якість"].forEach(t => hr.appendChild(element("th", "", t)));
-      head.appendChild(hr);
-      const tb = element("tbody", "");
-      for (const entry of result.points.slice(-25).reverse()) {
+      const unit = result.signal && result.signal.unit || "";
+      const stats = element("div", "history-summary");
+      const numericPoints = points.filter(point => point.value_decimal !== null);
+      const latestNumeric = numericPoints.length ? numericPoints[numericPoints.length - 1] : null;
+      add(stats, element("strong", "",
+        latestNumeric ? pretty(Number(latestNumeric.value_decimal), 3) + " " + unit : "—"),
+        element("span", "", points.length + " записів · " +
+          time(points[0].observed_at_utc) + " — " +
+          time(points[points.length - 1].observed_at_utc)));
+      plot.appendChild(stats);
+      plot.appendChild(svgChart(points, unit));
+
+      const head = element("div", "history-table-head");
+      head.appendChild(element("h3", "", "Останні вимірювання"));
+      head.appendChild(element("span", "subtle", "Час Київ · " +
+        (DEMO_MODE ? "архів MySQL" : "MySQL")));
+      tableArea.appendChild(head);
+      const wrapper = element("div", "table-wrap");
+      const table = element("table", "data-table");
+      const thead = element("thead", "");
+      const hr = element("tr", "");
+      ["Дата й час", "Значення", "Джерело"].forEach(t =>
+        hr.appendChild(element("th", "", t)));
+      thead.appendChild(hr);
+      const tbody = element("tbody", "");
+      for (const entry of points.slice(-30).reverse()) {
         const tr = element("tr", "");
-        [time(entry.observed_at_utc), number(entry.value_decimal), entry.quality].forEach(v => tr.appendChild(element("td", "", v)));
-        tb.appendChild(tr);
+        [time(entry.observed_at_utc),
+         entry.value_decimal === null ? "—" : pretty(Number(entry.value_decimal), 3) + " " + unit,
+         "MySQL"
+        ].forEach(value => tr.appendChild(element("td", "", value)));
+        tbody.appendChild(tr);
       }
-      const tbl = element("table", "data-table");
-      add(tbl, head, tb); add(table, tbl); body.appendChild(table);
+      add(table, thead, tbody);
+      wrapper.appendChild(table);
+      tableArea.appendChild(wrapper);
     } catch (_error) {
-      if (current(cycle)) body.appendChild(createEmpty("Історія недоступна", "Перевірте підключення до MySQL."));
+      if (current(cycle) && id === requestId) {
+        clear(plot);
+        plot.appendChild(createEmpty("Не вдалося отримати історію",
+          "Перевірте з'єднання з MySQL і спробуйте знову."));
+      }
     }
   }
   picker.addEventListener("change", refresh);
   range.addEventListener("change", refresh);
   await refresh();
 }
+function displayDeviceKey(value) {
+  const key = String(value || "");
+  if (key === "simulated_deye_sg05lp3") return "Deye · основний профіль";
+  if (key === "sim_deye20k_parallel_1") return "Deye №1";
+  if (key === "sim_deye20k_parallel_2") return "Deye №2";
+  return key || "—";
+}
+function deviceLabel(device, index = 0) {
+  const slot = Number(device.slot_no || index + 1);
+  return "Deye №" + (Number.isInteger(slot) && slot > 0 ? slot : index + 1);
+}
+function deviceReading(values, key) {
+  const item = values?.[key];
+  return item && item.value_decimal !== null && item.value_decimal !== undefined ?
+    number(item.value_decimal) + " " + (item.unit || "") : "—";
+}
+function storedDeviceNote(reading) {
+  return reading?.observed_at_utc ?
+    "Останній запис: " + time(reading.observed_at_utc) : "Записів немає";
+}
+async function fetchParallelDevices(cycle) {
+  const profile = await api("/parallel");
+  if (!current(cycle)) return null;
+  const devices = Array.isArray(profile.devices) ? profile.devices : [];
+  const responses = await Promise.allSettled(devices.map(d =>
+    api("/parallel/latest?device=" + encodeURIComponent(d.device_key))));
+  if (!current(cycle)) return null;
+  return devices.map((d, i) => ({
+    ...d, slot_no: Number(d.slot_no || i + 1),
+    values: responses[i].status === "fulfilled" ? (responses[i].value.values || {}) : {},
+  }));
+}
+async function renderTwinSummary(cycle) {
+  let devices;
+  try { devices = await fetchParallelDevices(cycle); } catch (_error) { return; }
+  if (!current(cycle) || !devices?.length) return;
+  section("Два інвертори Deye", "Показники кожного інвертора з MySQL");
+  const grid = element("div", "parallel-home-grid");
+  main.appendChild(grid);
+  for (const [i, device] of devices.entries()) {
+    const card = element("article", "parallel-device parallel-home-device");
+    const head = element("div", "parallel-device-head");
+    add(head, element("strong", "parallel-device-name", deviceLabel(device, i)),
+      element("span", "parallel-state", "MYSQL"));
+    card.appendChild(head);
+    card.appendChild(element("p", "parallel-device-model",
+      device.model || "SUN-20K-SG05LP3-EU-SM2"));
+    const metrics = element("div", "parallel-metric-list");
+    for (const [key, label] of [
+      ["pv_power", "PV"], ["battery_power", "АКБ"], ["battery_soc", "SOC"]
+    ]) {
+      const tile = element("div", "parallel-reading");
+      add(tile, element("small", "", label),
+        element("strong", "", deviceReading(device.values, key)),
+        element("span", "", storedDeviceNote(device.values[key])));
+      metrics.appendChild(tile);
+    }
+    card.appendChild(metrics);
+    const link = element("a", "parallel-open-link", "Усі показники інверторів");
+    link.href = "#/parallel";
+    card.appendChild(link);
+    grid.appendChild(card);
+  }
+}
+async function renderParallel(cycle) {
+  addStatusMessage();
+  section("Паралельна система Deye",
+    "SUN-20K-SG05LP3-EU-SM2 · два інвертори · спільна АКБ");
+  let devices;
+  try { devices = await fetchParallelDevices(cycle); }
+  catch (_error) {
+    main.appendChild(createEmpty("Не вдалося прочитати інвертори",
+      "Перевірте MySQL і повторіть запит."));
+    return;
+  }
+  if (!current(cycle)) return;
+  if (!devices?.length) {
+    main.appendChild(createEmpty("Інверторів у базі поки немає",
+      "Після очищення бази дані з'являться після першого завантаження."));
+    return;
+  }
+  const grid = element("div", "parallel-devices");
+  main.appendChild(grid);
+  for (const [i, device] of devices.entries()) {
+    const query = "?device=" + encodeURIComponent(device.device_key);
+    const card = element("article", "parallel-device");
+    const heading = element("div", "parallel-device-head");
+    add(heading, element("strong", "parallel-device-name", deviceLabel(device, i)),
+      element("span", "parallel-state", "MYSQL"));
+    card.appendChild(heading);
+    card.appendChild(element("p", "parallel-device-model",
+      device.model || "SUN-20K-SG05LP3-EU-SM2"));
+    const metrics = element("div", "parallel-metric-list");
+    for (const [key, label] of [
+      ["pv_power", "Генерація PV"], ["battery_power", "Потужність АКБ"],
+      ["battery_soc", "SOC"], ["load_power", "Навантаження"],
+      ["grid_power", "Мережа"], ["inverter_temperature", "Температура"]
+    ]) {
+      const tile = element("div", "parallel-reading");
+      add(tile, element("small", "", label),
+        element("strong", "", deviceReading(device.values, key)),
+        element("span", "", storedDeviceNote(device.values[key])));
+      metrics.appendChild(tile);
+    }
+    card.appendChild(metrics);
+    grid.appendChild(card);
+    const result = await Promise.allSettled([
+      api("/parallel/history" + query + "&key=pv_power&hours=24"),
+      api("/parallel/modbus-fields" + query),
+      api("/parallel/raw" + query + "&limit=200"),
+      api("/parallel/events" + query),
+    ]);
+    if (!current(cycle)) return;
+    const [history, fields, raw, events] = result;
+    const fieldList = fields.status === "fulfilled" ?
+      (fields.value.fields || []) : [];
+    const rawRows = raw.status === "fulfilled" ?
+      (raw.value.raw_registers || []) : [];
+    const info = element("div", "parallel-demo-counters");
+    for (const [label, count] of [
+      ["Поля Modbus", fieldList.length],
+      ["Сирі регістри", raw.status === "fulfilled" ? raw.value.total : 0],
+      ["Події", events.status === "fulfilled" ? (events.value.events || []).length : 0]
+    ]) {
+      const item = element("div", "parallel-demo-counter");
+      add(item, element("strong", "", String(count || 0)),
+        element("small", "", label));
+      info.appendChild(item);
+    }
+    card.appendChild(info);
+    const chart = element("section", "parallel-device-chart");
+    chart.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
+    const points = history.status === "fulfilled" ? (history.value.points || []) : [];
+    if (points.filter(p => p.value_decimal !== null).length < 2) {
+      chart.appendChild(createEmpty("Недостатньо даних для графіка",
+        "Для побудови графіка потрібні два збережені вимірювання."));
+    } else {
+      chart.appendChild(svgChart(points, "кВт"));
+    }
+    card.appendChild(chart);
+
+    const rawPanel = element("section", "parallel-raw-viewer");
+    rawPanel.appendChild(element("h3", "", "Регістри Modbus"));
+    const rawArea = element("div", "parallel-raw-table");
+    rawPanel.appendChild(rawArea);
+    const rawMore = element("button", "more-button", "Показати регістри");
+    rawMore.type = "button";
+    rawPanel.appendChild(rawMore);
+    card.appendChild(rawPanel);
+    let rawOffset = 0;
+    let rowsCache = rawRows;
+    const totalRaw = raw.status === "fulfilled" ? Number(raw.value.total || 0) : 0;
+    const pollUid = raw.status === "fulfilled" ? (raw.value.poll?.poll_uid || "") : "";
+    async function loadRaw() {
+      rawMore.disabled = true;
+      try {
+        const data = rawOffset === 0 && rowsCache ? rowsCache :
+          (await api("/parallel/raw" + query +
+            "&limit=200&offset=" + rawOffset +
+            (pollUid ? "&poll_uid=" + encodeURIComponent(pollUid) : ""))).raw_registers || [];
+        rowsCache = null;
+        if (!current(cycle)) return;
+        for (const entry of data) {
+          const row = element("div", "parallel-raw-row");
+          add(row, element("code", "", String(entry.register_address)),
+            element("span", "", "FC" + entry.function_code),
+            element("strong", "", String(entry.raw_uint16)));
+          rawArea.appendChild(row);
+        }
+        rawOffset += data.length;
+        rawMore.textContent = "Показано " + rawOffset + " із " + totalRaw +
+          (rawOffset < totalRaw ? " · ще 200" : "");
+        rawMore.hidden = rawOffset >= totalRaw || data.length === 0;
+      } catch (_error) {
+        rawArea.appendChild(createEmpty("Регістри недоступні",
+          "Не вдалося прочитати записи MySQL."));
+      } finally {
+        if (current(cycle)) rawMore.disabled = false;
+      }
+    }
+    rawMore.addEventListener("click", loadRaw);
+    if (!totalRaw) {
+      rawMore.hidden = true;
+      rawArea.appendChild(createEmpty("Регістри відсутні",
+        "Поки немає збережених регістрів для цього інвертора."));
+    }
+
+    const fieldPanel = element("section", "parallel-raw-viewer parallel-field-viewer");
+    fieldPanel.appendChild(element("h3", "",
+      "Параметри Modbus — " + fieldList.length));
+    const fieldArea = element("div", "parallel-raw-table");
+    fieldPanel.appendChild(fieldArea);
+    const fieldMore = element("button", "more-button", "Показати параметри");
+    fieldMore.type = "button";
+    fieldPanel.appendChild(fieldMore);
+    card.appendChild(fieldPanel);
+    let fieldOffset = 0;
+    function loadFields() {
+      for (const entry of fieldList.slice(fieldOffset, fieldOffset + 80)) {
+        const row = element("div", "parallel-field-row");
+        const shown = entry.value_decimal !== null &&
+          entry.value_decimal !== undefined ? number(entry.value_decimal) :
+          (entry.value_text || "—");
+        add(row, element("code", "", entry.field_key),
+          element("span", "", entry.field_name),
+          element("strong", "", shown + " " + (entry.unit || "")));
+        fieldArea.appendChild(row);
+      }
+      fieldOffset += Math.min(80, fieldList.length - fieldOffset);
+      fieldMore.textContent = "Показано " + fieldOffset + " із " + fieldList.length;
+      fieldMore.hidden = fieldOffset >= fieldList.length;
+    }
+    fieldMore.addEventListener("click", loadFields);
+    if (!fieldList.length) {
+      fieldMore.hidden = true;
+      fieldArea.appendChild(createEmpty("Поля Modbus відсутні",
+        "Для цього інвертора немає записів каталогу."));
+    }
+  }
+}
+
+async function renderEvents(cycle) {
+  section("Журнал подій", "Події обладнання та підтверджені операції імпорту MySQL");
+  const summary = element("div", "event-summary");
+  const deviceCard = element("div", "event-count-card");
+  const batchCard = element("div", "event-count-card");
+  add(deviceCard, element("strong", "", "…"),
+    element("span", "", "Події обладнання"));
+  add(batchCard, element("strong", "", "…"),
+    element("span", "", "Операції завантаження"));
+  add(summary, deviceCard, batchCard);
+  main.appendChild(summary);
+
+  const eventPanel = panel("Події обладнання",
+    "Фактичні записи журналу пристрою. Звичайні вимірювання не вважаються аваріями.");
+  const deviceBody = element("div", "events-list");
+  eventPanel.appendChild(deviceBody);
+  main.appendChild(eventPanel);
+
+  const batchPanel = panel("Історія завантажень",
+    "Системні записи з rakurs_ingest_batches. Це не аварії Deye.");
+  const batchBody = element("div", "events-list");
+  batchPanel.appendChild(batchBody);
+  main.appendChild(batchPanel);
+
+  const responses = await Promise.allSettled([api("/events"), api("/batches")]);
+  if (!current(cycle)) return;
+  const [events, batches] = responses;
+  if (events.status !== "fulfilled") {
+    deviceCard.childNodes[0].textContent = "—";
+    deviceBody.appendChild(createEmpty("Журнал недоступний",
+      "Не вдалося прочитати rakurs_device_events."));
+  } else {
+    const items = events.value.events || [];
+    deviceCard.childNodes[0].textContent = String(items.length);
+    if (!items.length) {
+      deviceBody.appendChild(createEmpty("Подій обладнання поки немає",
+        "Для цього пристрою у MySQL немає зафіксованих повідомлень чи аварій."));
+    }
+    for (const record of items) {
+      const row = element("article", "event-row");
+      const level = String(record.severity || "info").toLowerCase();
+      row.className += " event-" + (/^(error|critical|alarm)$/.test(level) ?
+        "critical" : /^(warning|warn)$/.test(level) ? "warning" : "info");
+      const marker = element("span", "event-mark", "●");
+      const info = element("div", "event-description");
+      add(info, element("strong", "", record.message || record.event_code || "Подія"),
+        element("small", "", (record.event_code || "Без коду") +
+          " · " + displayDeviceKey(record.device_key)));
+      const stamp = element("div", "event-stamp");
+      add(stamp, element("span", "event-severity", level),
+        element("time", "", time(record.observed_at_utc)));
+      add(row, marker, info, stamp);
+      deviceBody.appendChild(row);
+    }
+  }
+  if (batches.status !== "fulfilled") {
+    batchCard.childNodes[0].textContent = "—";
+    batchBody.appendChild(createEmpty("Журнал завантажень недоступний",
+      "Не вдалося прочитати rakurs_ingest_batches."));
+  } else {
+    const items = batches.value.batches || [];
+    batchCard.childNodes[0].textContent = String(items.length);
+    if (!items.length) {
+      batchBody.appendChild(createEmpty("Завантаження не зафіксовані",
+        "У журналі імпорту поки немає записів."));
+    }
+    for (const batch of items) {
+      const row = element("article", "event-row event-batch");
+      const code = String(batch.error_code || "");
+      const imported = batch.status === "simulated";
+      const title = code === "DEYE_HISTORY_72H_V1" ?
+        "Додано історію вимірювань за 72 години" :
+        imported ? "Завантажено записи MySQL" :
+        "Операція завантаження: " + (batch.status || "невідомо");
+      const accepted = batch.accepted_count ?? 0;
+      const received = batch.received_count ?? 0;
+      const rejected = batch.rejected_count ?? 0;
+      const marker = element("span", "event-mark", "↓");
+      const info = element("div", "event-description");
+      add(info, element("strong", "", title),
+        element("small", "", "Прийнято: " + accepted +
+          " · Отримано: " + received + " · Відхилено: " + rejected));
+      const stamp = element("div", "event-stamp");
+      add(stamp, element("span", "event-severity", "MySQL"),
+        element("time", "", time(batch.finished_at_utc || batch.started_at_utc)));
+      add(row, marker, info, stamp);
+      batchBody.appendChild(row);
+    }
+  }
+  const note = element("p", "events-note",
+    "Відсутність записів у журналі подій не доводить, що аварій не було: " +
+    "потрібне підключене джерело подій та його опитування.");
+  main.appendChild(note);
+}
+
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
   section(sectionName, DEMO_MODE ? "Архів MySQL" :
@@ -421,8 +969,8 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
       fields.forEach(field => {
         const raw = item[field];
         const displayed = field.endsWith("_utc") ? time(raw) :
-          field === "kind" && raw === "simulation" ? "Архівний профіль" :
-          field === "kind" && raw === "inverter" ? "Інвертор" :
+          field === "kind" && (raw === "simulation" || raw === "inverter") ? "Інвертор" :
+          field === "device_key" ? displayDeviceKey(raw) :
           (raw ?? "—");
         row.appendChild(element("td", "", displayed));
       });
@@ -433,60 +981,115 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
 }
 async function renderModbus(cycle) {
   addStatusMessage();
-  section("Повний перелік Modbus", DEMO_MODE ?
-    "Профіль P3 · збережений знімок" : "Профіль P3 · довідник регістрів");
-  const pane = panel("Параметри Deye", "Найменування, адреси, значення та одиниці");
-  main.appendChild(pane);
+  section("Довідник Modbus", "Технічні параметри · лише читання");
+  const root = panel("Регістр і значення",
+    "Пошук за назвою, групою або адресою регістра");
+  root.className += " modbus-workspace";
+  main.appendChild(root);
   try {
-    const payload = await api("/modbus-fields");
+    const response = await api("/modbus-fields");
     if (!current(cycle)) return;
-    const summary = element("p", "subtle",
-      "Параметрів: " + payload.count + " · Адрес у профілі: " + payload.register_count);
-    pane.appendChild(summary);
-    const wrap = element("div", "table-wrap");
-    const table = element("table", "data-table");
-    const head = element("thead", ""), tr = element("tr", "");
-    ["Група", "Параметр", "Адреса Modbus", "Значення", "Одиниця"].forEach(t =>
-      tr.appendChild(element("th", "", t)));
-    head.appendChild(tr);
-    const body = element("tbody", "");
-    for (const field of payload.fields) {
-      const row = element("tr", "");
-      let regs = field.registers_json || "[]";
-      try {
-        regs = JSON.parse(regs);
-        regs = regs.map(r => "0x" + Number(r).toString(16).toUpperCase().padStart(4, "0"))
-          .join(", ");
-      } catch (_error) {
-        regs = String(regs);
-      }
-      const value = field.value_text !== null && field.value_text !== undefined ?
-        field.value_text : number(field.value_decimal);
-      [field.group_name, field.field_name, regs || "Розрахунковий",
-       value, field.unit || ""].forEach(v => row.appendChild(element("td", "", v)));
-      body.appendChild(row);
+    const fields = response.fields || [];
+    root.appendChild(element("div", "modbus-stats",
+      fields.length + " параметрів · " +
+      (response.register_count || 0) + " адрес регістрів"));
+    const toolbar = element("div", "modbus-toolbar");
+    const search = element("input", "search-field");
+    search.type = "search";
+    search.placeholder = "Пошук за назвою, ключем, регістром…";
+    search.setAttribute("aria-label", "Пошук Modbus");
+    const group = element("select", "");
+    group.setAttribute("aria-label", "Фільтр групи Modbus");
+    const all = element("option", "", "Усі групи");
+    all.value = "";
+    group.appendChild(all);
+    const groups = [...new Set(fields.map(f => f.group_name || "Інше"))].sort();
+    for (const name of groups) {
+      const option = element("option", "", name);
+      option.value = name;
+      group.appendChild(option);
     }
-    add(table, head, body); wrap.appendChild(table); pane.appendChild(wrap);
+    toolbar.appendChild(search);
+    toolbar.appendChild(group);
+    root.appendChild(toolbar);
+    const indicator = element("p", "subtle");
+    root.appendChild(indicator);
+    const wrapper = element("div", "table-wrap");
+    const table = element("table", "data-table modbus-table");
+    const thead = element("thead", ""), tr = element("tr", "");
+    ["Група", "Параметр", "Регістр", "Значення", "Од."].forEach(t =>
+      tr.appendChild(element("th", "", t)));
+    thead.appendChild(tr);
+    const tbody = element("tbody", "");
+    add(table, thead, tbody);
+    wrapper.appendChild(table);
+    root.appendChild(wrapper);
+    const more = element("button", "more-button", "Показати ще 100");
+    more.type = "button";
+    root.appendChild(more);
+    const prepared = fields.map(f => {
+      let addresses = f.registers_json || "[]";
+      try {
+        addresses = JSON.parse(addresses).map(n =>
+          "0x" + Number(n).toString(16).toUpperCase().padStart(4, "0")).join(", ");
+      } catch (_error) {
+        addresses = String(addresses);
+      }
+      return {
+        field: f, addresses,
+        search: ((f.field_name || "") + " " + (f.field_key || "") + " " +
+          (f.group_name || "") + " " + addresses).toLocaleLowerCase("uk")
+      };
+    });
+    let matches = prepared, displayed = 0;
+    function drawRows(start, end) {
+      for (const item of matches.slice(start, end)) {
+        const f = item.field;
+        const row = element("tr", "");
+        const value = f.value_text !== null && f.value_text !== undefined ?
+          String(f.value_text) : f.value_decimal === null ?
+          "—" : pretty(Number(f.value_decimal), 3);
+        [f.group_name || "—", f.field_name || f.field_key,
+         item.addresses || "Розрахунковий", value, f.unit || "—"].forEach(x =>
+          row.appendChild(element("td", "", x)));
+        tbody.appendChild(row);
+      }
+      displayed = end;
+      indicator.textContent = "Показано " + displayed + " із " + matches.length;
+      more.hidden = displayed >= matches.length;
+    }
+    function filter() {
+      const q = search.value.trim().toLocaleLowerCase("uk");
+      const selected = group.value;
+      matches = prepared.filter(item => (!selected ||
+        (item.field.group_name || "Інше") === selected) &&
+        item.search.includes(q));
+      displayed = 0;
+      clear(tbody);
+      drawRows(0, Math.min(100, matches.length));
+    }
+    search.addEventListener("input", filter);
+    group.addEventListener("change", filter);
+    more.addEventListener("click", () =>
+      drawRows(displayed, Math.min(displayed + 100, matches.length)));
+    filter();
   } catch (_error) {
-    pane.appendChild(createEmpty("Не вдалося завантажити реєстр", "Перевірте MySQL."));
+    root.appendChild(createEmpty("Modbus недоступний",
+      "Не вдалося отримати довідник регістрів MySQL."));
   }
 }
-
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", DEMO_MODE ? "Архівні дані" :
-                                                      "Статус незалежного Rakurs");
+  section("Конфігурація системи", "Показники та пристрої MySQL");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
-    ["Джерело", DEMO_MODE ? "MySQL · походження не підтверджене" : "MySQL"],
-    ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Параметри архіву" : "Підтверджені сигнали",
-      state.status ? (DEMO_MODE ? state.status.simulated_signals :
-                                  state.status.verified_signals) : "—"],
-    ["Колектор Deye", "Не запущений"]
+    ["Джерело", "MySQL"],
+    ["Пристрої у базі", state.status ? state.status.registered_devices : "—"],
+    ["Показники у базі", state.status ? state.status.displayed_signals : "—"],
+    ["Автоматичне опитування", state.status?.collector_active ? "Увімкнено" : "Не запущено"]
   ].forEach(pair => {
     const item = element("div", "");
     add(item, element("strong", "", pair[1]), element("small", "", pair[0]));
@@ -519,21 +1122,29 @@ async function render() {
         // Preserve server-rendered readings, and do not switch the page to —.
         restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API incomplete");
+        // The independent twin archive is not dependent on the legacy single
+        // inverter SSR values. Keep existing SSR and append twin cards only
+        // when the two inverter data endpoints respond.
+        if (!state.twinFallbackCycle || state.twinFallbackCycle !== cycle) {
+          state.twinFallbackCycle = cycle;
+          await renderTwinSummary(cycle);
+        }
         return;
       }
       primedValues = values;
-      if (!FORCE_REAL_MODE && critical.some(key => values[key].quality === "simulated")) {
-        DEMO_MODE = true; // source metadata always wins over stale mode state
-      }
+      // Database quality labels do not suppress existing values.
     } catch (_error) {
       if (current(cycle)) {
         restoreServerReadings();
         console.warn("Rakurs: keeping original MySQL readings; client API failed");
+        state.twinFallbackCycle = cycle;
+        await renderTwinSummary(cycle);
       }
       return;
     }
   }
   if (!current(cycle)) return;
+  state.twinFallbackCycle = null;
   clear(main);
   switch (state.route) {
     case "overview": await renderOverview(cycle, primedValues); break;
@@ -544,32 +1155,33 @@ async function render() {
     case "grid": await renderGroup(["grid"], "Електромережа", cycle); break;
     case "load": await renderGroup(["load"], "Навантаження", cycle); break;
     case "inverter": await renderGroup(["inverter", "output", "generator"], "Інвертор і генератор", cycle); break;
+    case "parallel": await renderParallel(cycle); break;
+    case "trends": await renderTrends(cycle); break;
     case "history": await renderHistory(cycle, false); break;
-    case "events": await renderTable("/events", "Події", ["Час", "Рівень", "Код", "Повідомлення", "Пристрій"],
-      ["observed_at_utc", "severity", "event_code", "message", "device_key"], cycle); break;
+    case "events": await renderEvents(cycle); break;
     case "archive": await renderHistory(cycle, true); break;
     case "modbus": await renderModbus(cycle); break;
     case "system": await renderSystem(cycle); break;
   }
 }
 async function boot() {
-  // Always load the database status before selecting a display mode. When
-  // only synthetic samples exist, use them on the ordinary Rakurs homepage.
+  // Load the database status before rendering all views.
   const results = await Promise.allSettled([
     api("/catalog"), api("/status"), api("/signals"), api("/auth")
   ]);
   state.catalog = results[0].status === "fulfilled" ? results[0].value : null;
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
   state.verified = results[2].status === "fulfilled" ? results[2].value.signals : [];
-  // The API is the source of truth: never label synthetic values as verified.
-  DEMO_MODE = state.status ? state.status.mode === "simulation" :
-    (SSR_MODE === "simulation" && !FORCE_REAL_MODE);
+  // One operational MySQL view; show every stored measurement.
 
-  const switcher = element("span", "tag", "Архів MySQL");
-  switcher.title = "Збережені записи MySQL; походження фізичних вимірювань не підтверджено";
-  const actions = document.querySelector(".top-actions");
-  if (actions) actions.appendChild(switcher);
-  if (DEMO_MODE) document.body.classList.add("demo-mode");
+  const mode = document.getElementById("mode-indicator");
+  if (mode) {
+    const empty = !state.status?.has_real_samples;
+    mode.textContent = empty ? "Очікування показників" : "Дані MySQL";
+    mode.className = "mode-indicator " + (empty ? "mode-pending" : "mode-real");
+    mode.title = empty ? "У базі ще немає вимірювань" : "Показники з бази MySQL";
+  }
+  // Styling and data selection use the same operational mode.
   updateConnection(state.status !== null);
   if (results[3].status === "fulfilled") createLogout(results[3].value);
   await render();
