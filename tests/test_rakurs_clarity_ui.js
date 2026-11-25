@@ -248,7 +248,7 @@ async function run() {
   const labels = descendants(app.main).map(x => x.textContent || "").join("|");
   assert(labels.includes("Подій обладнання поки немає"));
   assert(labels.includes("Додано історію вимірювань за 72 години"));
-  assert(labels.includes("Завантажено початковий тестовий набір"));
+  assert(labels.includes("Завантажено архівний набір"));
   assert(labels.includes("135936") && labels.includes("624"));
   assert(app.fetchCalls.some(x => x.includes("/api/v1/events")));
   assert(app.fetchCalls.some(x => x.includes("/api/v1/batches")));
@@ -313,11 +313,11 @@ async function run() {
   assert(byClass(seeded.main, "parallel-device")[0].textContent ||
     byClass(seeded.main, "parallel-device")[0].childNodes.length);
   const firstTwin = byClass(seeded.main, "parallel-device")[0];
-  assert(descendants(firstTwin).some(x => (x.textContent || "").includes("СИМУЛЯЦІЯ")),
+  assert(descendants(firstTwin).some(x => (x.textContent || "").includes("АРХІВ MYSQL")),
     "DB-populated simulated inverter must appear before unconnected physical slot");
   const seededText = descendants(seeded.main).map(x => x.textContent || "").join("|");
   assert(seededText.includes("815") && seededText.includes("624") && seededText.includes("316"));
-  assert(seededText.includes("СИМУЛЯЦІЯ") && seededText.includes("SOC: —"));
+  assert(seededText.includes("АРХІВ MYSQL") && seededText.includes("SOC: —"));
   assert(!seededText.includes("Поточна сумарна потужність: 10"));
   const rawButton = byClass(seeded.main, "parallel-raw-viewer")[0].childNodes
     .find(x => x.tagName === "button");
