@@ -1,8 +1,8 @@
 "use strict";
 // Rakurs standalone: the ONLY data API is this app's /api/v1/* backed by MySQL.
 const base = "/api/v1";
-let DEMO_MODE = new URLSearchParams(window.location.search).get("demo") === "1";
-const FORCE_REAL_MODE = new URLSearchParams(window.location.search).get("real") === "1";
+const DEMO_MODE = false;
+const FORCE_REAL_MODE = false;
 const views = [
   ["overview", "Огляд", "◈"],
   ["pv", "Сонце", "☀"],
@@ -73,8 +73,7 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path) {
-  const selection = FORCE_REAL_MODE ? "real=1" : (DEMO_MODE ? "demo=1" : "");
-  const url = base + path + (selection ? (path.includes("?") ? "&" : "?") + selection : "");
+  const url = base + path;
   const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
@@ -143,8 +142,7 @@ function verifiedKeys() {
   return new Set(state.verified.map(s => s.signal_key));
 }
 function addStatusMessage() {
-  if (DEMO_MODE) return;
-  if (!state.status) {
+    if (!state.status) {
     message("Підключення до MySQL не підтверджено",
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
   } else if (!state.status.has_real_samples) {
@@ -287,9 +285,7 @@ async function renderOverview(cycle, primedValues = null) {
   main.appendChild(intro);
   await renderTwinSummary(cycle);
   if (!current(cycle)) return;
-  section("Збережений зріз", DEMO_MODE ?
-    "Архів одного профілю · не сумарні показники двох Deye" :
-    "Останні показники з MySQL · час Київ");
+  section("Останні показники", "Один пристрій з MySQL · без сумування двох інверторів");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
   deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
@@ -617,7 +613,7 @@ async function renderHistory(cycle, archived) {
         const tr = element("tr", "");
         [time(entry.observed_at_utc),
          entry.value_decimal === null ? "—" : pretty(Number(entry.value_decimal), 3) + " " + unit,
-         entry.quality === "simulated" ? "Архів MySQL · джерело не підтверджене" : entry.quality || "—"
+         "MySQL"
         ].forEach(value => tr.appendChild(element("td", "", value)));
         tbody.appendChild(tr);
       }
@@ -635,6 +631,13 @@ async function renderHistory(cycle, archived) {
   picker.addEventListener("change", refresh);
   range.addEventListener("change", refresh);
   await refresh();
+}
+function displayDeviceKey(value) {
+  const key = String(value || "");
+  if (key === "simulated_deye_sg05lp3") return "Deye · основний профіль";
+  if (key === "sim_deye20k_parallel_1") return "Deye №1";
+  if (key === "sim_deye20k_parallel_2") return "Deye №2";
+  return key || "—";
 }
 function deviceLabel(device, index = 0) {
   const slot = Number(device.slot_no || index + 1);
@@ -897,7 +900,7 @@ async function renderEvents(cycle) {
       const info = element("div", "event-description");
       add(info, element("strong", "", record.message || record.event_code || "Подія"),
         element("small", "", (record.event_code || "Без коду") +
-          " · " + (record.device_key || "Невідомий пристрій")));
+          " · " + displayDeviceKey(record.device_key)));
       const stamp = element("div", "event-stamp");
       add(stamp, element("span", "event-severity", level),
         element("time", "", time(record.observed_at_utc)));
@@ -919,10 +922,10 @@ async function renderEvents(cycle) {
     for (const batch of items) {
       const row = element("article", "event-row event-batch");
       const code = String(batch.error_code || "");
-      const simulated = batch.status === "simulated";
+      const imported = batch.status === "simulated";
       const title = code === "DEYE_HISTORY_72H_V1" ?
         "Додано історію вимірювань за 72 години" :
-        simulated ? "Завантажено архівний набір" :
+        imported ? "Завантажено записи MySQL" :
         "Операція завантаження: " + (batch.status || "невідомо");
       const accepted = batch.accepted_count ?? 0;
       const received = batch.received_count ?? 0;
@@ -967,8 +970,8 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
       fields.forEach(field => {
         const raw = item[field];
         const displayed = field.endsWith("_utc") ? time(raw) :
-          field === "kind" && raw === "simulation" ? "Архівний профіль" :
-          field === "kind" && raw === "inverter" ? "Інвертор" :
+          field === "kind" && (raw === "simulation" || raw === "inverter") ? "Інвертор" :
+          field === "device_key" ? displayDeviceKey(raw) :
           (raw ?? "—");
         row.appendChild(element("td", "", displayed));
       });
@@ -1078,20 +1081,16 @@ async function renderModbus(cycle) {
 }
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", DEMO_MODE ? "Архівні дані" :
-                                                      "Статус незалежного Rakurs");
+  section("Конфігурація системи", "Показники та пристрої MySQL");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
-    ["Джерело", DEMO_MODE ? "MySQL · походження не підтверджене" : "MySQL"],
-    [DEMO_MODE ? "Профілі у MySQL" : "Фізичні інвертори",
-      state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Параметри архіву" : "Підтверджені сигнали",
-      state.status ? (DEMO_MODE ? state.status.simulated_signals :
-                                  state.status.verified_signals) : "—"],
-    ["Колектор Deye", "Не запущений"]
+    ["Джерело", "MySQL"],
+    ["Пристрої у базі", state.status ? state.status.registered_devices : "—"],
+    ["Показники у базі", state.status ? state.status.displayed_signals : "—"],
+    ["Автоматичне опитування", state.status?.collector_active ? "Увімкнено" : "Не запущено"]
   ].forEach(pair => {
     const item = element("div", "");
     add(item, element("strong", "", pair[1]), element("small", "", pair[0]));
@@ -1134,9 +1133,7 @@ async function render() {
         return;
       }
       primedValues = values;
-      if (!FORCE_REAL_MODE && critical.some(key => values[key].quality === "simulated")) {
-        DEMO_MODE = true; // source metadata always wins over stale mode state
-      }
+      // Database quality labels do not suppress existing values.
     } catch (_error) {
       if (current(cycle)) {
         restoreServerReadings();
@@ -1169,31 +1166,23 @@ async function render() {
   }
 }
 async function boot() {
-  // Always load the database status before selecting a display mode. When
-  // only synthetic samples exist, use them on the ordinary Rakurs homepage.
+  // Load the database status before rendering all views.
   const results = await Promise.allSettled([
     api("/catalog"), api("/status"), api("/signals"), api("/auth")
   ]);
   state.catalog = results[0].status === "fulfilled" ? results[0].value : null;
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
   state.verified = results[2].status === "fulfilled" ? results[2].value.signals : [];
-  // The API is the source of truth: never label synthetic values as verified.
-  DEMO_MODE = state.status ? state.status.mode === "simulation" :
-    (SSR_MODE === "simulation" && !FORCE_REAL_MODE);
+  // One operational MySQL view; show every stored measurement.
 
   const mode = document.getElementById("mode-indicator");
   if (mode) {
-    const awaitingReal = !DEMO_MODE && !state.status?.has_real_samples;
-    mode.textContent = DEMO_MODE ? "Архів MySQL" :
-      awaitingReal ? "Очікування реальних даних" : "Реальні вимірювання";
-    mode.className = "mode-indicator " + (DEMO_MODE ? "mode-simulation" :
-      awaitingReal ? "mode-pending" : "mode-real");
-    mode.title = DEMO_MODE ?
-      "Архівні записи MySQL не підтверджені фізичним опитуванням" :
-      awaitingReal ? "Підтверджених реальних вимірювань поки немає" :
-      "Дані, отримані з підключених вимірювальних приладів";
+    const empty = !state.status?.has_real_samples;
+    mode.textContent = empty ? "Очікування показників" : "Дані MySQL";
+    mode.className = "mode-indicator " + (empty ? "mode-pending" : "mode-real");
+    mode.title = empty ? "У базі ще немає вимірювань" : "Показники з бази MySQL";
   }
-  if (DEMO_MODE) document.body.classList.add("demo-mode");
+  // Styling and data selection use the same operational mode.
   updateConnection(state.status !== null);
   if (results[3].status === "fulfilled") createLogout(results[3].value);
   await render();
