@@ -169,8 +169,14 @@ UPDATE rakurs_modbus_frames
  SET status='generated' WHERE device_id IN (2,3) AND status='simulated';
 UPDATE rakurs_modbus_poll_runs
  SET transport='offline',status='generated',quality='generated',
- ingest_source='rakurs_preview_history'
+ ingest_source='rakurs_preview_history',
+ poll_uid=IF(device_id=2,'archive_deye20k_1_v1','archive_deye20k_2_v1')
  WHERE device_id IN (2,3) AND quality='simulated';
+UPDATE rakurs_signals SET
+ verification_note='Параметр не перевірено за фізичним обладнанням'
+ WHERE verification_note LIKE '%Synthetic%' OR
+       verification_note LIKE '%simulat%' OR
+       verification_note LIKE '%test%';
 UPDATE rakurs_ingest_batches
  SET status='generated'
  WHERE device_id IN (2,3) AND status='simulated';
