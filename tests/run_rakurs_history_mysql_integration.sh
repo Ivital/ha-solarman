@@ -15,12 +15,16 @@ docker run -d --name "$NAME" --network none \
   mysql:8.0 >/dev/null
 # No docker network means no MySQL port even on the runner.
 for attempt in $(seq 1 90); do
-  if docker exec "$NAME" mysqladmin ping -uroot "-p$PASS" --silent >/dev/null 2>&1; then
+  # mysqladmin ping returns success even for Access denied while the image
+  # is still creating the real root account. Require authenticated SQL.
+  if docker exec "$NAME" mysql -uroot "-p$PASS" "$DBNAME" \
+      --execute='SELECT 1' >/dev/null 2>&1; then
     break
   fi
   sleep 2
 done
-docker exec "$NAME" mysqladmin ping -uroot "-p$PASS" --silent >/dev/null
+docker exec "$NAME" mysql -uroot "-p$PASS" "$DBNAME" \
+  --execute='SELECT 1' >/dev/null
 query() { docker exec -i "$NAME" mysql -uroot "-p$PASS" "$DBNAME" "$@"; }
 
 query < "$ROOT/deploy/rakurs/archive_mysql_schema.sql"
