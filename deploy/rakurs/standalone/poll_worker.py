@@ -171,7 +171,7 @@ def ready_devices(db):
         cur.execute(
             "SELECT d.id,d.device_key,d.kind,c.transport,c.gateway_ip,"
             "c.gateway_port,c.slave_id,c.function_code,c.register_address,"
-            "c.register_count,c.timeout_ms,pm.modbus_address "
+            "c.register_count,c.timeout_ms,pm.modbus_address,"\n            "c.enabled,c.verified_connection,pm.member_kind,"\n            "pm.member_verified,pm.transport_verified "
             "FROM rakurs_device_settings AS c "
             "JOIN rakurs_devices AS d ON d.id=c.device_id "
             "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
@@ -187,7 +187,7 @@ def ready_devices(db):
         try:
             host=validate_ip(item["gateway_ip"])
             allowed={x.strip() for x in os.getenv("RAKURS_ALLOWED_GATEWAY_IPS","").split(",")}
-            if (host in allowed and item["transport"] in ("modbus_tcp","rtu_tcp")
+            if (item.get("kind") == "inverter" and\n                    item.get("enabled") == 1 and item.get("verified_connection") == 1 and\n                    item.get("member_kind") == "physical" and\n                    item.get("member_verified") == 1 and\n                    item.get("transport_verified") == 1 and\n                    host in allowed and item["transport"] in ("modbus_tcp","rtu_tcp")
                     and item["slave_id"]==item["modbus_address"] and
                     1<=int(item["register_count"])<=8):
                 valid.append(item)
