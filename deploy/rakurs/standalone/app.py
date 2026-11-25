@@ -438,7 +438,7 @@ def batches():
         "JOIN rakurs_devices AS d ON d.id=b.device_id "
         "ORDER BY b.started_at_utc DESC LIMIT 50"
     )
-    return jsonify({"data_source": "mysql", "batches": serialize(result)}
+    return jsonify({"data_source": "mysql", "batches": serialize(result)})
 
 # Parallel group: observation only. Do not infer physical wiring from Modbus
 # addresses, and do not sum values across devices until provenance is verified.
