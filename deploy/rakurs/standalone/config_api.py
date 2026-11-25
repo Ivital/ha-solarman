@@ -14,7 +14,7 @@ from flask import abort, g, jsonify, request, session
 import pymysql
 
 KEY = re.compile(r"^[a-z][a-z0-9_]{0,127}$")
-TEXT = re.compile(r"^[^\\x00-\\x1f\\x7f]{1,96}$")
+TEXT = re.compile(r"^[^\x00-\x1f\x7f]{1,96}$")
 MODEL = "SUN-20K-SG05LP3-EU-SM2"
 GROUP = "deye_sun20k_parallel_shared_battery"
 
