@@ -18,7 +18,8 @@ const views = [
   ["modbus", "Modbus", "▤"],
   ["system", "Система", "⚙"]
 ];
-const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0 };
+const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0,
+  selectedDeviceKey: null, selectedSlotNo: 1 };
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
 // Root HTML contains authoritative MySQL readings. Never erase those readings
@@ -73,7 +74,11 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path) {
-  const url = base + path;
+  const scoped = /^\/(latest|history|modbus-fields)(\?|$)/.test(path);
+  const suffix = scoped && state.selectedDeviceKey ?
+    (path.includes("?") ? "&" : "?") +
+    "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
+  const url = base + path + suffix;
   const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
   if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
   return response.json();
@@ -285,7 +290,8 @@ async function renderOverview(cycle, primedValues = null) {
   main.appendChild(intro);
   await renderTwinSummary(cycle);
   if (!current(cycle)) return;
-  section("Останні показники", "Один пристрій з MySQL · без сумування двох інверторів");
+  section("Останні показники · Deye №" + state.selectedSlotNo,
+    "Дані обраного інвертора MySQL · без сумування двох пристроїв");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
   deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
@@ -668,6 +674,10 @@ async function renderTwinSummary(cycle) {
   let devices;
   try { devices = await fetchParallelDevices(cycle); } catch (_error) { return; }
   if (!current(cycle) || !devices?.length) return;
+  if (state.selectedDeviceKey) {
+    const selected = devices.find(d => d.device_key === state.selectedDeviceKey);
+    if (selected) state.selectedSlotNo = selected.slot_no;
+  }
   section("Два інвертори Deye", "Показники кожного інвертора з MySQL");
   const grid = element("div", "parallel-home-grid");
   main.appendChild(grid);
@@ -690,6 +700,19 @@ async function renderTwinSummary(cycle) {
       metrics.appendChild(tile);
     }
     card.appendChild(metrics);
+    const select = element("button", "parallel-open-link",
+      "Показати Deye №" + device.slot_no + " на головній");
+    select.type = "button";
+    select.setAttribute("aria-pressed", String(
+      state.selectedDeviceKey === device.device_key ||
+      (!state.selectedDeviceKey && device.slot_no === 1)));
+    select.addEventListener("click", () => {
+      if (state.selectedDeviceKey === device.device_key) return;
+      state.selectedDeviceKey = device.device_key;
+      state.selectedSlotNo = device.slot_no;
+      render();
+    });
+    card.appendChild(select);
     const link = element("a", "parallel-open-link", "Усі показники інверторів");
     link.href = "#/parallel";
     card.appendChild(link);
@@ -1108,7 +1131,7 @@ async function render() {
   buildNav();
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
   let primedValues = null;
-  if (state.route === "overview" && SSR_PRESENT) {
+  if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey) {
     // This is the key guard: a failed/stale client API must not replace the
     // successful server-rendered database values with placeholders.
     const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
