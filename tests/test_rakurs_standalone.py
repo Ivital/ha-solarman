@@ -357,7 +357,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertIn('restoreServerReadings();', js)
         self.assertIn('critical.every(key => values[key]', js)
         self.assertIn('const FORCE_REAL_MODE =', js)
-        self.assertIn('const url = base + path;', js)
+        self.assertIn('const url = base + path + suffix;', js)
         self.assertNotIn('window.location.replace(', js)
         self.assertNotIn('message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ"', js)
         html = (RAKURS / "standalone/templates/index.html").read_text()
