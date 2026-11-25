@@ -50,6 +50,8 @@ if [[ "$MODE" == "--check" ]]; then
 fi
 
 sudo -v
+echo '=== READ-ONLY NEW-CODE MYSQL ACCEPTANCE ==='
+bash "$HERE/audit_unified_mysql_readonly.sh" --check
 [[ "$(git branch --show-current)" == "feature/deye-trb145-monitoring" ]] || {
   echo 'STOP: unexpected git branch' >&2; exit 2
 }
