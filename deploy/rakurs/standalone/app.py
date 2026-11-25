@@ -239,7 +239,7 @@ def index():
             "unit": (item["unit"] or "") if item else "",
             "quality": item["quality"] if item else None,
         })
-    return render_template("index.html", initial_cards=cards, initial_simulated=False)
+    return render_template("index.html", initial_cards=cards)
 
 
 # Standalone HTML snapshot sourced from the same MySQL device as the overview.
@@ -557,7 +557,7 @@ def parallel_device_latest():
             sample["age_seconds"] = None
             sample["freshness_state"] = "unknown"
     return jsonify({
-        "data_source": "mysql", "simulation": False,
+        "data_source": "mysql", 
         "device_key": selected["device_key"],
         "values": serialize(latest),
         "total_values": None,
@@ -687,7 +687,7 @@ def parallel_live_health():
         })
     return jsonify({
         "data_source": "mysql", "expected_inverters": 2,
-        "simulation": False, "collector_process_confirmed": False,
+         "collector_process_confirmed": False,
         "devices": entries, "shared_battery_soc_verified": False,
         "warning": "Recent polls do not confirm collector process health; "
                    "no physical Master/Slave or BMS source is inferred.",
@@ -711,7 +711,7 @@ def parallel_live_polls():
         (selected["id"], limit, offset),
     )
     return jsonify({
-        "data_source":"mysql","simulation":False,
+        "data_source":"mysql",
         "device_key":selected["device_key"],"offset":offset,"limit":limit,
         "total":total["n"] if total else 0,"polls":serialize(polls),
     })
@@ -723,7 +723,7 @@ def parallel_live_raw():
     offset, limit = parallel_page_options(500)
     if not poll:
         return jsonify({"device_key":selected["device_key"],"poll":None,
-                        "total":0,"raw_registers":[],"simulation":False})
+                        "total":0,"raw_registers":[]})
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_register_samples "
         "WHERE device_id=%s AND poll_id=%s ",
@@ -737,7 +737,7 @@ def parallel_live_raw():
         "ORDER BY frame_id,register_address LIMIT %s OFFSET %s",
         (selected["id"], poll["id"], limit, offset),
     )
-    return jsonify({"device_key":selected["device_key"],"simulation":False,
+    return jsonify({"device_key":selected["device_key"],
                     "poll":serialize(poll),"offset":offset,"limit":limit,
                     "total":total["n"] if total else 0,
                     "raw_registers":serialize(records)})
@@ -749,7 +749,7 @@ def parallel_live_bits():
     offset, limit = parallel_page_options(500)
     if not poll:
         return jsonify({"device_key":selected["device_key"],"poll":None,
-                        "total":0,"bits":[],"simulation":False})
+                        "total":0,"bits":[]})
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_bit_samples "
         "WHERE device_id=%s AND poll_id=%s ",
@@ -762,7 +762,7 @@ def parallel_live_bits():
         "ORDER BY frame_id,bit_address LIMIT %s OFFSET %s",
         (selected["id"], poll["id"], limit, offset),
     )
-    return jsonify({"device_key":selected["device_key"],"simulation":False,
+    return jsonify({"device_key":selected["device_key"],
                     "poll":serialize(poll),"offset":offset,"limit":limit,
                     "total":total["n"] if total else 0,"bits":serialize(records)})
 
@@ -773,7 +773,7 @@ def parallel_live_frames():
     offset, limit = parallel_page_options(100)
     if not poll:
         return jsonify({"device_key":selected["device_key"],"poll":None,
-                        "total":0,"frames":[],"simulation":False})
+                        "total":0,"frames":[]})
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_frames "
         "WHERE device_id=%s AND poll_id=%s", (selected["id"], poll["id"]),
@@ -787,7 +787,7 @@ def parallel_live_frames():
         "ORDER BY sequence_no LIMIT %s OFFSET %s",
         (selected["id"], poll["id"], limit, offset),
     )
-    return jsonify({"device_key":selected["device_key"],"simulation":False,
+    return jsonify({"device_key":selected["device_key"],
                     "poll":serialize(poll),"offset":offset,"limit":limit,
                     "total":total["n"] if total else 0,"frames":serialize(records)})
 
