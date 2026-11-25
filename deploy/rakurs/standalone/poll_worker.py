@@ -166,6 +166,22 @@ def poll_probe(config):
     }
 
 
+def exclude_conflicting_buses(devices):
+    """Fail closed when two physical units share ID or gateway framing."""
+    grouped = {}
+    for device in devices:
+        key = (device["gateway_ip"], int(device["gateway_port"]))
+        grouped.setdefault(key, []).append(device)
+    blocked = set()
+    for endpoint, members in grouped.items():
+        modes = {d["transport"] for d in members}
+        ids = [int(d["slave_id"]) for d in members]
+        if len(modes) != 1 or len(ids) != len(set(ids)):
+            blocked.add(endpoint)
+    return [d for d in devices
+            if (d["gateway_ip"], int(d["gateway_port"])) not in blocked]
+
+
 def ready_devices(db):
     with db.cursor() as cur:
         cur.execute(
@@ -200,7 +216,8 @@ def ready_devices(db):
                 valid.append(item)
         except (ValueError,TypeError):
             continue
-    return valid
+    # Sequential poller: never issue ambiguous requests to one RS485 bus.
+    return exclude_conflicting_buses(valid)
 
 
 def runtime(db,state,*,device=None,error=None,attempt=False,success=False):
