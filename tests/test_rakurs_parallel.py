@@ -189,7 +189,8 @@ class ParallelApiTests(unittest.TestCase):
         sql = next(q for q, _ in self.db_calls
                    if "FROM rakurs_modbus_fields AS f" in q)
         self.assertIn("m.device_id=%s", sql)
-        self.assertIn("ms.device_id=m.device_id", sql)
+        self.assertIn("FROM rakurs_modbus_field_samples WHERE device_id=%s GROUP BY field_id", sql)
+        self.assertIn("m.field_id=recent.field_id", sql)
         self.assertNotIn("f.verified=1", sql)
         self.assertNotIn("m.quality=", sql)
 
