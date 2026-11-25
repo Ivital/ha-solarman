@@ -267,6 +267,10 @@ function detailMetric(label, key, values, icon = "◦") {
   add(val, element("strong", "", pretty(value)), element("small", "",
     value !== null && record ? (record.unit || "") : ""));
   cell.appendChild(val);
+  if (record && record.observed_at_utc) {
+    cell.appendChild(element("time","subtle metric-timestamp",
+      "Запис: "+time(record.observed_at_utc)));
+  }
   return cell;
 }
 function panel(title, description) {
@@ -460,7 +464,10 @@ async function renderGroup(groups, title, cycle) {
     const row = element("article", "metric");
     const info = element("div", "metric-info");
     add(info, element("strong", "", metric.label),
-      element("small", "", metric.key));
+      element("small", "", metric.key),
+      element("time","subtle metric-timestamp",
+        record && record.observed_at_utc ?
+          time(record.observed_at_utc) : "Час відсутній"));
     const val = element("div", "metric-reading");
     add(val, element("span", "number" + (hasValue ? "" : " unknown"),
         hasValue ? pretty(Number(record.value_decimal), 3) : "—"),
@@ -1065,7 +1072,7 @@ async function renderModbus(cycle) {
     const wrapper = element("div", "table-wrap");
     const table = element("table", "data-table modbus-table");
     const thead = element("thead", ""), tr = element("tr", "");
-    ["Група", "Параметр", "Регістр", "Значення", "Од."].forEach(t =>
+    ["Група", "Параметр", "Регістр", "Значення", "Од.", "Дата й час"].forEach(t =>
       tr.appendChild(element("th", "", t)));
     thead.appendChild(tr);
     const tbody = element("tbody", "");
@@ -1098,7 +1105,8 @@ async function renderModbus(cycle) {
           String(f.value_text) : f.value_decimal === null ?
           "—" : pretty(Number(f.value_decimal), 3);
         [f.group_name || "—", f.field_name || f.field_key,
-         item.addresses || "Розрахунковий", value, f.unit || "—"].forEach(x =>
+         item.addresses || "Розрахунковий", value, f.unit || "—",
+         f.observed_at_utc ? time(f.observed_at_utc) : "—"].forEach(x =>
           row.appendChild(element("td", "", x)));
         tbody.appendChild(row);
       }
