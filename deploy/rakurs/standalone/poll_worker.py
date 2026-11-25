@@ -208,11 +208,13 @@ def runtime(db,state,*,device=None,error=None,attempt=False,success=False):
         cur.execute(
             "UPDATE rakurs_poll_runtime SET worker_heartbeat_utc=UTC_TIMESTAMP(6),"
             "state=%s,last_device_id=COALESCE(%s,last_device_id),"
-            "last_error=%s,"
+            "last_error=CASE WHEN %s THEN NULL "
+            "WHEN %s IS NOT NULL THEN %s ELSE last_error END,"
             "last_attempt_utc=IF(%s,UTC_TIMESTAMP(6),last_attempt_utc),"
             "last_success_utc=IF(%s,UTC_TIMESTAMP(6),last_success_utc) "
             "WHERE id=1",
-            (state,device,error,bool(attempt),bool(success)))
+            (state,device,bool(success or state=="disabled"),error,error,
+             bool(attempt),bool(success)))
 
 
 def main():
@@ -254,9 +256,15 @@ def main():
                             switch=cur.fetchone()
                         if not switch or not switch["enabled"]:
                             break
-                        runtime(db,"active",device=device["id"],attempt=True)
+                        # Device-level disable/config changes must also be
+                        # enforced immediately before the network request.
+                        fresh=next((d for d in ready_devices(db)
+                                    if d["id"]==device["id"]),None)
+                        if fresh is None:
+                            continue
+                        runtime(db,"active",device=fresh["id"],attempt=True)
                         try:
-                            payload=poll_probe(device)
+                            payload=poll_probe(fresh)
                             result=persist(db,payload)
                             if result["status"]=="saved" and payload["quality"]=="good":
                                 runtime(db,"active",device=device["id"],success=True)
