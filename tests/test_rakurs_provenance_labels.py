@@ -57,8 +57,8 @@ class PublicPresentationTests(unittest.TestCase):
                       sample_definition)
         self.assertIn("PRIMARY KEY (device_id, field_id, observed_at_utc)",
                       field_definition)
-        self.assertNotIn("id BIGINT", sample_definition)
-        self.assertNotIn("id BIGINT", field_definition)
+        self.assertNotRegex(sample_definition, r"(?m)^\s*id\s+BIGINT")
+        self.assertNotRegex(field_definition, r"(?m)^\s*id\s+BIGINT")
         for invalid in (
             "SELECT mx.id FROM rakurs_samples",
             "SELECT ms.id FROM rakurs_modbus_field_samples",
