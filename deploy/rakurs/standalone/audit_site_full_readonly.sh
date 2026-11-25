@@ -5,7 +5,7 @@ umask 077
 ROOT=/home/ivital/deye-monitoring-src
 TARGET=/opt/rakurs/standalone
 PREFIX=deploy/rakurs/standalone
-BASE=d17dddabea6b11c00a3867134cf1dbe663f7a454
+BASE="${RAKURS_AUDIT_REF:-d17dddabea6b11c00a3867134cf1dbe663f7a454}"
 BRANCH=fix/rakurs-site-quality-audit-20261125
 DOMAIN=rakurs.zakryttya.org.ua
 VENV=/home/ivital/.venvs/rakurs-tests
