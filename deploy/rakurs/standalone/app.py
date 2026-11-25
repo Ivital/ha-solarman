@@ -227,7 +227,7 @@ def index():
             "AND m.signal_id=recent.signal_id "
             "AND m.observed_at_utc=recent.latest_at "
             "WHERE s.signal_key IN (" + placeholders + ") "
-            "ORDER BY s.signal_key",
+            "ORDER BY s.signal_key LIMIT 32",
             (selected, selected) + keys,
         )
     latest = {item["signal_key"]: item for item in readings}
