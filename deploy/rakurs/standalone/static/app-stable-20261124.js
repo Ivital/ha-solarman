@@ -16,10 +16,11 @@ const views = [
   ["events", "Події", "◇"],
   ["archive", "Архів", "▦"],
   ["modbus", "Modbus", "▤"],
-  ["system", "Система", "⚙"]
+  ["system", "Система", "⚙"],
+  ["settings", "Керування", "⚙"]
 ];
 const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0,
-  selectedDeviceKey: null, selectedSlotNo: 1 };
+  selectedDeviceKey: null, selectedSlotNo: 1, role: "viewer", csrf: null };
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
 // Root HTML contains authoritative MySQL readings. Never erase those readings
@@ -73,14 +74,21 @@ function message(title, detail, warning) {
   add(box, element("div", "banner-icon", warning ? "!" : "◎"), content);
   main.appendChild(box);
 }
-async function api(path) {
+async function api(path, options = {}) {
   const scoped = /^\/(latest|history|modbus-fields)(\?|$)/.test(path);
   const suffix = scoped && state.selectedDeviceKey ?
     (path.includes("?") ? "&" : "?") +
     "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
   const url = base + path + suffix;
-  const response = await fetch(url, {cache: "no-store", credentials: "same-origin"});
-  if (!response.ok) throw new Error("Помилка отримання даних MySQL (" + response.status + ")");
+  const response = await fetch(url, {cache:"no-store",credentials:"same-origin",
+    method:options.body ? "POST" : "GET",
+    headers:options.body ? {"Content-Type":"application/json",
+      "X-CSRF-Token":state.csrf || ""} : {},
+    body:options.body ? JSON.stringify(options.body) : undefined});
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(error.error || "Помилка API RAKURS (" + response.status + ")");
+  }
   return response.json();
 }
 function createLogout(auth) {
@@ -110,7 +118,7 @@ function buildNav() {
   const sections = [
     ["МОНІТОРИНГ", ["overview", "parallel", "pv", "battery", "grid", "load", "inverter"]],
     ["АНАЛІТИКА", ["trends", "history", "archive", "events"]],
-    ["НАЛАШТУВАННЯ", ["modbus", "system"]]
+    ["НАЛАШТУВАННЯ", ["modbus", "settings", "system"]]
   ];
   for (const [label, names] of sections) {
     navigation.appendChild(element("div", "nav-group-label", label));
@@ -169,8 +177,11 @@ function metricCard(label, icon, key, values, tone = "neutral", subtitle = "") {
   const value = reading(values, key);
   const card = element("article", "card kpi kpi-" + tone);
   const head = element("div", "kpi-head");
+  const observed = data && data.observed_at_utc;
+  const age = observed ? (Date.now()-new Date(observed).getTime())/1000 : null;
+  const fresh = age !== null && Number.isFinite(age) && age >= -60 && age <= 120;
   add(head, element("span", "kpi-icon", icon), element("span", "kpi-state",
-    value === null ? "Немає даних" : "Є запис"));
+    value === null ? "Немає даних" : fresh ? "Свіжий запис" : "Архівний запис"));
   card.appendChild(head);
   card.appendChild(element("h3", "", label));
   const numberRow = element("div", "kpi-reading");
@@ -323,9 +334,7 @@ async function renderOverview(cycle, primedValues = null) {
       state.status.verified_signals || 0) + " показників у базі" :
     "Джерело даних: MySQL";
   add(footer, element("span", "", statusText),
-    element("span", "", DEMO_MODE ?
-      "Записи MySQL · фізичне походження не підтверджене" :
-      "Дані реальних приладів"));
+    element("span", "", "Збережені показники MySQL"));
   main.appendChild(footer);
 }
 async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
@@ -355,6 +364,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     ranges.appendChild(btn);
     return btn;
   });
+  heading.appendChild(element("span","subtle","Deye №"+state.selectedSlotNo));
   heading.appendChild(ranges);
   root.appendChild(heading);
   const grid = element("div", "trend-grid");
@@ -392,8 +402,8 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
       }
       const points = result.value.points || [];
       const numeric = points.filter(p => p.value_decimal !== null);
-      if (numeric.length < 2) {
-        body.appendChild(createEmpty("Недостатньо даних", "Потрібні щонайменше дві точки."));
+      if (!numeric.length) {
+        body.appendChild(createEmpty("Немає вимірювань", "За вибраний період записів немає."));
         return;
       }
       const currentValue = numeric[numeric.length - 1].value_decimal;
@@ -415,7 +425,8 @@ async function renderTrends(cycle) {
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title, items.length + " параметрів · останні збережені показники");
+  section(title + " · Deye №" + state.selectedSlotNo,
+    items.length + " параметрів · останні збережені показники");
   if (!items.length) {
     main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр."));
     return;
@@ -500,18 +511,30 @@ function svgChart(points, unit) {
     label.textContent = ((high - (high - low) * i / 3).toFixed(2)) + (unit ? " " + unit : "");
     svg.appendChild(label);
   }
+  if (real.length === 1) {
+    const y = 238 - (real[0].v - low)*198/(high-low);
+    const dot = document.createElementNS(svg.namespaceURI,"circle");
+    dot.setAttribute("cx","460");dot.setAttribute("cy",String(y));
+    dot.setAttribute("r","6");dot.setAttribute("fill","#71e6d8");
+    svg.appendChild(dot);
+    const label=document.createElementNS(svg.namespaceURI,"text");
+    label.setAttribute("x","460");label.setAttribute("y",String(y-16));
+    label.setAttribute("text-anchor","middle");
+    label.textContent=pretty(real[0].v,3)+" "+(unit||"");
+    svg.appendChild(label);
+  }
   const polyline = document.createElementNS(svg.namespaceURI, "polyline");
   const pointsString = real.map(p => {
-    const x = 52 + p.index * 816 / Math.max(1, points.length - 1);
+    const x = real.length === 1 ? 460 : 52 + p.index * 816 / Math.max(1, points.length - 1);
     const y = 238 - (p.v - low) * 198 / (high - low);
     return x.toFixed(2) + "," + y.toFixed(2);
   }).join(" ");
   polyline.setAttribute("points", pointsString);
-  svg.appendChild(polyline);
+  if (real.length > 1) svg.appendChild(polyline);
   const first = points[real[0].index];
   const last = points[real[real.length - 1].index];
   if (first && last) {
-    const labels = [
+    const labels = real.length === 1 ? [[460,first.observed_at_utc,"middle"]] : [
       [52, first.observed_at_utc, "start"],
       [868, last.observed_at_utc, "end"]
     ];
@@ -533,8 +556,9 @@ function svgChart(points, unit) {
 }
 async function renderHistory(cycle, archived) {
   addStatusMessage();
-  section(archived ? "Архів вимірювань" : "Історія показників",
-    "Графік та журнал окремого сигналу · час Київ");
+  section((archived ? "Архів вимірювань" : "Історія показників") +
+    " · Deye №" + state.selectedSlotNo,
+    "Графік і журнал обраного інвертора · час Київ");
   const available = state.verified;
   if (!available.length) {
     main.appendChild(createEmpty("Немає збережених сигналів",
@@ -710,6 +734,9 @@ async function renderTwinSummary(cycle) {
       if (state.selectedDeviceKey === device.device_key) return;
       state.selectedDeviceKey = device.device_key;
       state.selectedSlotNo = device.slot_no;
+      try { if (typeof localStorage !== "undefined")
+        localStorage.setItem("rakurs.selectedDeye",device.device_key);
+      } catch (_error) {}
       render();
     });
     card.appendChild(select);
@@ -788,9 +815,9 @@ async function renderParallel(cycle) {
     const chart = element("section", "parallel-device-chart");
     chart.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
     const points = history.status === "fulfilled" ? (history.value.points || []) : [];
-    if (points.filter(p => p.value_decimal !== null).length < 2) {
-      chart.appendChild(createEmpty("Недостатньо даних для графіка",
-        "Для побудови графіка потрібні два збережені вимірювання."));
+    if (points.filter(p => p.value_decimal !== null).length === 0) {
+      chart.appendChild(createEmpty("Вимірювань немає",
+        "За останні 24 години немає числових значень."));
     } else {
       chart.appendChild(svgChart(points, "кВт"));
     }
@@ -1004,7 +1031,8 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
 }
 async function renderModbus(cycle) {
   addStatusMessage();
-  section("Довідник Modbus", "Технічні параметри · лише читання");
+  section("Довідник Modbus · Deye №"+state.selectedSlotNo,
+    "Технічні параметри · лише читання · значення MySQL");
   const root = panel("Регістр і значення",
     "Пошук за назвою, групою або адресою регістра");
   root.className += " modbus-workspace";
@@ -1101,6 +1129,150 @@ async function renderModbus(cycle) {
       "Не вдалося отримати довідник регістрів MySQL."));
   }
 }
+function settingsField(form, label, value, kind = "text", choices = []) {
+  const wrap=element("label","settings-field");
+  wrap.appendChild(element("span","",label));
+  let control;
+  if(kind==="select") {
+    control=element("select","");
+    for(const [v,title] of choices) {
+      const item=element("option","",title);
+      item.value=String(v);
+      if(String(v)===String(value??"")) item.selected=true;
+      control.appendChild(item);
+    }
+    control.value=String(value??"");
+  } else {
+    control=element("input","");
+    control.type=kind;
+    if(kind==="checkbox") control.checked=Boolean(value);
+    else control.value=value==null?"":String(value);
+  }
+  wrap.appendChild(control);
+  form.appendChild(wrap);
+  return control;
+}
+async function renderSettings(cycle) {
+  section("Керування інверторами та опитуванням",
+    "Налаштування зберігаються в MySQL · лише читання FC03/FC04");
+  let cfg;
+  try { cfg=await api("/config"); }
+  catch(error) {
+    if(current(cycle)) message("Налаштування недоступні",error.message,true);
+    return;
+  }
+  if(!current(cycle)) return;
+  if(!cfg.available) {
+    main.appendChild(createEmpty("Модуль ще не встановлено",
+      cfg.reason || "Потрібна контрольована міграція MySQL."));
+    return;
+  }
+  const admin=state.role==="admin" && Boolean(state.csrf);
+  if(!admin) message("Перегляд без редагування",
+    "Змінювати інвертори та параметри опитування може лише адміністратор.",false);
+  const box=panel("Автоматичне опитування",
+    "Вимкнення має дію від наступного циклу агента. Готовність MySQL ≠ доступність інвертора.");
+  box.className+=" settings-panel";
+  const status=element("p","settings-state",
+    cfg.worker_online ? "Агент: відповідає" : "Агент: не запущений");
+  box.appendChild(status);
+  box.appendChild(element("p","subtle",
+    cfg.enabled ? "Увімкнення запитано · "+(cfg.actively_polling?"є робочі цикли":"виконання не підтверджено") :
+    "Опитування вимкнено"));
+  const pollFields=element("div","settings-fields");
+  const enabled=settingsField(pollFields,"Автоматичне опитування",cfg.enabled,"checkbox");
+  const interval=settingsField(pollFields,"Інтервал, секунд (15–3600)",
+    cfg.interval_seconds,"number");
+  box.appendChild(pollFields);
+  if(admin) {
+    const save=element("button","settings-save","Зберегти режим і інтервал");
+    save.type="button";
+    const outcome=element("p","subtle","");
+    save.addEventListener("click",async()=>{
+      save.disabled=true;
+      try {
+        await api("/config/polling",{body:{
+          enabled:enabled.checked,interval_seconds:Number(interval.value)
+        }});
+        outcome.textContent="Налаштування збережено";
+      } catch(error) {outcome.textContent=error.message;}
+      finally {save.disabled=false;}
+    });
+    box.appendChild(save);box.appendChild(outcome);
+  } else {enabled.disabled=true;interval.disabled=true;}
+  main.appendChild(box);
+  section("Реєстр і параметри з'єднання",
+    "IP шлюза, порт, Modbus ID і діапазон регістрів кожного інвертора");
+  const makeCard=(d,adding=false)=>{
+    const root=panel(adding?"Додати інвертор":(d.display_name||d.device_key));
+    root.className+=" settings-panel";
+    if(!adding) root.appendChild(element("p","subtle",
+      "Внутрішній ключ: "+d.device_key+" · "+(d.slot_no?"Deye №"+d.slot_no:"окремий пристрій")));
+    root.appendChild(element("p","settings-state",
+      d.verified_connection ? "З'єднання підтверджено окремою процедурою" :
+      "Канал не підтверджено · опитування заблоковане до введення в експлуатацію"));
+    const fields=element("div","settings-fields");
+    const inputs={};
+    if(adding) {
+      inputs.device_key=settingsField(fields,"Унікальний ключ (латиниця)",
+        "inverter_new","text");
+      inputs.slot_no=settingsField(fields,"Слот паралельної системи","", "select",
+        [["","Не входить у пару"],["1","Deye №1"],["2","Deye №2"]]);
+    }
+    inputs.display_name=settingsField(fields,"Назва",d.display_name||"Новий інвертор");
+    inputs.model=settingsField(fields,"Модель",d.model||"SUN-20K-SG05LP3-EU-SM2");
+    inputs.serial_number=settingsField(fields,"Серійний номер",d.serial_number||"");
+    inputs.transport=settingsField(fields,"Протокол",d.transport||"unconfigured","select",[
+      ["unconfigured","Не налаштовано"],["modbus_tcp","Modbus TCP"],["rtu_tcp","Modbus RTU через TCP-шлюз"]]);
+    inputs.gateway_ip=settingsField(fields,"IPv4 шлюза",d.gateway_ip||"");
+    inputs.gateway_port=settingsField(fields,"TCP порт",d.gateway_port||"", "number");
+    inputs.slave_id=settingsField(fields,"Modbus ID (1–247)",d.slave_id||"", "number");
+    inputs.function_code=settingsField(fields,"Функція читання",d.function_code||3,"select",
+      [[3,"FC03 Holding Registers"],[4,"FC04 Input Registers"]]);
+    inputs.register_address=settingsField(fields,"Початкова адреса регістрів",
+      d.register_address??0,"number");
+    inputs.register_count=settingsField(fields,"Кількість регістрів за цикл (1–8)",
+      d.register_count||1,"number");
+    inputs.timeout_ms=settingsField(fields,"Таймаут, мс",
+      d.timeout_ms||1500,"number");
+    inputs.enabled=settingsField(fields,"Дозволити опитування цього інвертора",
+      d.enabled||false,"checkbox");
+    root.appendChild(fields);
+    if(admin) {
+      const button=element("button","settings-save",
+        adding?"Створити інвертор":"Зберегти інвертор");
+      button.type="button";
+      const outcome=element("p","subtle","");
+      button.addEventListener("click",async()=>{
+        const payload={};
+        for(const [key,item] of Object.entries(inputs)) {
+          if(key==="slot_no") payload.slot_no=item.value===""?null:Number(item.value);
+          else if(key==="enabled") payload[key]=Boolean(item.checked);
+          else if(["gateway_port","slave_id"].includes(key))
+            payload[key]=item.value===""?null:Number(item.value);
+          else if(["function_code","register_address","register_count","timeout_ms"].includes(key))
+            payload[key]=Number(item.value);
+          else payload[key]=item.value;
+        }
+        button.disabled=true;
+        try {
+          await api(adding?"/config/inverters":"/config/inverters/"+d.id,{body:payload});
+          outcome.textContent="Збережено. Нове підключення потребує окремого підтвердження.";
+        } catch(error) {outcome.textContent=error.message;}
+        finally {button.disabled=false;}
+      });
+      root.appendChild(button);root.appendChild(outcome);
+    }else {
+      for(const input of Object.values(inputs)) input.disabled=true;
+    }
+    return root;
+  };
+  for(const device of cfg.devices||[]) main.appendChild(makeCard(device));
+  if(admin) main.appendChild(makeCard({},true));
+  main.appendChild(element("p","subtle",
+    "Налаштування не змінюють інвертор. Фізичне опитування можливе лише після "+
+    "підтвердження порту, Modbus ID, окремого агента та дозволеного шлюза."));
+}
 async function renderSystem(cycle) {
   addStatusMessage();
   section("Конфігурація системи", "Показники та пристрої MySQL");
@@ -1185,12 +1357,13 @@ async function render() {
     case "archive": await renderHistory(cycle, true); break;
     case "modbus": await renderModbus(cycle); break;
     case "system": await renderSystem(cycle); break;
+    case "settings": await renderSettings(cycle); break;
   }
 }
 async function boot() {
   // Load the database status before rendering all views.
   const results = await Promise.allSettled([
-    api("/catalog"), api("/status"), api("/signals"), api("/auth")
+    api("/catalog"), api("/status"), api("/signals"), api("/auth"), api("/parallel")
   ]);
   state.catalog = results[0].status === "fulfilled" ? results[0].value : null;
   state.status = results[1].status === "fulfilled" ? results[1].value : null;
@@ -1206,7 +1379,18 @@ async function boot() {
   }
   // Styling and data selection use the same operational mode.
   updateConnection(state.status !== null);
-  if (results[3].status === "fulfilled") createLogout(results[3].value);
+  if (results[3].status === "fulfilled") {
+    const auth=results[3].value;
+    state.role=auth.role || "viewer";state.csrf=auth.csrf || null;
+    createLogout(auth);
+  }
+  const pair=results[4].status === "fulfilled" ? results[4].value.devices : [];
+  try {
+    const stored=typeof localStorage !== "undefined" ?
+      localStorage.getItem("rakurs.selectedDeye") : null;
+    const found=(pair||[]).find(x=>x.device_key===stored);
+    if(found){state.selectedDeviceKey=stored;state.selectedSlotNo=Number(found.slot_no||1);}
+  }catch(_error){}
   await render();
 }
 window.addEventListener("hashchange", render);
