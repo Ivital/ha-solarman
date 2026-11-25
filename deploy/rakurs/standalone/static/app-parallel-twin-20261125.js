@@ -1129,6 +1129,150 @@ async function renderModbus(cycle) {
       "Не вдалося отримати довідник регістрів MySQL."));
   }
 }
+function settingsField(form, label, value, kind = "text", choices = []) {
+  const wrap=element("label","settings-field");
+  wrap.appendChild(element("span","",label));
+  let control;
+  if(kind==="select") {
+    control=element("select","");
+    for(const [v,title] of choices) {
+      const item=element("option","",title);
+      item.value=String(v);
+      if(String(v)===String(value??"")) item.selected=true;
+      control.appendChild(item);
+    }
+    control.value=String(value??"");
+  } else {
+    control=element("input","");
+    control.type=kind;
+    if(kind==="checkbox") control.checked=Boolean(value);
+    else control.value=value==null?"":String(value);
+  }
+  wrap.appendChild(control);
+  form.appendChild(wrap);
+  return control;
+}
+async function renderSettings(cycle) {
+  section("Керування інверторами та опитуванням",
+    "Налаштування зберігаються в MySQL · лише читання FC03/FC04");
+  let cfg;
+  try { cfg=await api("/config"); }
+  catch(error) {
+    if(current(cycle)) message("Налаштування недоступні",error.message,true);
+    return;
+  }
+  if(!current(cycle)) return;
+  if(!cfg.available) {
+    main.appendChild(createEmpty("Модуль ще не встановлено",
+      cfg.reason || "Потрібна контрольована міграція MySQL."));
+    return;
+  }
+  const admin=state.role==="admin" && Boolean(state.csrf);
+  if(!admin) message("Перегляд без редагування",
+    "Змінювати інвертори та параметри опитування може лише адміністратор.",false);
+  const box=panel("Автоматичне опитування",
+    "Вимкнення має дію від наступного циклу агента. Готовність MySQL ≠ доступність інвертора.");
+  box.className+=" settings-panel";
+  const status=element("p","settings-state",
+    cfg.worker_online ? "Агент: відповідає" : "Агент: не запущений");
+  box.appendChild(status);
+  box.appendChild(element("p","subtle",
+    cfg.enabled ? "Увімкнення запитано · "+(cfg.actively_polling?"є робочі цикли":"виконання не підтверджено") :
+    "Опитування вимкнено"));
+  const pollFields=element("div","settings-fields");
+  const enabled=settingsField(pollFields,"Автоматичне опитування",cfg.enabled,"checkbox");
+  const interval=settingsField(pollFields,"Інтервал, секунд (15–3600)",
+    cfg.interval_seconds,"number");
+  box.appendChild(pollFields);
+  if(admin) {
+    const save=element("button","settings-save","Зберегти режим і інтервал");
+    save.type="button";
+    const outcome=element("p","subtle","");
+    save.addEventListener("click",async()=>{
+      save.disabled=true;
+      try {
+        await api("/config/polling",{body:{
+          enabled:enabled.checked,interval_seconds:Number(interval.value)
+        }});
+        outcome.textContent="Налаштування збережено";
+      } catch(error) {outcome.textContent=error.message;}
+      finally {save.disabled=false;}
+    });
+    box.appendChild(save);box.appendChild(outcome);
+  } else {enabled.disabled=true;interval.disabled=true;}
+  main.appendChild(box);
+  section("Реєстр і параметри з'єднання",
+    "IP шлюза, порт, Modbus ID і діапазон регістрів кожного інвертора");
+  const makeCard=(d,adding=false)=>{
+    const root=panel(adding?"Додати інвертор":(d.display_name||d.device_key));
+    root.className+=" settings-panel";
+    if(!adding) root.appendChild(element("p","subtle",
+      "Внутрішній ключ: "+d.device_key+" · "+(d.slot_no?"Deye №"+d.slot_no:"окремий пристрій")));
+    root.appendChild(element("p","settings-state",
+      d.verified_connection ? "З'єднання підтверджено окремою процедурою" :
+      "Канал не підтверджено · опитування заблоковане до введення в експлуатацію"));
+    const fields=element("div","settings-fields");
+    const inputs={};
+    if(adding) {
+      inputs.device_key=settingsField(fields,"Унікальний ключ (латиниця)",
+        "inverter_new","text");
+      inputs.slot_no=settingsField(fields,"Слот паралельної системи","", "select",
+        [["","Не входить у пару"],["1","Deye №1"],["2","Deye №2"]]);
+    }
+    inputs.display_name=settingsField(fields,"Назва",d.display_name||"Новий інвертор");
+    inputs.model=settingsField(fields,"Модель",d.model||"SUN-20K-SG05LP3-EU-SM2");
+    inputs.serial_number=settingsField(fields,"Серійний номер",d.serial_number||"");
+    inputs.transport=settingsField(fields,"Протокол",d.transport||"unconfigured","select",[
+      ["unconfigured","Не налаштовано"],["modbus_tcp","Modbus TCP"],["rtu_tcp","Modbus RTU через TCP-шлюз"]]);
+    inputs.gateway_ip=settingsField(fields,"IPv4 шлюза",d.gateway_ip||"");
+    inputs.gateway_port=settingsField(fields,"TCP порт",d.gateway_port||"", "number");
+    inputs.slave_id=settingsField(fields,"Modbus ID (1–247)",d.slave_id||"", "number");
+    inputs.function_code=settingsField(fields,"Функція читання",d.function_code||3,"select",
+      [[3,"FC03 Holding Registers"],[4,"FC04 Input Registers"]]);
+    inputs.register_address=settingsField(fields,"Початкова адреса регістрів",
+      d.register_address??0,"number");
+    inputs.register_count=settingsField(fields,"Кількість регістрів за цикл (1–8)",
+      d.register_count||1,"number");
+    inputs.timeout_ms=settingsField(fields,"Таймаут, мс",
+      d.timeout_ms||1500,"number");
+    inputs.enabled=settingsField(fields,"Дозволити опитування цього інвертора",
+      d.enabled||false,"checkbox");
+    root.appendChild(fields);
+    if(admin) {
+      const button=element("button","settings-save",
+        adding?"Створити інвертор":"Зберегти інвертор");
+      button.type="button";
+      const outcome=element("p","subtle","");
+      button.addEventListener("click",async()=>{
+        const payload={};
+        for(const [key,item] of Object.entries(inputs)) {
+          if(key==="slot_no") payload.slot_no=item.value===""?null:Number(item.value);
+          else if(key==="enabled") payload[key]=Boolean(item.checked);
+          else if(["gateway_port","slave_id"].includes(key))
+            payload[key]=item.value===""?null:Number(item.value);
+          else if(["function_code","register_address","register_count","timeout_ms"].includes(key))
+            payload[key]=Number(item.value);
+          else payload[key]=item.value;
+        }
+        button.disabled=true;
+        try {
+          await api(adding?"/config/inverters":"/config/inverters/"+d.id,{body:payload});
+          outcome.textContent="Збережено. Нове підключення потребує окремого підтвердження.";
+        } catch(error) {outcome.textContent=error.message;}
+        finally {button.disabled=false;}
+      });
+      root.appendChild(button);root.appendChild(outcome);
+    }else {
+      for(const input of Object.values(inputs)) input.disabled=true;
+    }
+    return root;
+  };
+  for(const device of cfg.devices||[]) main.appendChild(makeCard(device));
+  if(admin) main.appendChild(makeCard({},true));
+  main.appendChild(element("p","subtle",
+    "Налаштування не змінюють інвертор. Фізичне опитування можливе лише після "+
+    "підтвердження порту, Modbus ID, окремого агента та дозволеного шлюза."));
+}
 async function renderSystem(cycle) {
   addStatusMessage();
   section("Конфігурація системи", "Показники та пристрої MySQL");
