@@ -64,7 +64,9 @@ $DumpArgs = @('--protocol=TCP','--host=127.0.0.1','--port=3306',
 if ($LASTEXITCODE -ne 0) { throw 'STOP: MySQL full backup failed; database unchanged' }
 $Info = Get-Item -LiteralPath $Backup
 if ($Info.Length -lt 1024) { throw 'STOP: backup too small; database unchanged' }
-$Stream = [System.IO.StreamReader]::new($Backup)
+# Windows PowerShell 4.0 on Windows Server 2012 R2 does not support ::new().
+# File.OpenText returns a StreamReader and handles UTF-8 dump text directly.
+$Stream = [System.IO.File]::OpenText($Backup)
 $Tables = 0
 $Completed = $false
 try {
