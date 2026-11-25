@@ -318,6 +318,8 @@ async function run() {
   const seededText = descendants(seeded.main).map(x => x.textContent || "").join("|");
   assert(seededText.includes("815") && seededText.includes("624") && seededText.includes("316"));
   assert(seededText.includes("АРХІВ MYSQL") && seededText.includes("SOC: —"));
+  assert(!/симуляц|симуль|тестов|демо|синтетич/i.test(seededText),
+    "Archived records must not display simulator terminology to users");
   assert(!seededText.includes("Поточна сумарна потужність: 10"));
   const rawButton = byClass(seeded.main, "parallel-raw-viewer")[0].childNodes
     .find(x => x.tagName === "button");
