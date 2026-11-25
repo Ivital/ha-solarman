@@ -288,7 +288,7 @@ async function renderOverview(cycle, primedValues = null) {
   await renderTwinSummary(cycle);
   if (!current(cycle)) return;
   section("Збережений зріз", DEMO_MODE ?
-    "Попередній тестовий набір одного пристрою · НЕ сумарні показники двох Deye" :
+    "Архів одного профілю · не сумарні показники двох Deye" :
     "Останні показники з MySQL · час Київ");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
@@ -322,7 +322,7 @@ async function renderOverview(cycle, primedValues = null) {
     "Джерело даних: MySQL";
   add(footer, element("span", "", statusText),
     element("span", "", DEMO_MODE ?
-      "Тестові вимірювання — не фактичні показники обладнання" :
+      "Записи MySQL · фізичне походження не підтверджене" :
       "Дані реальних приладів"));
   main.appendChild(footer);
 }
@@ -603,7 +603,7 @@ async function renderHistory(cycle, archived) {
       const head = element("div", "history-table-head");
       head.appendChild(element("h3", "", "Останні вимірювання"));
       head.appendChild(element("span", "subtle", "Час Київ · " +
-        (DEMO_MODE ? "тестові дані" : "MySQL")));
+        (DEMO_MODE ? "архів MySQL" : "MySQL")));
       tableArea.appendChild(head);
       const wrapper = element("div", "table-wrap");
       const table = element("table", "data-table");
@@ -617,7 +617,7 @@ async function renderHistory(cycle, archived) {
         const tr = element("tr", "");
         [time(entry.observed_at_utc),
          entry.value_decimal === null ? "—" : pretty(Number(entry.value_decimal), 3) + " " + unit,
-         entry.quality === "simulated" ? "Тестові дані" : entry.quality || "—"
+         entry.quality === "simulated" ? "Архів MySQL · джерело не підтверджене" : entry.quality || "—"
         ].forEach(value => tr.appendChild(element("td", "", value)));
         tbody.appendChild(tr);
       }
@@ -647,7 +647,7 @@ async function renderTwinSummary(cycle) {
   }
   if (!current(cycle) || !profile?.simulation || !profile.storage_ready ||
       !Array.isArray(profile.devices) || profile.devices.length !== 2) return;
-  section("Два інвертори Deye", "Окремі тестові дані кожного пристрою · MySQL");
+  section("Два інвертори Deye", "Окремі записи кожного профілю · MySQL");
   const grid = element("div", "parallel-home-grid");
   main.appendChild(grid);
   const results = await Promise.allSettled(profile.devices.map(d =>
@@ -656,8 +656,8 @@ async function renderTwinSummary(cycle) {
   profile.devices.forEach((d, i) => {
     const card = element("article", "parallel-device parallel-home-device");
     const title = element("div", "parallel-device-head");
-    add(title, element("strong", "parallel-device-name", "Тестовий Deye №" + d.slot_no),
-      element("span", "parallel-state", "СИМУЛЯЦІЯ"));
+    add(title, element("strong", "parallel-device-name", "Deye №" + d.slot_no),
+      element("span", "parallel-state", "АРХІВ MYSQL"));
     card.appendChild(title);
     card.appendChild(element("p", "parallel-device-model",
       "SUN-20K-SG05LP3-EU-SM2 · 20 кВт номінально"));
@@ -674,7 +674,7 @@ async function renderTwinSummary(cycle) {
       add(tile, element("small", "", label),
         element("strong", "", valid ?
           number(item.value_decimal) + " " + (item.unit || "") : "—"),
-        element("span", "", "Тестове значення · НЕ телеметрія"));
+        element("span", "", "Запис MySQL · джерело не підтверджене"));
       metrics.appendChild(tile);
     }
     card.appendChild(metrics);
@@ -688,8 +688,8 @@ async function renderTwinSummary(cycle) {
     grid.appendChild(card);
   });
   main.appendChild(element("p", "parallel-readonly-note",
-    "Це дві симуляції, не показники реального обладнання. Спільна АКБ " +
-    "не має підтвердженого SOC; відсотки тестових пристроїв не додаються."));
+    "Походження цих значень не підтверджене фізичним опитуванням. Спільна АКБ " +
+    "не має підтвердженого SOC; відсотки двох профілів не додаються."));
 }
 
 async function renderParallel(cycle) {
@@ -699,7 +699,7 @@ async function renderParallel(cycle) {
   await renderParallelDemo(cycle);
   if (!current(cycle)) return;
   section("Фізичні інвертори — ще не підключені",
-    "Місця для двох реальних Deye, без вигаданих показників");
+    "Профілі фізичних Deye · підтверджених вимірювань поки немає");
   const intro = panel("Паралельна система · 2 × 20 кВт",
     "40 кВт — номінальна паспортна потужність двох інверторів, а не поточна генерація.");
   intro.className += " parallel-intro";
@@ -764,7 +764,7 @@ async function renderParallel(cycle) {
       ];
       if (!data) {
         card.appendChild(createEmpty("Зчитування ще не налаштоване",
-          "Rakurs не підставляє тестові показники як дані другого інвертора."));
+          "Rakurs не підставляє архівні значення як вимірювання іншого інвертора."));
         detail.appendChild(card);
         continue;
       }
@@ -813,8 +813,8 @@ async function renderParallel(cycle) {
       } else {
         const points = history.value.points || [];
         if (points.filter(point => point.value_decimal !== null).length < 2) {
-          chartBox.appendChild(createEmpty("Ще немає реальної історії",
-            "Графік не підміняється синтетичними даними."));
+          chartBox.appendChild(createEmpty("Ще немає підтвердженої історії",
+            "Графік не підміняється вигаданими даними."));
         } else {
           chartBox.appendChild(svgChart(points, "кВт"));
         }
@@ -823,8 +823,8 @@ async function renderParallel(cycle) {
     }
     if (!devices.length) {
       const explain = element("p", "parallel-readonly-note",
-        "У базі поки є синтетичний тестовий пристрій, але він навмисно не " +
-        "вважається фізичним інвертором №1 чи №2.");
+        "У базі є архівні записи, однак вони не використовуються як " +
+        "підтвердження фізичного інвертора №1 чи №2.");
       main.appendChild(explain);
     }
   } catch (_error) {
@@ -834,13 +834,13 @@ async function renderParallel(cycle) {
 }
 
 async function renderParallelDemo(cycle) {
-  section("Тестова база двох інверторів",
-    "Окремий навчальний набір · не є зчитуванням із фізичного обладнання");
-  const scope = panel("Симульовані вимірювання",
-    "Перевірка повноти архіву для кожного з двох тестових Deye.");
+  section("Архів двох інверторів",
+    "Збережені записи MySQL · фізичне джерело не підтверджене");
+  const scope = panel("Архівні записи",
+    "Перевірка повноти архіву для кожного з двох профілів Deye.");
   scope.className += "parallel-demo-panel";
   const intro = element("p", "parallel-warning",
-    "УСІ наведені нижче значення синтетичні. Їх не можна використовувати " +
+    "Походження цих значень не підтверджене фізичним опитуванням. Їх не можна використовувати " +
     "для керування живленням, розрахунків енергії чи діагностики аварій.");
   scope.appendChild(intro);
   main.appendChild(scope);
@@ -850,27 +850,27 @@ async function renderParallelDemo(cycle) {
   try {
     payload = await api("/parallel/simulation");
   } catch (_error) {
-    if (current(cycle)) cards.appendChild(createEmpty("Тестовий архів недоступний",
+    if (current(cycle)) cards.appendChild(createEmpty("Архів недоступний",
       "Перевірте наявність таблиць MySQL для збереження Modbus."));
     return;
   }
   if (!current(cycle)) return;
   const devices = payload.devices || [];
   if (!payload.storage_ready || devices.length !== 2) {
-    cards.appendChild(createEmpty("Два тестові інвертори ще не заповнені",
-      "Потрібна окрема одноразова операція створення демонстраційних записів " +
-      "із резервною копією MySQL. Реальних вимірювань вона не додає."));
+    cards.appendChild(createEmpty("Архів двох інверторів ще не заповнений",
+      "Не знайдено двох повних наборів архівних записів у MySQL. " +
+      "Для їх відображення потрібні записи з відповідних джерел."));
     return;
   }
   for (const device of devices) {
     const card = element("article", "parallel-device");
     const title = element("div", "parallel-device-head");
     add(title, element("strong", "parallel-device-name",
-      "Тестовий інвертор №" + device.slot_no),
-      element("span", "parallel-state", "СИМУЛЯЦІЯ"));
+      "Deye №" + device.slot_no),
+      element("span", "parallel-state", "АРХІВ MYSQL"));
     card.appendChild(title);
     card.appendChild(element("p", "parallel-device-model",
-      "SUN-20K-SG05LP3-EU-SM2 · без фізичного підключення"));
+      "SUN-20K-SG05LP3-EU-SM2 · архів MySQL"));
     const summary = element("div", "parallel-demo-counters");
     for (const [name, count] of [
       ["Сирі регістри", device.raw_registers],
@@ -901,12 +901,12 @@ async function renderParallelDemo(cycle) {
         add(tile, element("small", "", label),
           element("strong", "", ready ?
             number(reading.value_decimal) + " " + (reading.unit || "") : "—"),
-          element("span", "", "Тільки тестові дані"));
+          element("span", "", "Запис MySQL"));
         previews.appendChild(tile);
       }
     } catch (_error) {
-      previews.appendChild(createEmpty("Тестові значення недоступні",
-        "Можна перевірити базу, не змінюючи реальні пристрої."));
+      previews.appendChild(createEmpty("Архівні значення недоступні",
+        "Перевірка архіву не звертається до обладнання."));
     }
     const rawSection = element("section", "parallel-raw-viewer");
     rawSection.appendChild(element("h3", "", "Повний архів сирих регістрів"));
@@ -928,7 +928,7 @@ async function renderParallelDemo(cycle) {
           add(row, element("code", "", String(item.register_address)),
             element("span", "", "FC" + item.function_code),
             element("strong", "", String(item.raw_uint16)),
-            element("small", "", "тестовий"));
+            element("small", "", "архів"));
           table.appendChild(row);
         }
         offset += rows.length;
@@ -967,7 +967,7 @@ async function renderParallelDemo(cycle) {
             element("code", "", entry.field_key),
             element("span", "", entry.field_name),
             element("strong", "", shown + " " + (entry.unit || "")),
-            element("small", "", "СИМУЛЯЦІЯ"));
+            element("small", "", "АРХІВ MYSQL"));
           decodedRows.appendChild(row);
         }
         fieldOffset += items.length;
@@ -998,7 +998,7 @@ async function renderEvents(cycle) {
   main.appendChild(summary);
 
   const eventPanel = panel("Події обладнання",
-    "Фактичні записи журналу пристрою. Симульовані вимірювання не вважаються аваріями.");
+    "Фактичні записи журналу пристрою. Звичайні вимірювання не вважаються аваріями.");
   const deviceBody = element("div", "events-list");
   eventPanel.appendChild(deviceBody);
   main.appendChild(eventPanel);
@@ -1057,7 +1057,7 @@ async function renderEvents(cycle) {
       const simulated = batch.status === "simulated";
       const title = code === "DEYE_HISTORY_72H_V1" ?
         "Додано історію вимірювань за 72 години" :
-        simulated ? "Завантажено початковий тестовий набір" :
+        simulated ? "Завантажено архівний набір" :
         "Операція завантаження: " + (batch.status || "невідомо");
       const accepted = batch.accepted_count ?? 0;
       const received = batch.received_count ?? 0;
@@ -1069,7 +1069,7 @@ async function renderEvents(cycle) {
           " · Отримано: " + received + " · Відхилено: " + rejected));
       const stamp = element("div", "event-stamp");
       add(stamp, element("span", "event-severity", simulated ?
-        "Тестові дані" : (batch.status || "Без статусу")),
+        "Архів MySQL" : (batch.status || "Без статусу")),
         element("time", "", time(batch.finished_at_utc || batch.started_at_utc)));
       add(row, marker, info, stamp);
       batchBody.appendChild(row);
@@ -1083,7 +1083,7 @@ async function renderEvents(cycle) {
 
 async function renderTable(path, sectionName, headings, fields, cycle) {
   addStatusMessage();
-  section(sectionName, DEMO_MODE ? "Демо · MySQL" :
+  section(sectionName, DEMO_MODE ? "Архів MySQL" :
                                         "Записи виключно з MySQL rakurs");
   const root = panel(sectionName);
   main.appendChild(root);
@@ -1091,7 +1091,7 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
     const payload = await api(path);
     if (!current(cycle)) return;
     const source = payload.events || payload.devices || payload.batches || [];
-    if (!source.length) { root.appendChild(createEmpty("Записів поки немає", "Дані не вигадуються й не генеруються для демонстрації.")); return; }
+    if (!source.length) { root.appendChild(createEmpty("Записів поки немає", "Наявні записи відображаються без підстановки значень.")); return; }
     const wrap = element("div", "table-wrap"), table = element("table", "data-table");
     const thead = element("thead", ""), tr = element("tr", "");
     headings.forEach(t => tr.appendChild(element("th", "", t)));
@@ -1206,16 +1206,16 @@ async function renderModbus(cycle) {
 }
 async function renderSystem(cycle) {
   addStatusMessage();
-  section("Конфігурація системи", DEMO_MODE ? "Демо режим" :
+  section("Конфігурація системи", DEMO_MODE ? "Архівні дані" :
                                                       "Статус незалежного Rakurs");
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
-    ["Джерело", DEMO_MODE ? "MySQL · СИМУЛЯЦІЯ" : "MySQL"],
+    ["Джерело", DEMO_MODE ? "MySQL · походження не підтверджене" : "MySQL"],
     ["Пристрої", state.status ? state.status.registered_devices : "—"],
-    [DEMO_MODE ? "Тестові параметри" : "Підтверджені сигнали",
+    [DEMO_MODE ? "Параметри архіву" : "Підтверджені сигнали",
       state.status ? (DEMO_MODE ? state.status.simulated_signals :
                                   state.status.verified_signals) : "—"],
     ["Колектор Deye", "Не запущений"]
@@ -1311,12 +1311,12 @@ async function boot() {
   const mode = document.getElementById("mode-indicator");
   if (mode) {
     const awaitingReal = !DEMO_MODE && !state.status?.has_real_samples;
-    mode.textContent = DEMO_MODE ? "Тестові дані" :
+    mode.textContent = DEMO_MODE ? "Архів MySQL" :
       awaitingReal ? "Очікування реальних даних" : "Реальні вимірювання";
     mode.className = "mode-indicator " + (DEMO_MODE ? "mode-simulation" :
       awaitingReal ? "mode-pending" : "mode-real");
     mode.title = DEMO_MODE ?
-      "Це симульована історія MySQL, а не показники підключеного інвертора" :
+      "Архівні записи MySQL не підтверджені фізичним опитуванням" :
       awaitingReal ? "Підтверджених реальних вимірювань поки немає" :
       "Дані, отримані з підключених вимірювальних приладів";
   }
