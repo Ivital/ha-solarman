@@ -1488,6 +1488,27 @@ async function boot() {
     const found=(pair||[]).find(x=>x.device_key===stored);
     if(found){state.selectedDeviceKey=stored;state.selectedSlotNo=Number(found.slot_no||1);}
   }catch(_error){}
+  const choice=document.getElementById("device-select");
+  if(choice && (pair||[]).length) {
+    clear(choice);
+    for(const d of pair) {
+      const option=element("option","","Deye №"+Number(d.slot_no||1));
+      option.value=d.device_key;
+      choice.appendChild(option);
+    }
+    choice.value=state.selectedDeviceKey || pair[0].device_key;
+    choice.hidden=(pair||[]).length<2;
+    choice.addEventListener("change",()=>{
+      const picked=pair.find(d=>d.device_key===choice.value);
+      if(!picked)return;
+      state.selectedDeviceKey=picked.device_key;
+      state.selectedSlotNo=Number(picked.slot_no||1);
+      try {if(typeof localStorage!=="undefined")
+        localStorage.setItem("rakurs.selectedDeye",picked.device_key);
+      } catch(_error) {}
+      render();
+    });
+  }
   await render();
 }
 window.addEventListener("hashchange", render);
