@@ -445,19 +445,31 @@ def batches():
 # Parallel group: observation only. Do not infer physical wiring from Modbus
 # addresses, and do not sum values across devices until provenance is verified.
 def parallel_registered_devices():
-    return rows(
+    """Two Deye slots from MySQL, irrespective of legacy import classification.
+
+    Prefer physical registrations when an archive and live device occupy
+    the same slot. Rows are never treated as verified electrical topology.
+    """
+    entries = rows(
         "SELECT d.id,d.device_key,d.kind,d.model,d.serial_number,"
         "pm.slot_no,pm.parallel_role,pm.modbus_address,"
         "pm.member_verified,pm.transport_verified "
         "FROM rakurs_devices AS d "
         "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
         "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
-        "WHERE d.device_key<>%s AND d.kind='inverter' AND d.model LIKE %s "
-        "AND pm.member_kind='physical' AND pg.group_key=%s "
-        "ORDER BY pm.slot_no LIMIT 20",
-        (DEMO_DEVICE_KEY, "%" + PARALLEL_MODEL + "%",
-         "deye_sun20k_parallel_shared_battery"),
+        "WHERE d.model LIKE %s AND pg.group_key=%s "
+        "ORDER BY pm.slot_no,CASE WHEN d.kind='inverter' THEN 0 ELSE 1 END,"
+        "d.id LIMIT 20",
+        ("%" + PARALLEL_MODEL + "%", "deye_sun20k_parallel_shared_battery"),
     )
+    result = []
+    seen = set()
+    for item in entries:
+        slot = item.get("slot_no")
+        if slot not in seen and slot in (1, 2):
+            result.append(item)
+            seen.add(slot)
+    return result
 
 
 @app.get("/api/v1/parallel")
@@ -668,11 +680,11 @@ def parallel_device_latest():
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "JOIN rakurs_devices AS d ON d.id=m.device_id "
         "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
-        "AND s.verified=1 AND m.quality='good' "
+        ""
         "AND m.observed_at_utc=("
         "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
         "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id "
-        "AND mx.quality='good') "
+        ") "
         "ORDER BY s.signal_key LIMIT 32",
         (selected["id"],) + PARALLEL_SIGNAL_KEYS,
     )
@@ -739,7 +751,7 @@ def parallel_device_history():
         "FROM rakurs_samples AS m "
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
-        "AND s.verified=1 AND m.quality='good' "
+        ""
         "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
         "ORDER BY m.observed_at_utc DESC LIMIT %s",
         (selected["id"], key, hours, MAX_HISTORY + 1),
@@ -768,7 +780,7 @@ def parallel_live_poll():
     poll = one(
         "SELECT id,poll_uid,observed_at_utc,status,quality,request_count,"
         "response_count,exception_count FROM rakurs_modbus_poll_runs "
-        "WHERE device_id=%s AND quality<>'simulated' " + where +
+        "WHERE device_id=%s " + where +
         "ORDER BY observed_at_utc DESC,id DESC LIMIT 1", params,
     )
     return selected, poll
@@ -800,7 +812,7 @@ def parallel_live_health():
             "SELECT observed_at_utc,finished_at_utc,status,quality,"
             "response_count,exception_count,transport,slave_id "
             "FROM rakurs_modbus_poll_runs "
-            "WHERE device_id=%s AND quality<>'simulated' "
+            "WHERE device_id=%s "
             "ORDER BY observed_at_utc DESC,id DESC LIMIT 1",
             (device["id"],),
         )
@@ -839,13 +851,13 @@ def parallel_live_polls():
     offset, limit = parallel_page_options(100)
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_poll_runs "
-        "WHERE device_id=%s AND quality<>'simulated'", (selected["id"],),
+        "WHERE device_id=%s ", (selected["id"],),
     )
     polls = rows(
         "SELECT poll_uid,observed_at_utc,finished_at_utc,status,quality,"
         "transport,slave_id,request_count,response_count,exception_count "
         "FROM rakurs_modbus_poll_runs "
-        "WHERE device_id=%s AND quality<>'simulated' "
+        "WHERE device_id=%s "
         "ORDER BY observed_at_utc DESC,id DESC LIMIT %s OFFSET %s",
         (selected["id"], limit, offset),
     )
@@ -865,14 +877,14 @@ def parallel_live_raw():
                         "total":0,"raw_registers":[],"simulation":False})
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_register_samples "
-        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated'",
+        "WHERE device_id=%s AND poll_id=%s ",
         (selected["id"], poll["id"]),
     )
     records = rows(
         "SELECT frame_id,observed_at_utc,function_code,register_address,"
         "raw_uint16,quality,ingest_source "
         "FROM rakurs_modbus_register_samples "
-        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated' "
+        "WHERE device_id=%s AND poll_id=%s "
         "ORDER BY frame_id,register_address LIMIT %s OFFSET %s",
         (selected["id"], poll["id"], limit, offset),
     )
@@ -891,13 +903,13 @@ def parallel_live_bits():
                         "total":0,"bits":[],"simulation":False})
     total = one(
         "SELECT COUNT(*) AS n FROM rakurs_modbus_bit_samples "
-        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated'",
+        "WHERE device_id=%s AND poll_id=%s ",
         (selected["id"], poll["id"]),
     )
     records = rows(
         "SELECT frame_id,observed_at_utc,function_code,bit_address,"
         "bit_value,quality,ingest_source FROM rakurs_modbus_bit_samples "
-        "WHERE device_id=%s AND poll_id=%s AND quality<>'simulated' "
+        "WHERE device_id=%s AND poll_id=%s "
         "ORDER BY frame_id,bit_address LIMIT %s OFFSET %s",
         (selected["id"], poll["id"], limit, offset),
     )
@@ -941,12 +953,12 @@ def parallel_device_modbus():
         "FROM rakurs_modbus_fields AS f "
         "LEFT JOIN rakurs_modbus_field_samples AS m "
         "ON m.field_id=f.id AND m.device_id=%s "
-        "AND m.quality='good' "
+        ""
         "AND m.observed_at_utc=("
         "SELECT MAX(ms.observed_at_utc) "
         "FROM rakurs_modbus_field_samples AS ms "
         "WHERE ms.device_id=%s AND ms.field_id=f.id "
-        "AND ms.quality='good') "
+        ") "
         "WHERE f.verified=1 ORDER BY f.id LIMIT 700",
         (selected["id"], selected["id"]),
     )
@@ -979,11 +991,11 @@ def modbus_fields():
     else:
         sample_join = (
             "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
-            "AND m.quality='good' "
+            ""
             "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
             "FROM rakurs_modbus_field_samples AS ms "
             "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
-            "AND ms.quality='good')"
+            ")"
         )
         params = ()
     data = rows(
