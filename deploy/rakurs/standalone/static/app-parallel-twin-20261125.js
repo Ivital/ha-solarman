@@ -238,7 +238,7 @@ function energyFlow(values) {
   root.appendChild(diagram);
   const note = element("p", "energy-note",
     "Напрямки відповідають знаку потужності у збережених даних. " +
-    "Схема показує сумарні потоки, а не розподіл енергії між окремими споживачами.");
+    "Схема показує збережені показники одного пристрою, не суму двох інверторів.");
   root.appendChild(note);
   return root;
 }
@@ -936,8 +936,7 @@ async function renderEvents(cycle) {
         element("small", "", "Прийнято: " + accepted +
           " · Отримано: " + received + " · Відхилено: " + rejected));
       const stamp = element("div", "event-stamp");
-      add(stamp, element("span", "event-severity", simulated ?
-        "Архів MySQL" : (batch.status || "Без статусу")),
+      add(stamp, element("span", "event-severity", "MySQL"),
         element("time", "", time(batch.finished_at_utc || batch.started_at_utc)));
       add(row, marker, info, stamp);
       batchBody.appendChild(row);
@@ -1125,7 +1124,7 @@ async function render() {
         console.warn("Rakurs: keeping original MySQL readings; client API incomplete");
         // The independent twin archive is not dependent on the legacy single
         // inverter SSR values. Keep existing SSR and append twin cards only
-        // when verified twin simulation endpoints respond.
+        // when the two inverter data endpoints respond.
         if (!state.twinFallbackCycle || state.twinFallbackCycle !== cycle) {
           state.twinFallbackCycle = cycle;
           await renderTwinSummary(cycle);
