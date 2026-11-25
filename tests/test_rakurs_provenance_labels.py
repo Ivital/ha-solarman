@@ -26,7 +26,7 @@ class PublicPresentationTests(unittest.TestCase):
     def test_all_js_entrypoints_share_single_mode(self):
         active = (ROOT / "static/app-parallel-twin-20261125.js").read_text()
         self.assertIn('const DEMO_MODE = false;', active)
-        self.assertIn('const url = base + path;', active)
+        self.assertIn('const url = base + path + suffix;', active)
         self.assertIn('mode.textContent = empty ? "Очікування показників" : "Дані MySQL";', active)
         self.assertIn('api("/parallel/latest?device="', active)
         self.assertIn('api("/parallel/raw"', active)
