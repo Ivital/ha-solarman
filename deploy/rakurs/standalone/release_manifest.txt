@@ -12,6 +12,7 @@ templates/index.html
 templates/login.html
 templates/deye_server.html
 static/app.js
+static/app-stable-20261124.js
 static/style.css
 static/login.css
 static/clarity-ui-20261124.css
