@@ -113,6 +113,44 @@ assert status["registered_devices"]==len(devices["devices"]),(
 topology=get("/api/v1/parallel")
 listed=topology["devices"]
 assert topology["registered_inverters"]==len(listed)
+assert len(listed)==2, "Expected the two Deye group slots"
+with m.open_db() as db:
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT d.id,d.device_key,pm.slot_no FROM rakurs_devices AS d "
+            "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
+            "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
+            "WHERE pg.group_key=%s AND pm.slot_no IN (1,2) "
+            "ORDER BY pm.slot_no",
+            ("deye_sun20k_parallel_shared_battery",),
+        )
+        slots = {x["slot_no"]:x for x in cur.fetchall()}
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key=%s",
+            ("simulated_deye_sg05lp3",),
+        )
+        legacy = cur.fetchone()["n"]
+assert set(slots)=={1,2}
+assert slots[1]["device_key"]==listed[0]["device_key"]
+assert slots[2]["device_key"]==listed[1]["device_key"]
+default = get("/api/v1/latest?keys=pv_power")
+assert default["primary_device_id"]==slots[1]["id"]
+second = get("/api/v1/latest?keys=pv_power&device="+quote(slots[2]["device_key"]))
+assert second["primary_device_id"]==slots[2]["id"]
+for endpoint in (
+    "/api/v1/parallel/simulation",
+    "/api/v1/parallel/simulation/latest?device=sim_deye20k_parallel_1",
+    "/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1",
+    "/api/v1/parallel/simulation/fields?device=sim_deye20k_parallel_1",
+):
+    assert c.get(endpoint,base_url="https://localhost").status_code==404
+assert c.get(
+    "/api/v1/latest?keys=pv_power&device=simulated_deye_sg05lp3",
+    base_url="https://localhost").status_code==404
+print("DEYE_1_PRIMARY_MATCH=PASS")
+print("DEYE_2_SCOPED_SELECTION=PASS")
+print("LEGACY_SIMULATION_APIS_RETIRED=PASS")
+print("LEGACY_SINGLE_DEYE_PRESENT=",legacy)
 for item in listed:
     key=item["device_key"]
     encoded=quote(key,safe="")
