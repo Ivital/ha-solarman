@@ -115,6 +115,9 @@ topology=get("/api/v1/parallel")
 listed=topology["devices"]
 assert topology["registered_inverters"]==len(listed)
 assert len(listed)==2, "Expected the two Deye group slots"
+assert [int(d["slot_no"]) for d in listed]==[1,2], (
+    "The public API must label the two physical slots Deye №1/№2", listed)
+print("DEYE_SLOT_LABELS=PASS")
 with m.open_db() as db:
     with db.cursor() as cur:
         cur.execute(
