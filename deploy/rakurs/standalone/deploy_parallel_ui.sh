@@ -166,6 +166,8 @@ assert profile["aggregate_verified"] is False
 assert profile["battery_soc_percent"] is None
 assert profile["aggregate_values"] == {}
 assert len(profile["devices"]) == profile["registered_inverters"]
+assert [int(d["slot_no"]) for d in profile["devices"]]==[1,2]
+print("PARALLEL_PUBLIC_SLOT_LABELS=PASS")
 assert profile["registered_inverters"] == len(profile["devices"])
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
 print("MYSQL_DEYE_DEVICE_SLOTS=" + str(profile["registered_inverters"]))
