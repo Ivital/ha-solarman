@@ -1310,10 +1310,14 @@ async function boot() {
 
   const mode = document.getElementById("mode-indicator");
   if (mode) {
-    mode.textContent = DEMO_MODE ? "Тестові дані" : "Реальні вимірювання";
-    mode.className = "mode-indicator " + (DEMO_MODE ? "mode-simulation" : "mode-real");
+    const awaitingReal = !DEMO_MODE && !state.status?.has_real_samples;
+    mode.textContent = DEMO_MODE ? "Тестові дані" :
+      awaitingReal ? "Очікування реальних даних" : "Реальні вимірювання";
+    mode.className = "mode-indicator " + (DEMO_MODE ? "mode-simulation" :
+      awaitingReal ? "mode-pending" : "mode-real");
     mode.title = DEMO_MODE ?
       "Це симульована історія MySQL, а не показники підключеного інвертора" :
+      awaitingReal ? "Підтверджених реальних вимірювань поки немає" :
       "Дані, отримані з підключених вимірювальних приладів";
   }
   if (DEMO_MODE) document.body.classList.add("demo-mode");
