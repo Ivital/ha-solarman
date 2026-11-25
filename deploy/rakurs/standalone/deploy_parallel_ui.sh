@@ -14,8 +14,8 @@ ROOT="$(cd -- "$HERE/../../.." && pwd)"
 TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
-  app.py parallel_support.py modbus_archive.py modbus_wire.py
-  mysql_transport.py templates/index.html templates/deye_server.html
+  app.py auth.py parallel_support.py modbus_archive.py modbus_wire.py
+  mysql_transport.py templates/index.html templates/login.html templates/deye_server.html
   static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
 )
@@ -31,6 +31,7 @@ grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parall
 grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'Дані MySQL' "$HERE/templates/index.html"
 grep -Fq 'ПОКАЗНИКИ З MYSQL' "$HERE/templates/deye_server.html"
+! grep -Fq 'name="demo"' "$HERE/templates/login.html"
 grep -Fq 'aggregate_verified": False' "$HERE/parallel_support.py"
 if command -v node >/dev/null 2>&1; then
   node --check "$HERE/static/app-parallel-twin-20261125.js"
