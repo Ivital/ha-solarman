@@ -26,8 +26,35 @@ sudo -u rakurs env \
 from importlib import import_module
 from urllib.parse import quote
 import time
+import pymysql
 
 m=import_module("standalone.app")
+
+# Diagnostic wrappers are confined to this isolated process. They print a
+# MySQL errno and relevant table family, not credentials or SQL parameter data.
+def monitored(action, original):
+    def wrapper(sql, params=()):
+        started = time.monotonic()
+        table = next((name for name in (
+            "rakurs_modbus_field_samples", "rakurs_samples",
+            "rakurs_signals", "rakurs_modbus_fields",
+            "rakurs_parallel_members") if name in sql), "other")
+        try:
+            return original(sql, params)
+        except pymysql.MySQLError as error:
+            errno = error.args[0] if error.args and isinstance(error.args[0], int) else "unknown"
+            print("MYSQL_READ_ERROR", action, "TABLE", table, "ERRNO", errno,
+                  "MS", round((time.monotonic()-started)*1000), flush=True)
+            raise
+        finally:
+            elapsed = round((time.monotonic()-started)*1000)
+            if elapsed > 2500:
+                print("MYSQL_SLOW_READ", action, "TABLE", table, "MS", elapsed,
+                      flush=True)
+    return wrapper
+
+m.rows = monitored("rows", m.rows)
+m.one = monitored("one", m.one)
 with m.open_db() as db:
     with db.cursor() as cur:
         cur.execute(
@@ -64,8 +91,10 @@ c=m.app.test_client()
 with c.session_transaction(base_url="https://localhost") as session:
     session.update(uid=user["id"],ver=user["session_version"],at=int(time.time()))
 def get(path):
+    started = time.monotonic()
     r=c.get(path,base_url="https://localhost")
-    print("ROUTE",path.split("?")[0],"HTTP",r.status_code)
+    print("ROUTE",path.split("?")[0],"HTTP",r.status_code,
+          "MS",round((time.monotonic()-started)*1000),flush=True)
     if r.status_code!=200:
         raise AssertionError(f"NEW_CODE_ROUTE_FAIL={path} HTTP={r.status_code}")
     return r.get_json() if r.is_json else r.get_data(as_text=True)
