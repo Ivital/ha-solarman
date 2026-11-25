@@ -195,5 +195,62 @@ class AdminApiTests(unittest.TestCase):
         self.assertEqual(self.db.calls,[])
 
 
+class ArchiveRangeTests(unittest.TestCase):
+    def setUp(self):
+        from standalone import app as module
+        self.module=module
+        module.app.config.update(TESTING=True,AUTH_READY=True,
+                                 SECRET_KEY="test-range",SESSION_COOKIE_SECURE=False)
+        self.client=module.app.test_client()
+        with self.client.session_transaction() as sess:
+            sess.update(uid=123,ver=1,at=int(time.time()))
+        self.queries=[]
+        def lookup(sql,params=()):
+            if "FROM rakurs_users WHERE id=%s" in sql:
+                return {"id":123,"username":"admin","role":"admin",
+                        "session_version":1,"is_active":1}
+            if "SELECT d.id AS id" in sql:
+                return {"id":2}
+            return None
+        def history(sql,params=()):
+            self.queries.append((sql,params))
+            if "FROM rakurs_samples AS m" in sql:
+                return [{"observed_at_utc":datetime(2026,11,25,9,0),
+                         "value_decimal":"5.1","raw_value":None,"quality":"good"}]
+            return []
+        self.one=patch.object(module,"one",side_effect=lookup)
+        self.rows=patch.object(module,"rows",side_effect=history)
+        self.one.start();self.rows.start()
+        self.addCleanup(self.one.stop);self.addCleanup(self.rows.stop)
+
+    def test_bounded_archive_select_is_scoped_and_utc(self):
+        path=("/api/v1/history/range?key=pv_power&"
+              "start=2026-11-25T00:00:00Z&end=2026-11-26T00:00:00Z")
+        r=self.client.get(path)
+        self.assertEqual(r.status_code,200)
+        data=r.get_json()
+        self.assertEqual(data["primary_device_id"],2)
+        self.assertEqual(len(data["points"]),1)
+        query,params=self.queries[-1]
+        self.assertIn("m.device_id=%s",query)
+        self.assertIn("s.signal_key=%s",query)
+        self.assertEqual(params[0:2],(2,"pv_power"))
+        self.assertLessEqual(params[4],1001)
+        self.assertNotIn("DELETE",query)
+
+    def test_rejects_bad_dates_and_excessive_archive_range(self):
+        for query in (
+            "start=2026-11-25&end=2026-11-26",
+            "start=2026-11-25T00:00:00Z&end=2027-01-10T00:00:00Z",
+            "start=2026-11-26T00:00:00Z&end=2026-11-25T00:00:00Z",
+            "start=bad&end=2026-11-25T00:00:00Z",
+        ):
+            with self.subTest(query=query):
+                r=self.client.get("/api/v1/history/range?key=pv_power&"+query)
+                self.assertEqual(r.status_code,400)
+        self.assertEqual(self.queries,[])
+
+
+
 if __name__=="__main__":
     unittest.main()
