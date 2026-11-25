@@ -31,6 +31,8 @@ class LegacyDeyeRetirementTests(unittest.TestCase):
         script=(BASE/"retire_legacy_deye_windows.ps1").read_text(encoding="utf-8")
         self.assertIn("param([switch]$Apply)",script)
         self.assertIn("mysqldump.exe",script)
+        self.assertIn("[System.IO.File]::OpenText($Backup)",script)
+        self.assertNotIn("[System.IO.StreamReader]::new(",script)
         self.assertIn("--single-transaction",script)
         self.assertIn("BACKUP_SHA256",script)
         self.assertIn("START TRANSACTION;",script)
