@@ -57,16 +57,16 @@ INSERT INTO rakurs_samples
  value_decimal,raw_value,quality,ingest_source)
 SELECT
  m.device_id,m.signal_id,
- TIMESTAMPADD(MINUTE, -30*g.tick, m.observed_at_utc),
+ TIMESTAMPADD(MINUTE, -30*CAST(g.tick AS SIGNED), m.observed_at_utc),
  UTC_TIMESTAMP(6),
  CASE
   WHEN m.value_decimal IS NULL THEN NULL
   WHEN sig.signal_key IN ('pv_power','pv1_power','pv2_power') THEN
    ROUND(m.value_decimal *
      GREATEST(0,SIN(PI() * (
-       HOUR(TIMESTAMPADD(MINUTE,-30*g.tick,
+       HOUR(TIMESTAMPADD(MINUTE,-30*CAST(g.tick AS SIGNED),
          TIMESTAMPADD(HOUR,2,m.observed_at_utc))) +
-       MINUTE(TIMESTAMPADD(MINUTE,-30*g.tick,
+       MINUTE(TIMESTAMPADD(MINUTE,-30*CAST(g.tick AS SIGNED),
          TIMESTAMPADD(HOUR,2,m.observed_at_utc)))/60 - 7
      )/10)) *
      IF(m.device_id=2,0.98,1.07),5)
@@ -76,13 +76,13 @@ SELECT
   WHEN sig.signal_key LIKE '%energy_total' OR
        sig.signal_key LIKE '%import_total' OR
        sig.signal_key LIKE '%export_total' THEN
-   ROUND(GREATEST(0,m.value_decimal-g.tick*0.012*
+   ROUND(GREATEST(0,m.value_decimal-CAST(g.tick AS SIGNED)*0.012*
      IF(m.device_id=2,1,1.07)),5)
   WHEN sig.signal_key LIKE '%energy_today' OR
        sig.signal_key LIKE '%charge_today' OR
        sig.signal_key LIKE '%discharge_today' THEN
    ROUND(GREATEST(0,m.value_decimal*
-    (HOUR(TIMESTAMPADD(MINUTE,-30*g.tick,
+    (HOUR(TIMESTAMPADD(MINUTE,-30*CAST(g.tick AS SIGNED),
       TIMESTAMPADD(HOUR,2,m.observed_at_utc)))+1)/24),5)
   WHEN sig.signal_key LIKE '%status' OR
        sig.signal_key LIKE '%state' OR
@@ -119,7 +119,7 @@ INSERT INTO rakurs_modbus_field_samples
  value_decimal,value_text,raw_registers_json,quality,ingest_source)
 SELECT
  m.device_id,m.field_id,
- TIMESTAMPADD(HOUR,-g.tick,m.observed_at_utc),
+ TIMESTAMPADD(HOUR,-CAST(g.tick AS SIGNED),m.observed_at_utc),
  UTC_TIMESTAMP(6),
  CASE
   WHEN m.value_decimal IS NULL THEN NULL
@@ -129,7 +129,7 @@ SELECT
        f.field_key LIKE '%rated%' OR f.field_key LIKE '%address'
        THEN m.value_decimal
   WHEN f.field_key LIKE '%total%' THEN
-    ROUND(GREATEST(0,m.value_decimal-g.tick*0.02),5)
+    ROUND(GREATEST(0,m.value_decimal-CAST(g.tick AS SIGNED)*0.02),5)
   WHEN f.field_key LIKE '%power%' OR f.field_key LIKE '%current%' THEN
     ROUND(GREATEST(0,m.value_decimal*
        (0.88+0.12*SIN(g.tick*0.13+IF(m.device_id=2,0.6,1.2)))),5)
