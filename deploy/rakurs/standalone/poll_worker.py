@@ -211,7 +211,9 @@ def ready_devices(db):
                     item.get("member_verified") == 1 and
                     item.get("transport_verified") == 1 and
                     host in allowed and item["transport"] in ("modbus_tcp","rtu_tcp")
-                    and item["slave_id"]==item["modbus_address"] and
+                    and 1 <= int(item["gateway_port"]) <= 65535 and
+                    1 <= int(item["slave_id"]) <= 247 and
+                    item["slave_id"]==item["modbus_address"] and
                     1<=int(item["register_count"])<=8):
                 valid.append(item)
         except (ValueError,TypeError):
