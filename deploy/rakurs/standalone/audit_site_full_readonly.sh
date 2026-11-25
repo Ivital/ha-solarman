@@ -5,8 +5,8 @@ umask 077
 ROOT=/home/ivital/deye-monitoring-src
 TARGET=/opt/rakurs/standalone
 PREFIX=deploy/rakurs/standalone
-BASE="${RAKURS_AUDIT_REF:-d17dddabea6b11c00a3867134cf1dbe663f7a454}"
-BRANCH=fix/rakurs-site-quality-audit-20261125
+BASE="${RAKURS_AUDIT_REF:-$(git -C /home/ivital/deye-monitoring-src rev-parse origin/feature/deye-trb145-monitoring)}"
+BRANCH=feature/deye-trb145-monitoring
 DOMAIN=rakurs.zakryttya.org.ua
 VENV=/home/ivital/.venvs/rakurs-tests
 cd "$ROOT"
@@ -100,13 +100,8 @@ paths=[
  '/api/v1/status?demo=1','/api/v1/status?real=1',
  '/api/v1/signals','/api/v1/latest?keys=pv_power,battery_soc',
  '/api/v1/history?key=pv_power&hours=24',
- '/api/v1/events','/api/v1/devices?demo=1','/api/v1/devices?real=1',
+ '/api/v1/events','/api/v1/devices',
  '/api/v1/batches','/api/v1/parallel','/api/v1/parallel/health',
- '/api/v1/parallel/simulation',
- '/api/v1/parallel/simulation/latest?device=sim_deye20k_parallel_1',
- '/api/v1/parallel/simulation/latest?device=sim_deye20k_parallel_2',
- '/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1&limit=20',
- '/api/v1/parallel/simulation/fields?device=sim_deye20k_parallel_1&limit=20',
  '/api/v1/modbus-fields'
 ]
 failures=0
@@ -125,19 +120,19 @@ def read(path):
     r=client.get(path,base_url='https://localhost')
     try:return r.get_json() if r.status_code==200 else {}
     finally:r.close()
-for mode in ('demo','real'):
-    status=read('/api/v1/status?'+mode+'=1')
-    devices=read('/api/v1/devices?'+mode+'=1')
-    sc=status.get('registered_devices')
-    dc=len(devices.get('devices',[]))
-    print('DEVICE_CONSISTENCY',mode,'STATUS_COUNT',sc,'LIST_COUNT',dc,
-          'RESULT','MATCH' if sc==dc else 'MISMATCH')
+status=read('/api/v1/status')
+devices=read('/api/v1/devices')
+sc=status.get('registered_devices')
+dc=len(devices.get('devices',[]))
+print('MYSQL_DEVICE_CONSISTENCY','STATUS_COUNT',sc,'LIST_COUNT',dc,
+      'RESULT','MATCH' if sc==dc else 'MISMATCH')
+assert sc==dc and status.get('mode')=='real'
 print('FLASK_API_HTTP_FAILURES=',failures)
 print('AUTH_API_USED_LOCAL_EPHEMERAL_SESSION_ONLY=YES')
 print('MYSQL_WRITES=0 MODBUS_COMMANDS=0')
 PY
 
-echo '=== F. GITHUB DRAFT PR: FULL SOURCE TESTS IN SEPARATE CLONE ==='
+echo '=== F. RELEASE CODE: FULL SOURCE TESTS IN SEPARATE CLONE ==='
 git fetch --no-tags origin "refs/heads/$BRANCH"
 PATCH_SHA="$(git rev-parse FETCH_HEAD)"
 git clone --shared --no-checkout -q "$ROOT" "$WORK/source"
