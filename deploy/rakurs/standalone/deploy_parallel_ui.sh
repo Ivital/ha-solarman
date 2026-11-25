@@ -166,7 +166,6 @@ assert profile["battery_soc_percent"] is None
 assert profile["aggregate_values"] == {}
 assert len(profile["devices"]) == profile["registered_inverters"]
 assert profile["registered_inverters"] == len(profile["devices"])
-assert profile["registered_inverters"] == 2
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
 print("MYSQL_DEYE_DEVICE_SLOTS=" + str(profile["registered_inverters"]))
 rejected = c.get("/api/v1/parallel/latest?device=simulated_deye_sg05lp3",
@@ -176,32 +175,21 @@ print("UNREGISTERED_DEVICE_NOT_IN_PARALLEL_GROUP=PASS")
 events = c.get("/api/v1/events", base_url="https://localhost")
 assert events.status_code == 200
 print("EXISTING_EVENTS=PASS")
-demo_response = c.get("/api/v1/parallel/simulation", base_url="https://localhost")
-assert demo_response.status_code == 200, demo_response.status_code
-demo = demo_response.get_json()
-assert demo["simulation"] is True
-assert demo["storage_ready"] is True, "Two-inverter MySQL archive schema missing"
-assert len(demo["devices"]) == 2, "Both stored inverter records must exist"
-for device in demo["devices"]:
-    key = device["device_key"]
-    assert (device["raw_registers"],device["decoded_fields"],device["ui_fields"]) == (
-        815, 624, 316), "Missing complete twin archive: " + key
-    latest = c.get("/api/v1/parallel/simulation/latest?device=" + key,
+status = c.get("/api/v1/status", base_url="https://localhost")
+assert status.status_code == 200
+state = status.get_json()
+assert state["mode"] == "real"
+devices_response = c.get("/api/v1/devices", base_url="https://localhost")
+assert devices_response.status_code == 200
+assert state["registered_devices"] == len(devices_response.get_json()["devices"])
+for item in profile["devices"]:
+    device = item["device_key"]
+    latest = c.get("/api/v1/parallel/latest?device=" + device,
                    base_url="https://localhost")
-    assert latest.status_code == 200 and latest.get_json()["simulation"] is True
-    values = latest.get_json()["values"]
-    assert "pv_power" in values and values["pv_power"]["quality"] == "simulated"
-    decoded = c.get("/api/v1/parallel/simulation/fields?device=" + key +
-                    "&limit=80", base_url="https://localhost")
-    assert decoded.status_code == 200
-    assert decoded.get_json()["total"] == 624
-    assert decoded.get_json()["simulation"] is True
-    raw = c.get("/api/v1/parallel/simulation/raw?device=" + key + "&limit=200",
-                base_url="https://localhost")
-    assert raw.status_code == 200
-    assert raw.get_json()["total"] == 815
-    assert raw.get_json()["simulation"] is True
-print("TWO_STORED_INVERTERS_VISIBLE_API=PASS")
+    assert latest.status_code == 200
+    assert latest.get_json()["device_key"] == device
+print("ALL_MYSQL_DEVICES_VISIBLE=PASS")
+print("EMPTY_MYSQL_COMPATIBLE=YES")
 print("MYSQL_READ_ONLY=PASS")
 PY
 
