@@ -146,7 +146,7 @@ for fragment in ("/static/app-parallel-twin-20261125.js",
 print("PARALLEL_EXISTING_HOME=PASS")
 deye_page = c.get("/deye", base_url="https://localhost")
 assert deye_page.status_code == 200
-assert "ЗБЕРЕЖЕНИЙ ЗНІМОК" in deye_page.get_data(as_text=True)
+assert "ПОКАЗНИКИ З MYSQL" in deye_page.get_data(as_text=True)
 modbus_page = c.get("/deye/modbus", base_url="https://localhost")
 assert modbus_page.status_code == 200
 print("DEYE_ARCHIVE_HTML=PASS")
@@ -165,11 +165,11 @@ assert len(profile["devices"]) == profile["registered_inverters"]
 assert profile["registered_inverters"] == len(profile["devices"])
 assert profile["registered_inverters"] == 2
 print("PARALLEL_PROFILE_READ_ONLY=PASS")
-print("PHYSICAL_INVERTERS_REGISTERED=" + str(profile["registered_inverters"]))
+print("MYSQL_DEYE_DEVICE_SLOTS=" + str(profile["registered_inverters"]))
 rejected = c.get("/api/v1/parallel/latest?device=simulated_deye_sg05lp3",
                  base_url="https://localhost")
 assert rejected.status_code == 404
-print("SIMULATED_DEVICE_NOT_TREATED_AS_REAL=PASS")
+print("UNREGISTERED_DEVICE_NOT_IN_PARALLEL_GROUP=PASS")
 events = c.get("/api/v1/events", base_url="https://localhost")
 assert events.status_code == 200
 print("EXISTING_EVENTS=PASS")
@@ -198,7 +198,7 @@ for device in demo["devices"]:
     assert raw.status_code == 200
     assert raw.get_json()["total"] == 815
     assert raw.get_json()["simulation"] is True
-print("TWO_SIMULATED_INVERTERS_VISIBLE_API=PASS")
+print("TWO_STORED_INVERTERS_VISIBLE_API=PASS")
 print("MYSQL_READ_ONLY=PASS")
 PY
 
