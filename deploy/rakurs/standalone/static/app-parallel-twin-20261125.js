@@ -1099,7 +1099,14 @@ async function renderTable(path, sectionName, headings, fields, cycle) {
     const tbody = element("tbody", "");
     source.forEach(item => {
       const row = element("tr", "");
-      fields.forEach(field => row.appendChild(element("td", "", field.endsWith("_utc") ? time(item[field]) : (item[field] ?? "—"))));
+      fields.forEach(field => {
+        const raw = item[field];
+        const displayed = field.endsWith("_utc") ? time(raw) :
+          field === "kind" && raw === "simulation" ? "Архівний профіль" :
+          field === "kind" && raw === "inverter" ? "Інвертор" :
+          (raw ?? "—");
+        row.appendChild(element("td", "", displayed));
+      });
       tbody.appendChild(row);
     });
     add(table, thead, tbody); wrap.appendChild(table); root.appendChild(wrap);
@@ -1214,7 +1221,8 @@ async function renderSystem(cycle) {
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
     ["Джерело", DEMO_MODE ? "MySQL · походження не підтверджене" : "MySQL"],
-    ["Пристрої", state.status ? state.status.registered_devices : "—"],
+    [DEMO_MODE ? "Профілі у MySQL" : "Фізичні інвертори",
+      state.status ? state.status.registered_devices : "—"],
     [DEMO_MODE ? "Параметри архіву" : "Підтверджені сигнали",
       state.status ? (DEMO_MODE ? state.status.simulated_signals :
                                   state.status.verified_signals) : "—"],
