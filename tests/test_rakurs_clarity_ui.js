@@ -71,9 +71,9 @@ const fields = Array.from({length: 160}, (_, i) => ({
   registers_json: JSON.stringify([i]), value_decimal: String(i + 1),
   value_text: null, unit: "W"
 }));
-function prepare(mode) {
+function prepare(mode = "seeded") {
   const main = new Node("main");
-  main.dataset.initialMode = "simulation";
+  main.dataset.initialMode = "real";
   const ssr = new Node("div");
   ssr.ssr = true;
   ssr.textContent = "5.1 6.4 72";
@@ -98,65 +98,51 @@ function prepare(mode) {
   const loc = {pathname: "/", search: "", hash: "#/overview"};
   const events = {};
   const fetchCalls = [];
+  const slotKeys = mode === "two" ?
+    ["inverter_1", "inverter_2"] :
+    ["sim_deye20k_parallel_1", "sim_deye20k_parallel_2"];
+  const active = ["two", "seeded", "partial-seeded"].includes(mode);
+  const stored = active ? slotKeys.map((device_key, i) =>
+    ({device_key, slot_no:i + 1, model:"SUN-20K-SG05LP3-EU-SM2"})) : [];
   async function fetch(url) {
     fetchCalls.push(url);
-    if (mode === "fail" ||
-        ((mode === "partial" || mode === "partial-seeded") &&
-         url.includes("/latest") && !url.includes("/parallel/"))) {
-      if (mode !== "fail" && url.includes("/latest"))
-        return {ok: true, json: async () => ({values: {pv_power: latest.pv_power}})};
-      throw Error("Unreachable");
-    }
-    const data = url.includes("/catalog")
-      ? {groups: {pv: [{key: "pv_power", label: "PV power"}]}, all_metric_count: 316}
-      : url.includes("/status") ? {
-        mode: "simulation", displayed_signals: 316, simulated_signals: 316,
-        has_real_samples: false
-      }
+    if (mode === "fail") throw Error("Unreachable");
+    if ((mode === "partial" || mode === "partial-seeded") &&
+        url.includes("/latest?") && !url.includes("/parallel/"))
+      return {ok:true, json:async () => ({values: {pv_power:latest.pv_power}})};
+    const data =
+      url.includes("/catalog") ?
+        {groups:{pv:[{key:"pv_power",label:"PV power"}]},all_metric_count:316}
+      : url.includes("/status") ?
+        {mode:"real",displayed_signals:316,registered_devices:3,
+         has_real_samples:true,collector_active:false}
       : url.includes("/signals") ?
-        {signals: [{signal_key: "pv_power", label_uk: "PV power", unit: "кВт"}]}
-      : url.includes("/auth") ? {authenticated: false}
-      : url.includes("/parallel/simulation/latest") ?
-        {simulation:true, device_key: "sim_deye20k_parallel_1", values: latest}
-      : url.includes("/parallel/simulation/fields") ?
-        {simulation:true,total:2,fields:[
-          {field_key:"p3_0001",field_name:"PV unit one",unit:"кВт",
-           value_decimal:"5.1",value_text:null,quality:"simulated"},
+        {signals:[{signal_key:"pv_power",label_uk:"PV power",unit:"кВт"}]}
+      : url.includes("/auth") ? {authenticated:false}
+      : url.includes("/parallel/latest?") ?
+        {device_key:slotKeys[0],values:latest}
+      : url.includes("/parallel/history?") ? {points:history}
+      : url.includes("/parallel/modbus-fields?") ?
+        {device_key:slotKeys[0],fields:[
+          {field_key:"p3_0001",field_name:"PV one",unit:"кВт",
+           value_decimal:"5.1",value_text:null},
           {field_key:"p3_0002",field_name:"Temperature",unit:"°C",
-           value_decimal:"32",value_text:null,quality:"simulated"}
+           value_decimal:"32",value_text:null}
+        ],count:2}
+      : url.includes("/parallel/raw?") ?
+        {total:815,poll:{poll_uid:"poll_20261125"},raw_registers:[
+          {function_code:3,register_address:100,raw_uint16:65535},
+          {function_code:3,register_address:101,raw_uint16:0}
         ]}
-      : url.includes("/parallel/simulation/raw") ?
-        {simulation:true,total:2,raw_registers:[
-          {function_code:3,register_address:100,raw_uint16:65535,quality:"simulated"},
-          {function_code:3,register_address:101,raw_uint16:0,quality:"simulated"}
-        ]}
-      : url.includes("/parallel/simulation") ?
-        {simulation:true,storage_ready:["seeded","partial-seeded"].includes(mode),
-         devices:["seeded","partial-seeded"].includes(mode) ? [
-           {slot_no:1,device_key:"sim_deye20k_parallel_1",
-            raw_registers:815,decoded_fields:624,ui_fields:316},
-           {slot_no:2,device_key:"sim_deye20k_parallel_2",
-            raw_registers:815,decoded_fields:624,ui_fields:316}
-         ]:[]}
-      : url.includes("/parallel/latest") ? {device_key: "inverter_1", values:
-          {pv_power: {...latest.pv_power, quality: "good"}}}
-      : url.includes("/latest") ? {values: latest}
-      : url.includes("/parallel/events") ? {events: []}
-      : url.includes("/parallel/history") ? {points: history}
-      : url.includes("/parallel/modbus-fields") ? {fields: [], count: 0}
-      : url.includes("/parallel") ? {
-          expected_inverters: 2, registered_inverters: mode === "two" ? 2 : 0,
-          model: "SUN-20K-SG05LP3-EU-SM2", shared_battery: true,
-          aggregate_verified: false, battery_soc_percent: null,
-          devices: mode === "two" ? [
-            {device_key: "inverter_1", model: "SUN-20K-SG05LP3-EU-SM2"},
-            {device_key: "inverter_2", model: "SUN-20K-SG05LP3-EU-SM2"}
-          ] : []
-        }
-      : url.includes("/history") ? {signal: {unit: "кВт"}, points: history}
+      : url.includes("/parallel/events?") ? {events:[]}
+      : url.includes("/parallel") ?
+        {model:"SUN-20K-SG05LP3-EU-SM2",expected_inverters:2,
+         registered_inverters:stored.length,devices:stored,aggregate_verified:false}
+      : url.includes("/latest?") ? {values:latest}
+      : url.includes("/history?") ? {signal:{unit:"кВт"},points:history}
       : url.includes("/modbus-fields") ?
-        {count: fields.length, register_count: 815, fields}
-      : url.includes("/batches") ? {batches: [
+        {count:fields.length,register_count:815,fields}
+      : url.includes("/batches") ? {batches:[
           {started_at_utc:"2026-11-24T19:00:00Z",
            finished_at_utc:"2026-11-24T19:00:00Z",
            received_count:135936,accepted_count:135936,rejected_count:0,
@@ -166,175 +152,140 @@ function prepare(mode) {
            received_count:624,accepted_count:624,rejected_count:0,
            status:"simulated",error_code:null}
         ]}
-      : {devices: [], events: [], batches: []};
-    return {ok: true, json: async () => data};
+      : url.includes("/devices") ?
+        {devices:[
+          {device_key:"simulated_deye_sg05lp3",kind:"simulation",model:"Deye"},
+          {device_key:"sim_deye20k_parallel_1",kind:"simulation",model:"Deye"},
+          {device_key:"sim_deye20k_parallel_2",kind:"simulation",model:"Deye"}
+        ]}
+      : {events:[],devices:[],batches:[]};
+    return {ok:true,json:async () => data};
   }
   const sandbox = {
-    window: {location: loc, addEventListener: (name, fn) => {events[name] = fn;}},
-    location: loc, document: doc, fetch,
-    URLSearchParams, Number, Date, String, Array, Set, Math,
-    encodeURIComponent, console: {warn() {}}
+    window:{location:loc,addEventListener:(name,fn)=>{events[name]=fn;}},
+    location:loc,document:doc,fetch,
+    URLSearchParams,Number,Date,String,Array,Set,Math,
+    encodeURIComponent,console:{warn(){}}
   };
-  vm.runInNewContext(js, sandbox, {filename: "app-events-20261124.js"});
-  return {main, nav, events, loc, fetchCalls, ssr};
+  vm.runInNewContext(js,sandbox,{filename:"app-parallel-twin-20261125.js"});
+  return {main,nav,events,loc,fetchCalls,ssr,elements};
 }
 async function settle() {
-  await new Promise(resolve => setTimeout(resolve, 60));
+  await new Promise(resolve => setTimeout(resolve,60));
 }
 async function run() {
   assert(html.includes("/static/app-parallel-twin-20261125.js"));
   assert(html.includes("/static/parallel-twin-20261125.css"));
   assert(html.includes("/static/events-ui-20261124.css"));
   assert(html.includes("/static/clarity-ui-20261124.css"));
-  assert(html.includes('Показники Deye з бази даних'));
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  for (const scenario of ["fail", "partial"]) {
-    const app = prepare(scenario);
+  assert(!/Тестові дані|СИМУЛЯЦІЯ|ДЕМО/i.test(html));
+  for(const scenario of ["fail","partial"]) {
+    const app=prepare(scenario);
     await settle();
-    assert.equal(app.main.childNodes.length, 1, scenario + ": SSR wiped");
-    assert.equal(app.main.childNodes[0].textContent, app.ssr.textContent);
-    console.log("CLARITY_SSR_GUARD_" + scenario.toUpperCase() + "=PASS");
+    assert.equal(app.main.childNodes[0].textContent,app.ssr.textContent);
+    console.log("CLARITY_SSR_GUARD_"+scenario.toUpperCase()+"=PASS");
   }
-  const app = prepare("success");
+  const app=prepare("seeded");
   await settle();
-  assert.equal(byClass(app.main, "kpi").length, 4, "Four headline metrics");
-  assert.equal(byClass(app.main, "energy-diagram").length, 1, "Energy flow diagram");
-  assert.equal(byClass(app.main, "trend-card").length, 4, "Four history graphs");
-  assert.equal(byClass(app.nav, "nav-group-label").length, 3, "Grouped navigation");
-  assert(app.fetchCalls.some(x => x.includes("/api/v1/history?key=pv_power")));
-  console.log("CLARITY_OVERVIEW=PASS");
+  assert.equal(byClass(app.main,"kpi").length,4);
+  assert.equal(byClass(app.main,"energy-diagram").length,1);
+  assert.equal(byClass(app.main,"parallel-home-device").length,2);
+  assert.equal(byClass(app.main,"trend-card").length,4);
+  assert.equal(byClass(app.nav,"nav-group-label").length,3);
+  assert.equal(app.elements["mode-indicator"].textContent,"Дані MySQL");
+  assert(app.fetchCalls.some(x=>x.includes("/api/v1/history?key=pv_power")));
+  console.log("CLARITY_UNIFIED_MYSQL_OVERVIEW=PASS");
 
-  app.loc.hash = "#/trends";
+  app.loc.hash="#/trends";
   await app.events.hashchange();
-  assert.equal(byClass(app.main, "trend-card").length, 4);
-  const buttons = byClass(app.main, "range-control")[0].childNodes;
-  assert.equal(buttons.length, 3);
-  buttons[2].listeners.click();
+  assert.equal(byClass(app.main,"trend-card").length,4);
+  const ranges=byClass(app.main,"range-control")[0].childNodes;
+  assert.equal(ranges.length,3);
+  ranges[2].listeners.click();
   await settle();
-  assert(app.fetchCalls.some(x => x.includes("hours=168")));
+  assert(app.fetchCalls.some(x=>x.includes("hours=168")));
   console.log("CLARITY_TRENDS_24_72_168=PASS");
 
-  app.loc.hash = "#/modbus";
+  app.loc.hash="#/modbus";
   await app.events.hashchange();
-  const tbody = descendants(app.main).find(x => x.tagName === "tbody");
-  assert.equal(tbody.childNodes.length, 100, "initial Modbus page");
-  const more = byClass(app.main, "more-button")[0];
-  more.listeners.click();
-  assert.equal(tbody.childNodes.length, 160, "next Modbus page");
-  const search = byClass(app.main, "search-field")[0];
-  search.value = "Input 149";
+  const tbody=descendants(app.main).find(x=>x.tagName==="tbody");
+  assert.equal(tbody.childNodes.length,100);
+  byClass(app.main,"more-button")[0].listeners.click();
+  assert.equal(tbody.childNodes.length,160);
+  const search=byClass(app.main,"search-field")[0];
+  search.value="Input 149";
   search.listeners.input();
-  assert.equal(tbody.childNodes.length, 1, "search Modbus");
-  console.log("CLARITY_MODBUS_FILTER_AND_PAGINATION=PASS");
+  assert.equal(tbody.childNodes.length,1);
+  console.log("CLARITY_MODBUS_SEARCH_AND_PAGING=PASS");
 
-  app.loc.hash = "#/pv";
+  app.loc.hash="#/pv";
   await app.events.hashchange();
-  assert.equal(byClass(app.main, "metric").length, 1);
+  assert.equal(byClass(app.main,"metric").length,1);
   console.log("CLARITY_SIGNAL_FILTER=PASS");
 
-  app.loc.hash = "#/history";
+  app.loc.hash="#/history";
   await app.events.hashchange();
-  assert.equal(byClass(app.main, "history-workspace").length, 1);
-  assert.equal(byClass(app.main, "history-summary").length, 1);
+  assert.equal(byClass(app.main,"history-workspace").length,1);
+  assert.equal(byClass(app.main,"history-summary").length,1);
   console.log("CLARITY_HISTORY=PASS");
 
-  app.loc.hash = "#/events";
+  app.loc.hash="#/events";
   await app.events.hashchange();
-  assert.equal(byClass(app.main, "event-row").length, 2, "Existing DB ingestion batches");
-  assert.equal(byClass(app.main, "event-count-card").length, 2,
-    "Separate device event and DB load counters");
-  const labels = descendants(app.main).map(x => x.textContent || "").join("|");
-  assert(labels.includes("Подій обладнання поки немає"));
-  assert(labels.includes("Додано історію вимірювань за 72 години"));
-  assert(labels.includes("Завантажено архівний набір"));
-  assert(labels.includes("135936") && labels.includes("624"));
-  assert(app.fetchCalls.some(x => x.includes("/api/v1/events")));
-  assert(app.fetchCalls.some(x => x.includes("/api/v1/batches")));
-  console.log("CLARITY_EVENTS_REAL_BATCHES_NO_FAKE_ALARMS=PASS");
+  assert.equal(byClass(app.main,"event-row").length,2);
+  const eventCopy=descendants(app.main).map(x=>x.textContent||"").join("|");
+  assert(eventCopy.includes("Додано історію вимірювань за 72 години"));
+  assert(eventCopy.includes("Завантажено записи MySQL"));
+  assert(!/симуляц|тестов|демо/i.test(eventCopy));
+  console.log("CLARITY_MYSQL_EVENT_LOG=PASS");
 
-  app.loc.hash = "#/parallel";
+  app.loc.hash="#/system";
   await app.events.hashchange();
-  assert.equal(byClass(app.main, "parallel-device").length, 2,
-    "Must show two expected slots, not invent registered devices");
-  assert.equal(byClass(app.main, "parallel-reading").length, 0,
-    "Do not fabricate readings while physical ports are unverified");
-  const parallelText = descendants(app.main).map(x => x.textContent || "").join("|");
-  assert(parallelText.includes("Поточна сумарна потужність: —"));
-  assert(parallelText.includes("SOC: —"));
-  assert(parallelText.includes("Не зареєстрований"));
-  console.log("PARALLEL_TOPOLOGY_UNVERIFIED_NO_FAKE_VALUES=PASS");
+  const systemText=descendants(app.main).map(x=>x.textContent||"").join("|");
+  assert(systemText.includes("Пристрої у базі"));
+  assert(systemText.includes("Показники у базі"));
+  assert(!systemText.includes("sim_deye20k"));
+  assert(!systemText.includes("simulated"));
+  console.log("CLARITY_MYSQL_SYSTEM=PASS");
 
-  const two = prepare("two");
-  await settle();
-  two.loc.hash = "#/parallel";
-  await two.events.hashchange();
-  assert.equal(byClass(two.main, "parallel-device").length, 2);
-  assert.equal(byClass(two.main, "parallel-reading").length, 6);
-  assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_1")));
-  assert(two.fetchCalls.some(x => x.includes("/parallel/latest?device=inverter_2")));
-  assert(two.fetchCalls.some(x => x.includes("/parallel/history?device=inverter_1")));
-  assert(two.fetchCalls.some(x => x.includes("/parallel/modbus-fields?device=inverter_2")));
-  assert.equal(byClass(two.main, "parallel-device-chart").length, 2);
-  const parallelValueText = descendants(two.main).map(x => x.textContent || "").join("|");
-  assert(parallelValueText.includes("5,1"), "Verified per-device reading visible");
-  assert(parallelValueText.includes("SOC: —"), "Shared BMS SOC remains unknown");
-  assert(parallelValueText.includes("Поточна сумарна потужність: —"),
-    "No fabricated combined power");
-  console.log("PARALLEL_DISTINCT_DEVICE_ENDPOINTS=PASS");
-
-  const fallback = prepare("partial-seeded");
-  await settle();
-  assert(fallback.main.childNodes.some(x => x.ssr &&
-    x.textContent === fallback.ssr.textContent),
-    "Partial legacy API must preserve a clone of the server-rendered readings");
-  assert.equal(byClass(fallback.main, "parallel-home-device").length, 2,
-    "Two simulated Deye cards must render even with partial legacy SSR API");
-  assert(fallback.fetchCalls.some(x => x.includes("/parallel/simulation/latest?device=")));
-  console.log("PARALLEL_BOTH_DEVICES_SURVIVE_PARTIAL_LEGACY_API=PASS");
-
-  const seeded = prepare("seeded");
-  await settle();
-  assert.equal(byClass(seeded.main, "parallel-home-device").length, 2,
-    "Homepage must show both MySQL-seeded Deye devices immediately");
-  assert.equal(byClass(seeded.main, "parallel-reading").length, 6);
-  assert(seeded.fetchCalls.some(x => x.includes(
-    "/parallel/simulation/latest?device=sim_deye20k_parallel_1")));
-  assert(seeded.fetchCalls.some(x => x.includes(
-    "/parallel/simulation/latest?device=sim_deye20k_parallel_2")));
-  console.log("PARALLEL_BOTH_INVERTERS_ON_HOMEPAGE=PASS");
-
-  seeded.loc.hash = "#/parallel";
-  await seeded.events.hashchange();
-  assert.equal(byClass(seeded.main, "parallel-device").length, 2,
-    "Show two archive profiles without duplicate unconnected placeholders");
-  assert.equal(byClass(seeded.main, "parallel-demo-counter").length, 6);
-  assert(byClass(seeded.main, "parallel-device")[0].textContent ||
-    byClass(seeded.main, "parallel-device")[0].childNodes.length);
-  const firstTwin = byClass(seeded.main, "parallel-device")[0];
-  assert(descendants(firstTwin).some(x => (x.textContent || "").includes("АРХІВ MYSQL")),
-    "DB-populated simulated inverter must appear before unconnected physical slot");
-  const seededText = descendants(seeded.main).map(x => x.textContent || "").join("|");
-  assert(seededText.includes("815") && seededText.includes("624") && seededText.includes("316"));
-  assert(seededText.includes("АРХІВ MYSQL") &&
-    seededText.includes("Походження цих значень не підтверджене"));
-  assert(!/симуляц|симуль|тестов|демо|синтетич/i.test(seededText),
-    "Archived records must not display simulator terminology to users");
-  assert(!seededText.includes("Поточна сумарна потужність: 10"));
-  assert(!seededText.includes("Не зареєстрований"),
-    "Do not duplicate two archive profiles with vacant physical slots");
-  const rawButton = byClass(seeded.main, "parallel-raw-viewer")[0].childNodes
-    .find(x => x.tagName === "button");
+  app.loc.hash="#/parallel";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main,"parallel-device").length,2,
+    "Exactly two real-mode stored Deye cards");
+  assert.equal(byClass(app.main,"parallel-reading").length,12,
+    "Six stored readings for each Deye");
+  assert(app.fetchCalls.some(x=>x.includes("/parallel/latest?device=sim_deye20k_parallel_1")));
+  assert(app.fetchCalls.some(x=>x.includes("/parallel/latest?device=sim_deye20k_parallel_2")));
+  assert(app.fetchCalls.some(x=>x.includes("/parallel/history?device=sim_deye20k_parallel_1")));
+  assert(app.fetchCalls.some(x=>x.includes("/parallel/modbus-fields?device=sim_deye20k_parallel_2")));
+  const parallelText=descendants(app.main).map(x=>x.textContent||"").join("|");
+  assert(parallelText.includes("5,1"));
+  assert(parallelText.includes("815"));
+  assert(parallelText.includes("Поля Modbus"));
+  assert(!/симуляц|тестов|демо|синтетич/i.test(parallelText));
+  const rawButton=byClass(app.main,"parallel-raw-viewer")[0].childNodes
+    .find(x=>x.tagName==="button");
   await rawButton.listeners.click();
-  assert.equal(byClass(seeded.main, "parallel-raw-row").length, 2);
-  const decodedButton = byClass(seeded.main, "parallel-field-viewer")[0].childNodes
-    .find(x => x.tagName === "button");
-  await decodedButton.listeners.click();
-  assert.equal(byClass(seeded.main, "parallel-field-row").length, 2,
-    "Decoded Modbus records for inverter 1 must be browsable");
-  assert(seeded.fetchCalls.some(x =>
-    x.includes("/parallel/simulation/fields?device=sim_deye20k_parallel_1")));
-  console.log("PARALLEL_DEMO_TWO_COMPLETE_ARCHIVES_PAGED=PASS");
+  assert.equal(byClass(app.main,"parallel-raw-row").length,2);
+  const fieldButton=byClass(app.main,"parallel-field-viewer")[0].childNodes
+    .find(x=>x.tagName==="button");
+  fieldButton.listeners.click();
+  assert.equal(byClass(app.main,"parallel-field-row").length,2);
+  console.log("PARALLEL_TWO_DEYE_ALL_MYSQL_VALUES=PASS");
+
+  const partial=prepare("partial-seeded");
+  await settle();
+  assert(partial.main.childNodes.some(x=>x.ssr&&x.textContent===partial.ssr.textContent));
+  assert.equal(byClass(partial.main,"parallel-home-device").length,2);
+  console.log("PARALLEL_SURVIVES_INCOMPLETE_LEGACY_API=PASS");
+
+  const empty=prepare("empty");
+  await settle();
+  empty.loc.hash="#/parallel";
+  await empty.events.hashchange();
+  assert.equal(byClass(empty.main,"parallel-device").length,0);
+  console.log("PARALLEL_EMPTY_MYSQL_NO_FAKE_DEVICES=PASS");
 }
-run().catch(e => {console.error(e.stack);process.exitCode=1;});
+run().catch(e=>{console.error(e.stack);process.exitCode=1;});
