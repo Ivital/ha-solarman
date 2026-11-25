@@ -14,6 +14,8 @@ class PublicPresentationTests(unittest.TestCase):
         "templates/index.html",
         "templates/deye_server.html",
         "static/app-parallel-twin-20261125.js",
+        "static/app.js",
+        "static/app-stable-20261124.js",
     )
 
     def test_no_simulator_presentation_copy_in_active_site(self):
