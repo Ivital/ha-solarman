@@ -389,7 +389,9 @@ def history():
     )
     if signal is None:
         return jsonify({"data_source": "mysql", "signal": None,
-                        "hours": hours, "points": [], "truncated": False})
+                        "hours": hours, "points": [], "truncated": False,
+                        "primary_device_id": device_id,
+                        "aggregate_verified": False})
     data = rows(
         "SELECT m.observed_at_utc,m.received_at_utc,m.value_decimal,"
         "m.raw_value,m.quality FROM rakurs_samples AS m "
