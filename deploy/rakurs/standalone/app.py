@@ -177,7 +177,7 @@ def primary_device_id():
     """
     if not hasattr(g, "primary_device"):
         found = one(
-            "SELECT device_id AS id FROM rakurs_samples ORDER BY id LIMIT 1"
+            "SELECT device_id AS id FROM rakurs_samples ORDER BY device_id LIMIT 1"
         )
         g.primary_device = found["id"] if found else None
     return g.primary_device
@@ -192,10 +192,10 @@ def index():
         readings = rows(
             "SELECT s.signal_key,s.unit,m.value_decimal,m.quality "
             "FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.id=("
-            "SELECT mx.id FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=%s AND mx.signal_id=s.id "
-            "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
+            "JOIN rakurs_samples AS m ON m.device_id=%s AND m.signal_id=s.id "
+            "AND m.observed_at_utc=("
+            "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
+            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id) "
             "WHERE s.signal_key IN (" + placeholders + ") "
             "ORDER BY s.signal_key",
             (selected,) + keys,
@@ -242,10 +242,10 @@ def deye_snapshot():
         result = rows(
             "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,"
             "m.quality,m.observed_at_utc FROM rakurs_signals AS s "
-            "JOIN rakurs_samples AS m ON m.id=("
-            "SELECT mx.id FROM rakurs_samples AS mx "
-            "WHERE mx.device_id=%s AND mx.signal_id=s.id "
-            "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
+            "JOIN rakurs_samples AS m ON m.device_id=%s AND m.signal_id=s.id "
+            "AND m.observed_at_utc=("
+            "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
+            "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id) "
             "ORDER BY s.label_uk LIMIT 500",
             (device_id,),
         )
@@ -272,10 +272,11 @@ def deye_modbus_snapshot():
         "SELECT f.field_key,f.group_name,f.field_name,f.unit,"
         "f.registers_json,m.value_decimal,m.value_text,m.quality "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
-        "SELECT mx.id FROM rakurs_modbus_field_samples AS mx "
-        "WHERE mx.device_id=%s AND mx.field_id=f.id "
-        "ORDER BY mx.observed_at_utc DESC,mx.id DESC LIMIT 1) "
+        "LEFT JOIN rakurs_modbus_field_samples AS m "
+        "ON m.device_id=%s AND m.field_id=f.id "
+        "AND m.observed_at_utc=("
+        "SELECT MAX(mx.observed_at_utc) FROM rakurs_modbus_field_samples AS mx "
+        "WHERE mx.device_id=m.device_id AND mx.field_id=m.field_id) "
         "ORDER BY f.id LIMIT 700", params,
     )
     for item in result:
@@ -351,7 +352,7 @@ def latest():
                 "FROM rakurs_samples AS m "
                 "JOIN rakurs_signals AS s ON s.id=m.signal_id "
                 "WHERE m.device_id=%s AND s.signal_key=%s "
-                "ORDER BY m.observed_at_utc DESC,m.id DESC LIMIT 1",
+                "ORDER BY m.observed_at_utc DESC LIMIT 1",
                 (device_id, key),
             )
             if result is not None:
@@ -398,7 +399,7 @@ def history():
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
         "AND m.observed_at_utc>=UTC_TIMESTAMP(6)-INTERVAL %s HOUR "
-        "ORDER BY m.observed_at_utc DESC,m.id DESC LIMIT %s",
+        "ORDER BY m.observed_at_utc DESC LIMIT %s",
         (device_id, key, hours, MAX_HISTORY + 1),
     )
     truncated = len(data) > MAX_HISTORY
@@ -951,10 +952,11 @@ def parallel_device_modbus():
         "f.registers_json, m.value_decimal, m.value_text, "
         "m.quality, m.observed_at_utc "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
-        "SELECT ms.id FROM rakurs_modbus_field_samples AS ms "
-        "WHERE ms.device_id=%s AND ms.field_id=f.id "
-        "ORDER BY ms.observed_at_utc DESC,ms.id DESC LIMIT 1) "
+        "LEFT JOIN rakurs_modbus_field_samples AS m "
+        "ON m.device_id=%s AND m.field_id=f.id "
+        "AND m.observed_at_utc=("
+        "SELECT MAX(ms.observed_at_utc) FROM rakurs_modbus_field_samples AS ms "
+        "WHERE ms.device_id=m.device_id AND ms.field_id=m.field_id) "
         "ORDER BY f.id LIMIT 700",
         (selected["id"],),
     )
@@ -974,10 +976,11 @@ def modbus_fields():
         "f.unit,f.registers_json,f.derived,f.verified,"
         "m.value_decimal,m.value_text,m.quality,m.observed_at_utc "
         "FROM rakurs_modbus_fields AS f "
-        "LEFT JOIN rakurs_modbus_field_samples AS m ON m.id=("
-        "SELECT ms.id FROM rakurs_modbus_field_samples AS ms "
-        "WHERE ms.device_id=%s AND ms.field_id=f.id "
-        "ORDER BY ms.observed_at_utc DESC,ms.id DESC LIMIT 1) "
+        "LEFT JOIN rakurs_modbus_field_samples AS m "
+        "ON m.device_id=%s AND m.field_id=f.id "
+        "AND m.observed_at_utc=("
+        "SELECT MAX(ms.observed_at_utc) FROM rakurs_modbus_field_samples AS ms "
+        "WHERE ms.device_id=m.device_id AND ms.field_id=m.field_id) "
         "ORDER BY f.id LIMIT 700",
         (device_id,),
     )
