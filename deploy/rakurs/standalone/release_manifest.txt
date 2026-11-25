@@ -3,6 +3,8 @@
 __init__.py
 app.py
 auth.py
+config_api.py
+poll_worker.py
 mysql_transport.py
 parallel_support.py
 modbus_wire.py
