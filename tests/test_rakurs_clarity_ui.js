@@ -105,7 +105,9 @@ function prepare(mode = "seeded") {
     ["sim_deye20k_parallel_1", "sim_deye20k_parallel_2"];
   const active = ["two", "seeded", "partial-seeded", "single", "admin"].includes(mode);
   const stored = active ? slotKeys.map((device_key, i) =>
-    ({device_key, slot_no:i + 1, model:"SUN-20K-SG05LP3-EU-SM2"})) : [];
+    (mode === "seeded"
+      ? {device_key, model:"SUN-20K-SG05LP3-EU-SM2"}
+      : {device_key, slot_no:i + 1, model:"SUN-20K-SG05LP3-EU-SM2"})) : [];
   async function fetch(url, options = {}) {
     fetchCalls.push(url);
     if (mode === "fail") throw Error("Unreachable");
@@ -185,15 +187,21 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=fullwidth-20261125-1"'));
-  assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*minmax\(0,1fr\)/.test(chartCss),
-    "The dedicated charts route must use full-width cards");
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=grid-picker-20261125-2"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=grid-picker-20261125-2"'));
+  assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
+    "The dedicated charts route must have two compact columns");
+  assert(/@media\(max-width:760px\)/.test(chartCss),
+    "Charts should stack on small screens");
+  assert(chartCss.includes(".trend-card.trend-network") &&
+         chartCss.includes(".trend-network .chart polyline"),
+    "Network chart must not inherit nested trend-grid layout");
   assert(chartCss.includes(".history-chart .chart") &&
          chartCss.includes(".parallel-device-chart .chart") &&
          chartCss.includes("width:100%") &&
          chartCss.includes("max-width:none"),
     "All SVG chart surfaces must occupy available card width");
-  console.log("CLARITY_FULL_WIDTH_CHART_CSS=PASS");
+  console.log("CLARITY_CORRECT_CHART_LAYOUT=PASS");
   assert(!/Тестові дані|СИМУЛЯЦІЯ|ДЕМО/i.test(html));
   for(const scenario of ["fail","partial"]) {
     const app=prepare(scenario);
@@ -224,6 +232,9 @@ async function run() {
   console.log("CLARITY_SWITCH_DEYE_1_2=PASS");
   const globalPicker=app.elements["device-select"];
   assert.equal(globalPicker.childNodes.length,2);
+  assert.equal(globalPicker.childNodes[0].textContent,"Deye №1");
+  assert.equal(globalPicker.childNodes[1].textContent,"Deye №2",
+    "The missing server slot_no must not make both labels Deye №1");
   assert.equal(globalPicker.value,"sim_deye20k_parallel_2",
     "Global selector follows Deye 2 selected on the home card");
   // Home-card selector chooses Deye 2, while global control can switch back.
@@ -238,7 +249,14 @@ async function run() {
   app.loc.hash="#/trends";
   await app.events.hashchange();
   assert.equal(byClass(app.main,"trend-card").length,4);
-  assert.equal(byClass(app.main,"full-trends").length,1,"Charts route uses expanded panel layout");
+  assert.equal(byClass(app.main,"full-trends").length,1,"Charts route remains a compact analytics layout");
+  const chartTiles = byClass(app.main,"trend-card");
+  assert.equal(chartTiles.filter(tile => tile.className.split(/\s+/).includes("trend-grid")).length,0,
+    "No chart tile may reuse the trend-grid layout class");
+  const networkTile=chartTiles.find(tile => tile.className.split(/\s+/).includes("trend-network"));
+  assert(networkTile, "Network chart needs its own style class");
+  assert.equal(byClass(networkTile,"trend-content").length,1,
+    "Network plot content must occupy its own full-width tile");
   const ranges=byClass(app.main,"range-control")[0].childNodes;
   assert.equal(ranges.length,3);
   ranges[2].listeners.click();
