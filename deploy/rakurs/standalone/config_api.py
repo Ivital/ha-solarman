@@ -220,7 +220,8 @@ def register(app, *, rows, one, conn):
                     group_id=found["id"]
                     cur.execute(
                         "SELECT device_id FROM rakurs_parallel_members "
-                        "WHERE group_id=%s AND slot_no=%s FOR UPDATE",
+                        "WHERE group_id=%s AND slot_no=%s "
+                        "AND member_kind='physical' FOR UPDATE",
                         (group_id,slot))
                     if cur.fetchone():
                         raise ValueError("Цей слот Deye вже зайнятий")
@@ -235,7 +236,7 @@ def register(app, *, rows, one, conn):
                         "INSERT INTO rakurs_parallel_members "
                         "(group_id,device_id,slot_no,member_kind,parallel_role,"
                         "transport_verified,member_verified) "
-                        "VALUES (%s,%s,%s,'inverter','unverified',0,0)",
+                        "VALUES (%s,%s,%s,'physical','unverified',0,0)",
                         (group_id,device_id,slot))
                 cur.execute(
                     "INSERT INTO rakurs_device_settings "
