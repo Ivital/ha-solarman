@@ -163,6 +163,9 @@ class LiveArchiveApiTests(unittest.TestCase):
         self.assertNotIn("mx.id", code)
         self.assertNotIn("m.id", code)
         self.assertIn("ORDER BY s.signal_key LIMIT 32", code)
+        # The homepage must be bounded too, not just the per-inverter view.
+        homepage = code.split('@app.get("/")', 1)[1].split("def _display_decimal", 1)[0]
+        self.assertIn("ORDER BY s.signal_key LIMIT 32", homepage)
         self.assertIn("AND pg.group_key=%s", code)
 
 
