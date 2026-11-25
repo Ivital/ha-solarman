@@ -214,8 +214,8 @@ async function run() {
   console.log("CLARITY_SWITCH_DEYE_1_2=PASS");
   const globalPicker=app.elements["device-select"];
   assert.equal(globalPicker.childNodes.length,2);
-  assert.equal(globalPicker.value,"sim_deye20k_parallel_1",
-    "Boot global selector defaults to Deye 1 before home selection");
+  assert.equal(globalPicker.value,"sim_deye20k_parallel_2",
+    "Global selector follows Deye 2 selected on the home card");
   // Home-card selector chooses Deye 2, while global control can switch back.
   globalPicker.value="sim_deye20k_parallel_1";
   await globalPicker.listeners.change();
