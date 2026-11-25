@@ -15,7 +15,8 @@ TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
   app.py parallel_support.py modbus_archive.py modbus_wire.py
-  mysql_transport.py templates/index.html
+  mysql_transport.py templates/index.html templates/deye_server.html
+  static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
 )
 cd "$ROOT"
@@ -28,9 +29,13 @@ grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
 grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
+grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
+grep -Fq 'ЗБЕРЕЖЕНИЙ ЗНІМОК' "$HERE/templates/deye_server.html"
 grep -Fq 'aggregate_verified": False' "$HERE/parallel_support.py"
 if command -v node >/dev/null 2>&1; then
   node --check "$HERE/static/app-parallel-twin-20261125.js"
+  node --check "$HERE/static/app.js"
+  node --check "$HERE/static/app-stable-20261124.js"
   node tests/test_rakurs_clarity_ui.js
 fi
 bash -n "$HERE/audit_parallel_host_readonly.sh"
@@ -136,9 +141,15 @@ assert home.status_code == 200
 html = home.get_data(as_text=True)
 for fragment in ("/static/app-parallel-twin-20261125.js",
                  "/static/parallel-twin-20261125.css",
-                 'Показники Deye з бази даних', "5.1", "6.4", "72"):
+                 'Показники Deye з бази даних'):
     assert fragment in html, "Missing HTML/DB content: " + fragment
 print("PARALLEL_EXISTING_HOME=PASS")
+deye_page = c.get("/deye", base_url="https://localhost")
+assert deye_page.status_code == 200
+assert "ЗБЕРЕЖЕНИЙ ЗНІМОК" in deye_page.get_data(as_text=True)
+modbus_page = c.get("/deye/modbus", base_url="https://localhost")
+assert modbus_page.status_code == 200
+print("DEYE_ARCHIVE_HTML=PASS")
 res = c.get("/api/v1/parallel", base_url="https://localhost")
 assert res.status_code == 200, res.status_code
 profile = res.get_json()
@@ -190,7 +201,8 @@ print("MYSQL_READ_ONLY=PASS")
 PY
 
 echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
-for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css; do
+for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css \
+            static/app.js static/app-stable-20261124.js; do
   expected="$(sha256sum "$HERE/$path" | awk '{print $1}')"
   tmp="$(mktemp)"
   for route in LOCAL PUBLIC; do

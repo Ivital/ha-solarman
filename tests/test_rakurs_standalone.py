@@ -89,6 +89,27 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertFalse(obj["has_real_samples"])
         self.assertFalse(obj["home_assistant_dependency"])
 
+    def test_status_counts_provenance_specific_devices(self):
+        def lookup(sql, params):
+            if "FROM rakurs_devices WHERE kind='simulation'" in sql:
+                return {"n": 3}
+            if "FROM rakurs_devices WHERE kind='inverter'" in sql:
+                return {"n": 0}
+            if "COUNT(DISTINCT m.signal_id)" in sql:
+                return {"n": 316}
+            if "COUNT(*) AS n FROM rakurs_signals" in sql:
+                return {"n": 0}
+            if "SELECT 1 AS n" in sql:
+                return None
+            raise AssertionError("Unexpected SQL in status: " + sql)
+        self.data_one = lookup
+        demo = self.client.get("/api/v1/status?demo=1").get_json()
+        self.assertEqual(demo["registered_devices"], 3)
+        self.assertEqual(demo["mode"], "simulation")
+        real = self.client.get("/api/v1/status?real=1").get_json()
+        self.assertEqual(real["registered_devices"], 0)
+        self.assertFalse(real["has_real_samples"])
+
     def test_missing_latest_is_empty(self):
         self.assertEqual(
             self.client.get("/api/v1/latest?keys=pv_power,battery_soc").get_json()["values"], {}
@@ -136,7 +157,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         normal = self.client.get("/api/v1/modbus-fields")
         self.assertEqual(normal.status_code, 200)
         self.assertFalse(normal.get_json()["simulation"])
-        self.assertTrue(any("m.quality<>'simulated'" in call[1]
+        self.assertTrue(any("m.quality='good'" in call[1]
                             for call in self.data_calls))
 
     def test_malformed_keys_no_data_queries(self):
@@ -186,7 +207,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertIn("Генерація PV", html)
         self.assertIn("5.1", html)
         self.assertIn('data-initial-mode="simulation"', html)
-        self.assertIn("Тестові дані", html)
+        self.assertIn("Архів MySQL", html)
         self.assertIn("rakurs-history-72h-v1", html)
 
         status = self.client.get("/api/v1/status").get_json()

@@ -135,7 +135,7 @@ class ParallelApiTests(unittest.TestCase):
         query = next((q for q, params in self.db_calls
                       if "FROM rakurs_samples AS m" in q), "")
         self.assertIn("m.device_id=%s", query)
-        self.assertIn("m.quality<>'simulated'", query)
+        self.assertIn("m.quality='good'", query)
         self.assertIn("s.verified=1", query)
         self.assertFalse(any("INSERT " in sql or "UPDATE " in sql
                              for sql, params in self.db_calls))
@@ -170,7 +170,7 @@ class ParallelApiTests(unittest.TestCase):
                    if "FROM rakurs_samples AS m" in q)
         self.assertIn("WHERE m.device_id=%s", sql)
         self.assertIn("s.signal_key=%s", sql)
-        self.assertIn("m.quality<>'simulated'", sql)
+        self.assertIn("m.quality='good'", sql)
         self.assertEqual(self.client.get(
             "/api/v1/parallel/history?device=inverter_1&key=unknown_metric").status_code, 400)
         self.assertEqual(self.client.get(
@@ -190,7 +190,7 @@ class ParallelApiTests(unittest.TestCase):
         self.assertIn("m.device_id=%s", sql)
         self.assertIn("ms.device_id=%s", sql)
         self.assertIn("f.verified=1", sql)
-        self.assertIn("m.quality<>'simulated'", sql)
+        self.assertIn("m.quality='good'", sql)
 
     def test_simulated_two_device_archive_only_exposes_simulated_data(self):
         queries = []

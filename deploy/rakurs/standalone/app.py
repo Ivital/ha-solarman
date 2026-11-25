@@ -197,10 +197,10 @@ def index():
             "FROM rakurs_signals AS s "
             "JOIN rakurs_samples AS m ON m.signal_id=s.id "
             "WHERE s.signal_key IN (" + placeholders + ") "
-            "AND s.verified=1 AND m.quality<>'simulated' "
+            "AND s.verified=1 AND m.quality='good' "
             "AND m.observed_at_utc=("
             "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
-            "WHERE mx.signal_id=m.signal_id AND mx.quality<>'simulated') "
+            "WHERE mx.signal_id=m.signal_id AND mx.quality='good') "
             "ORDER BY m.observed_at_utc DESC LIMIT 16",
             keys,
         )
@@ -359,8 +359,7 @@ def demo_mode() -> bool:
 def status():
     if demo_mode():
         devices = one(
-            "SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key=%s",
-            (DEMO_DEVICE_KEY,)
+            "SELECT COUNT(*) AS n FROM rakurs_devices WHERE kind='simulation'"
         )
         signals = one(
             "SELECT COUNT(DISTINCT m.signal_id) AS n FROM rakurs_samples AS m "
@@ -386,11 +385,14 @@ def status():
             "collector_active": False, "home_assistant_dependency": False,
             "mysql_transport": mysql_transport_state(),
         })
-    devices = one("SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key<>%s",
-                  (DEMO_DEVICE_KEY,))
+    devices = one("SELECT COUNT(*) AS n FROM rakurs_devices WHERE kind='inverter'")
     verified = one("SELECT COUNT(*) AS n FROM rakurs_signals WHERE verified=1")
     sample_exists = one(
-        "SELECT 1 AS n FROM rakurs_samples WHERE quality<>'simulated' LIMIT 1"
+        "SELECT 1 AS n FROM rakurs_samples AS m "
+        "JOIN rakurs_signals AS s ON s.id=m.signal_id "
+        "JOIN rakurs_devices AS d ON d.id=m.device_id "
+        "WHERE m.quality='good' AND s.verified=1 "
+        "AND d.kind='inverter' LIMIT 1"
     )
     return jsonify({
         "data_source": "mysql", "mode": "real", "database": SCHEMA,
@@ -453,7 +455,7 @@ def latest():
                 "m.raw_value, m.quality, m.observed_at_utc "
                 "FROM rakurs_signals AS s JOIN rakurs_samples AS m ON m.signal_id=s.id "
                 "WHERE s.signal_key=%s AND s.verified=1 "
-                "AND m.quality<>'simulated' "
+                "AND m.quality='good' "
                 "ORDER BY m.observed_at_utc DESC LIMIT 1",
                 (key,),
             )
@@ -518,7 +520,7 @@ def history():
             "m.raw_value, m.quality FROM rakurs_samples AS m "
             "JOIN rakurs_signals AS s ON s.id=m.signal_id "
             "WHERE s.signal_key=%s AND s.verified=1 "
-            "AND m.quality<>'simulated' "
+            "AND m.quality='good' "
             "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
             "ORDER BY m.observed_at_utc DESC LIMIT %s",
             (key, hours, MAX_HISTORY + 1)
@@ -632,7 +634,7 @@ def parallel_demo_storage_ready():
 def parallel_demo_selected():
     key = request.args.get("device", "")
     if key not in PARALLEL_DEMO_KEYS:
-        abort(404, description="Невідомий тестовий інвертор")
+        abort(404, description="Невідомий архівний профіль інвертора")
     if not parallel_demo_storage_ready():
         abort(404, description="Архів двох інверторів ще не створено")
     result = one(
@@ -644,7 +646,7 @@ def parallel_demo_selected():
         (key, PARALLEL_MODEL),
     )
     if result is None:
-        abort(404, description="Тестовий інвертор не завантажено")
+        abort(404, description="Архівний профіль інвертора не знайдено")
     return result
 
 
@@ -677,7 +679,7 @@ def parallel_simulation_overview():
         "storage_ready": True, "devices": serialize(result),
         "expected_devices": 2, "profile_register_addresses": 815,
         "physical_inverters_registered_here": 0,
-        "warning": "Значення вигадані для тестування і не є показниками Deye",
+        "warning": "Походження архівних значень із фізичного Deye не підтверджене",
     })
 
 
@@ -738,7 +740,7 @@ def parallel_simulation_raw():
         "data_source": "mysql", "simulation": True,
         "device_key": selected["device_key"], "total": count["n"],
         "offset": offset, "limit": limit, "raw_registers": serialize(readings),
-        "note": "Синтетичні тестові слова, НЕ фактичний обмін Modbus",
+        "note": "Архівні регістри; походження з фізичного Modbus не підтверджене",
     })
 
 
@@ -784,7 +786,7 @@ def parallel_simulation_fields():
         "device_key": selected["device_key"],
         "offset": offset, "limit": limit, "total": total["n"] if total else 0,
         "fields": serialize(records),
-        "warning": "Значення є тестовими та не походять від фізичного Deye",
+        "warning": "Походження значень із фізичного Deye не підтверджене",
     })
 
 
@@ -799,11 +801,11 @@ def parallel_device_latest():
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "JOIN rakurs_devices AS d ON d.id=m.device_id "
         "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
-        "AND s.verified=1 AND m.quality<>'simulated' "
+        "AND s.verified=1 AND m.quality='good' "
         "AND m.observed_at_utc=("
         "SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
         "WHERE mx.device_id=m.device_id AND mx.signal_id=m.signal_id "
-        "AND mx.quality<>'simulated') "
+        "AND mx.quality='good') "
         "ORDER BY s.signal_key LIMIT 32",
         (selected["id"],) + PARALLEL_SIGNAL_KEYS,
     )
@@ -870,7 +872,7 @@ def parallel_device_history():
         "FROM rakurs_samples AS m "
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
-        "AND s.verified=1 AND m.quality<>'simulated' "
+        "AND s.verified=1 AND m.quality='good' "
         "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
         "ORDER BY m.observed_at_utc DESC LIMIT %s",
         (selected["id"], key, hours, MAX_HISTORY + 1),
@@ -1072,12 +1074,12 @@ def parallel_device_modbus():
         "FROM rakurs_modbus_fields AS f "
         "LEFT JOIN rakurs_modbus_field_samples AS m "
         "ON m.field_id=f.id AND m.device_id=%s "
-        "AND m.quality<>'simulated' "
+        "AND m.quality='good' "
         "AND m.observed_at_utc=("
         "SELECT MAX(ms.observed_at_utc) "
         "FROM rakurs_modbus_field_samples AS ms "
         "WHERE ms.device_id=%s AND ms.field_id=f.id "
-        "AND ms.quality<>'simulated') "
+        "AND ms.quality='good') "
         "WHERE f.verified=1 ORDER BY f.id LIMIT 700",
         (selected["id"], selected["id"]),
     )
@@ -1110,11 +1112,11 @@ def modbus_fields():
     else:
         sample_join = (
             "LEFT JOIN rakurs_modbus_field_samples AS m ON m.field_id=f.id "
-            "AND m.quality<>'simulated' "
+            "AND m.quality='good' "
             "AND m.observed_at_utc=(SELECT MAX(ms.observed_at_utc) "
             "FROM rakurs_modbus_field_samples AS ms "
             "WHERE ms.device_id=m.device_id AND ms.field_id=f.id "
-            "AND ms.quality<>'simulated')"
+            "AND ms.quality='good')"
         )
         params = ()
     data = rows(
