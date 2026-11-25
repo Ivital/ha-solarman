@@ -22,3 +22,5 @@ static/events-ui-20261124.css
 static/parallel-twin-20261125.css
 static/app-parallel-twin-20261125.js
 static/deye-server.css
+static/rakurs-color-20261125.css
+static/register-reference-v1053.json

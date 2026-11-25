@@ -9,6 +9,8 @@ const js = fs.readFileSync(path.join(root, "static/app-parallel-twin-20261125.js
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
 const chartCss = fs.readFileSync(path.join(root, "static/parallel-twin-20261125.css"), "utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
+const reference = JSON.parse(fs.readFileSync(path.join(root, "static/register-reference-v1053.json"), "utf8"));
+const colorCss = fs.readFileSync(path.join(root, "static/rakurs-color-20261125.css"), "utf8");
 
 class Node {
   constructor(tag) {
@@ -110,6 +112,7 @@ function prepare(mode = "seeded") {
       : {device_key, slot_no:i + 1, model:"SUN-20K-SG05LP3-EU-SM2"})) : [];
   async function fetch(url, options = {}) {
     fetchCalls.push(url);
+    if (url.includes("/static/register-reference-v1053.json")) return {ok:true,json:async()=>reference};
     if (mode === "fail") throw Error("Unreachable");
     if ((mode === "partial" || mode === "partial-seeded") &&
         url.includes("/latest?") && !url.includes("/parallel/"))
@@ -183,12 +186,23 @@ async function run() {
   assert(html.includes("/static/app-parallel-twin-20261125.js"));
   assert(html.includes("/static/parallel-twin-20261125.css"));
   assert(html.includes("/static/events-ui-20261124.css"));
+  assert(html.includes("/static/rakurs-color-20261125.css"));
+  assert(html.includes('id="theme-toggle"'));
+  assert(html.includes('data-theme="light"'));
+  assert(colorCss.includes(".kpi-solar") && colorCss.includes(".kpi-battery"));
+  assert(colorCss.includes("prefers-reduced-motion"));
+  assert.equal(reference.counts.document_addresses,755);
+  assert.equal(reference.counts.profile_addresses,815);
+  assert.equal(reference.counts.shared_addresses,290);
+  assert.equal(reference.entries.length,1280);
+  assert.equal(reference.compatibility,"NOT_VERIFIED_FOR_SUN20K_SG05LP3_EU_SM2");
+  console.log("CLARITY_COLORFUL_THEME_AND_REFERENCE_COUNTS=PASS");
   assert(html.includes("/static/clarity-ui-20261124.css"));
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=shared-rs485-20261125-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=shared-rs485-20261125-1"'));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=color-reference-20261125-1"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=color-reference-20261125-1"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -275,6 +289,15 @@ async function run() {
   search.listeners.input();
   assert.equal(tbody.childNodes.length,1);
   console.log("CLARITY_MODBUS_SEARCH_AND_PAGING=PASS");
+
+  app.loc.hash="#/registers";
+  await app.events.hashchange();
+  assert.equal(byClass(app.main,"register-workspace").length,1);
+  assert.equal(byClass(app.main,"register-row").length,100);
+  const regSearch=byClass(app.main,"search-field")[0];
+  regSearch.value="0x0001";regSearch.listeners.input();
+  assert.equal(byClass(app.main,"register-row").length,1);
+  console.log("CLARITY_ALL_SOURCE_REGISTER_AUDIT=PASS");
 
   app.loc.hash="#/pv";
   await app.events.hashchange();

@@ -14,6 +14,7 @@ const views = [
   ["events", "Події", "◇"],
   ["archive", "Архів", "▦"],
   ["modbus", "Modbus", "▤"],
+  ["registers", "Регістри V105.3", "▥"],
   ["system", "Система", "⚙"],
   ["settings", "Керування", "⚙"]
 ];
@@ -21,6 +22,24 @@ const state = { catalog: null, status: null, verified: [], route: "overview", cy
   selectedDeviceKey: null, selectedSlotNo: 1, role: "viewer", csrf: null };
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
+function setupColorTheme() {
+  const button = document.getElementById("theme-toggle");
+  if (!button || !document.body || !document.body.setAttribute) return;
+  let theme = "light";
+  try { theme = localStorage.getItem("rakurs_theme") === "dark" ? "dark" : "light"; }
+  catch (_error) { /* Private browsing can disable local storage. */ }
+  function apply(value) {
+    document.body.setAttribute("data-theme", value);
+    button.textContent = value === "light" ? "☾ Темна тема" : "☀ Світла тема";
+    button.setAttribute("aria-pressed", value === "dark" ? "true" : "false");
+  }
+  apply(theme);
+  button.addEventListener("click", () => {
+    theme = theme === "light" ? "dark" : "light"; apply(theme);
+    try { localStorage.setItem("rakurs_theme", theme); } catch (_error) {}
+  });
+}
+setupColorTheme();
 // Root HTML contains authoritative MySQL readings. Never erase those readings
 // until the browser has fetched the same readings successfully.
 const SSR_MODE = main ? main.dataset.initialMode : "";
@@ -116,7 +135,7 @@ function buildNav() {
   const sections = [
     ["МОНІТОРИНГ", ["overview", "parallel", "pv", "battery", "grid", "load", "inverter"]],
     ["АНАЛІТИКА", ["trends", "history", "archive", "events"]],
-    ["НАЛАШТУВАННЯ", ["modbus", "settings", "system"]]
+    ["НАЛАШТУВАННЯ", ["modbus", "registers", "settings", "system"]]
   ];
   for (const [label, names] of sections) {
     navigation.appendChild(element("div", "nav-group-label", label));
@@ -301,6 +320,18 @@ async function renderOverview(cycle, primedValues = null) {
     element("h2", "", "Енергія під контролем"),
     element("p", "", "Основні показники, напрямки потоків та зміни за часом — на одному екрані."));
   main.appendChild(intro);
+  const shortcuts = element("div", "quick-actions");
+  for (const [route, label, description] of [
+    ["parallel", "⧉ Два інвертори", "Перевірити показники Deye №1 та №2"],
+    ["history", "◷ Історія", "Подивитися збережені вимірювання"],
+    ["registers", "▥ Регістри V105.3", "Звірити адреси з документом і профілем"]
+  ]) {
+    const link = element("a", "quick-link");
+    link.href = "#/" + route;
+    add(link, element("b", "", label), element("small", "", description));
+    shortcuts.appendChild(link);
+  }
+  main.appendChild(shortcuts);
   await renderTwinSummary(cycle);
   if (!current(cycle)) return;
   section("Останні показники · Deye №" + state.selectedSlotNo,
@@ -1152,6 +1183,97 @@ async function renderModbus(cycle) {
       "Не вдалося отримати довідник регістрів MySQL."));
   }
 }
+async function renderRegisterReference(cycle) {
+  section("Регістри Deye · звірка V105.3",
+    "Офлайн-довідник: документація та профіль, не живе опитування");
+  const root = element("section", "panel register-workspace");
+  main.appendChild(root);
+  const intro = element("div", "register-lead");
+  add(intro, element("h2", "", "Що означають адреси регістрів?"),
+    element("p", "", "Порівнюємо оригінальний документ MODBUS RTU V105.3 (10.07.2024) та наявний профіль deye_p3. Збіг номера адреси не підтверджує однакову функцію для SUN-20K-SG05LP3-EU-SM2."),
+    element("p", "", "У цьому розділі немає Modbus-запитів, команд запису або автоматичного застосування масштабів. Реальні показники шукайте в розділі «Modbus»."));
+  root.appendChild(intro);
+  try {
+    const response = await fetch("/static/register-reference-v1053.json", {
+      credentials:"same-origin",cache:"no-store"});
+    if (!response.ok) throw new Error("No register reference");
+    const data = await response.json();
+    if (!current(cycle)) return;
+    const totals = element("div", "register-stats");
+    for (const [count,label] of [
+      [data.counts.document_addresses,"Адреси в документі"],
+      [data.counts.profile_addresses,"Адреси профілю"],
+      [data.counts.shared_addresses,"Є в обох"],
+      [data.counts.union_addresses,"Усього до звірки"]
+    ]) {
+      const tile = element("div", "register-stat");
+      add(tile,element("strong", "", count), element("span", "", label));
+      totals.appendChild(tile);
+    }
+    root.appendChild(totals);
+    const toolbar = element("div", "register-toolbar");
+    const search=element("input","search-field");
+    search.type="search";search.placeholder="Адреса, 0xHEX, назва поля, розділ…";
+    search.setAttribute("aria-label","Пошук у звірці регістрів");
+    const origin=element("select","");
+    origin.setAttribute("aria-label","Джерело адреси");
+    for (const [val,label] of [
+      ["","Усі адреси"],["both","У двох джерелах"],
+      ["document_only","Лише V105.3"],["profile_only","Лише профіль"]
+    ]) {const option=element("option","",label);option.value=val;origin.appendChild(option);}
+    const zone=element("select","");
+    zone.setAttribute("aria-label","Група регістрів");
+    for (const [val,label] of [
+      ["","Усі групи"],["identity","Ідентифікація"],
+      ["settings","Налаштування"],["telemetry","Телеметрія"],
+      ["custom","Спеціальні"],["battery","Батарейний пакет"],
+      ["language","Мовні"],["profile","Інші адреси профілю"]
+    ]) {const option=element("option","",label);option.value=val;zone.appendChild(option);}
+    add(toolbar,search,origin,zone);root.appendChild(toolbar);
+    const indicator=element("p","register-note");root.appendChild(indicator);
+    const wrap=element("div","table-wrap"),table=element("table","data-table");
+    const head=element("thead",""),tr=element("tr","");
+    for(const label of ["Адреса","Джерело","Розділ V105.3","Назви полів профілю","Од. з профілю"])tr.appendChild(element("th","",label));
+    head.appendChild(tr);
+    const body=element("tbody","");add(table,head,body);wrap.appendChild(table);root.appendChild(wrap);
+    const more=element("button","more-button","Показати ще 100");more.type="button";root.appendChild(more);
+    const badges={both:"Два джерела",document_only:"Лише V105.3",profile_only:"Лише deye_p3"};
+    let matched=[],displayed=0;
+    function draw(start,end){
+      for(const entry of matched.slice(start,end)){
+        const row=element("tr","register-row");
+        add(row,element("td","",entry.address+" ("+entry.hex+")"));
+        const cell=element("td",""),badge=element("span","register-badge "+entry.origin,badges[entry.origin]||"—");
+        cell.appendChild(badge);row.appendChild(cell);
+        add(row,element("td","",entry.zone),
+          element("td","",entry.names.length?entry.names.join("; "):"Немає у профілі — див. джерело V105.3"),
+          element("td","",entry.units.length?entry.units.join(", "):"—"));
+        body.appendChild(row);
+      }
+      displayed=end;indicator.textContent="Показано "+displayed+" із "+matched.length+
+        " адрес · у документі 777 рядків, включно з повторними адресами";
+      more.hidden=displayed>=matched.length;
+    }
+    function filter(){
+      const query=search.value.trim().toLocaleLowerCase("uk");
+      matched=data.entries.filter(entry=>
+        (!origin.value||origin.value===entry.origin)&&(!zone.value||zone.value===entry.kind)&&
+        (!query||[entry.address,entry.hex,entry.zone,...entry.names,...entry.units].join(" ").toLocaleLowerCase("uk").includes(query)));
+      displayed=0;clear(body);draw(0,Math.min(100,matched.length));
+    }
+    search.addEventListener("input",filter);
+    origin.addEventListener("change",filter);
+    zone.addEventListener("change",filter);
+    more.addEventListener("click",()=>draw(displayed,Math.min(displayed+100,matched.length)));
+    filter();
+    root.appendChild(element("p","register-note",
+      "Довідник адрес не доводить сумісність конкретної прошивки. Особливо обережно: 60–499 — налаштування; 10000+ — окремий опис батарейних пакетів; 20000+ — мовні ресурси. Жодних записів FC05/06/10/15/16 застосунок не виконує."));
+  } catch(_error){
+    if(current(cycle))root.appendChild(createEmpty("Довідник поки недоступний",
+      "Немає локального файла звірки. Показники MySQL залишаються доступними в інших розділах."));
+  }
+}
+
 function settingsField(form, label, value, kind = "text", choices = []) {
   const wrap=element("label","settings-field");
   wrap.appendChild(element("span","",label));
@@ -1544,6 +1666,7 @@ async function render() {
     case "events": await renderEvents(cycle); break;
     case "archive": await renderArchive(cycle); break;
     case "modbus": await renderModbus(cycle); break;
+    case "registers": await renderRegisterReference(cycle); break;
     case "system": await renderSystem(cycle); break;
     case "settings": await renderSettings(cycle); break;
   }

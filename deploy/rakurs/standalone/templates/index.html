@@ -3,15 +3,16 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="dark">
+  <meta name="color-scheme" content="light dark">
   <title>Rakurs — Енергомоніторинг</title>
   <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
   <link rel="stylesheet" href="/static/clarity-ui-20261124.css">
   <link rel="stylesheet" href="/static/events-ui-20261124.css">
-  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=shared-rs485-20261125-1">
-  <script defer src="/static/app-parallel-twin-20261125.js?v=shared-rs485-20261125-1"></script>
+  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=color-reference-20261125-1">
+  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=color-reference-20261125-1">
+  <script defer src="/static/app-parallel-twin-20261125.js?v=color-reference-20261125-1"></script>
 </head>
-<body>
+<body data-theme="light">
   <div class="layout">
     <aside class="sidebar" aria-label="Навігація Rakurs">
       <div class="brand">
@@ -34,6 +35,7 @@
           <h1 id="view-title">Огляд</h1>
         </div>
         <div class="top-actions">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Перемкнути світлу або темну тему">☾ Темна тема</button>
           <label class="device-select-wrap">Deye <select id="device-select" aria-label="Обраний інвертор" hidden></select></label>
           <span id="updated" class="updated">Оновлення даних…</span>
           <span id="mode-indicator" class="mode-indicator mode-real">Дані MySQL</span>
@@ -45,6 +47,11 @@
           <div class="eyebrow">ЕНЕРГОСИСТЕМА · ОГЛЯД</div>
           <h2>Енергія під контролем</h2>
           <p>Основні показники, напрямки потоків та зміни за часом — на одному екрані.</p>
+        </div>
+        <div class="quick-actions" aria-label="Швидкі переходи">
+          <a class="quick-link" href="#/parallel"><b>⧉ Два інвертори</b><small>Показники Deye №1 та №2</small></a>
+          <a class="quick-link" href="#/history"><b>◷ Історія</b><small>Архів збережених вимірювань</small></a>
+          <a class="quick-link" href="#/registers"><b>▥ Регістри V105.3</b><small>Порівняння протоколу та профілю</small></a>
         </div>
         <div class="section-header">
           <h2>Збережений зріз</h2>

@@ -18,17 +18,20 @@ FILES=(
   mysql_transport.py templates/index.html templates/login.html templates/deye_server.html
   static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
+  static/rakurs-color-20261125.css static/register-reference-v1053.json
 )
 cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=shared-rs485-20261125-1"' "$HERE/templates/index.html"
-grep -Fq 'href="/static/parallel-twin-20261125.css?v=shared-rs485-20261125-1"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=color-reference-20261125-1"' "$HERE/templates/index.html"
+grep -Fq 'href="/static/parallel-twin-20261125.css?v=color-reference-20261125-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
 grep -Fq 'case "parallel": await renderParallel(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'restoreServerReadings();' "$HERE/static/app-parallel-twin-20261125.js"
+grep -Fq 'href="/static/rakurs-color-20261125.css?v=color-reference-20261125-1"' "$HERE/templates/index.html"
+grep -Fq 'case "registers": await renderRegisterReference(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'Дані MySQL' "$HERE/templates/index.html"
 grep -Fq 'ПОКАЗНИКИ З MYSQL' "$HERE/templates/deye_server.html"
 ! grep -Fq 'name="demo"' "$HERE/templates/login.html"
@@ -198,7 +201,8 @@ PY
 
 echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
 for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css \
-            static/app.js static/app-stable-20261124.js; do
+            static/app.js static/app-stable-20261124.js \
+            static/rakurs-color-20261125.css static/register-reference-v1053.json; do
   expected="$(sha256sum "$HERE/$path" | awk '{print $1}')"
   tmp="$(mktemp)"
   for route in LOCAL PUBLIC; do
