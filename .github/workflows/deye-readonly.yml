@@ -82,7 +82,8 @@ jobs:
           $issues = $null
           foreach ($name in @(
             "retire_legacy_deye_windows.ps1",
-            "install_polling_config_windows.ps1"
+            "install_polling_config_windows.ps1",
+            "install_two_deye_history_windows.ps1"
           )) {
             $tokens = $null
             $issues = $null
