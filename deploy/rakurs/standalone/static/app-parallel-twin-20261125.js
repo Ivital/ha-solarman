@@ -636,361 +636,218 @@ async function renderHistory(cycle, archived) {
   range.addEventListener("change", refresh);
   await refresh();
 }
+function deviceLabel(device, index = 0) {
+  const slot = Number(device.slot_no || index + 1);
+  return "Deye №" + (Number.isInteger(slot) && slot > 0 ? slot : index + 1);
+}
+function deviceReading(values, key) {
+  const item = values?.[key];
+  return item && item.value_decimal !== null && item.value_decimal !== undefined ?
+    number(item.value_decimal) + " " + (item.unit || "") : "—";
+}
+function storedDeviceNote(reading) {
+  return reading?.observed_at_utc ?
+    "Останній запис: " + time(reading.observed_at_utc) : "Записів немає";
+}
+async function fetchParallelDevices(cycle) {
+  const profile = await api("/parallel");
+  if (!current(cycle)) return null;
+  const devices = Array.isArray(profile.devices) ? profile.devices : [];
+  const responses = await Promise.allSettled(devices.map(d =>
+    api("/parallel/latest?device=" + encodeURIComponent(d.device_key))));
+  if (!current(cycle)) return null;
+  return devices.map((d, i) => ({
+    ...d, slot_no: Number(d.slot_no || i + 1),
+    values: responses[i].status === "fulfilled" ? (responses[i].value.values || {}) : {},
+  }));
+}
 async function renderTwinSummary(cycle) {
-  // The original overview KPIs are from ONE legacy synthetic device.
-  // Independent 20 kW twin devices must be visible on the overview.
-  let profile;
-  try {
-    profile = await api("/parallel/simulation");
-  } catch (_error) {
-    return;
-  }
-  if (!current(cycle) || !profile?.simulation || !profile.storage_ready ||
-      !Array.isArray(profile.devices) || profile.devices.length !== 2) return;
-  section("Два інвертори Deye", "Окремі записи кожного профілю · MySQL");
+  let devices;
+  try { devices = await fetchParallelDevices(cycle); } catch (_error) { return; }
+  if (!current(cycle) || !devices?.length) return;
+  section("Два інвертори Deye", "Показники кожного інвертора з MySQL");
   const grid = element("div", "parallel-home-grid");
   main.appendChild(grid);
-  const results = await Promise.allSettled(profile.devices.map(d =>
-    api("/parallel/simulation/latest?device=" + encodeURIComponent(d.device_key))));
-  if (!current(cycle)) return;
-  profile.devices.forEach((d, i) => {
+  for (const [i, device] of devices.entries()) {
     const card = element("article", "parallel-device parallel-home-device");
-    const title = element("div", "parallel-device-head");
-    add(title, element("strong", "parallel-device-name", "Deye №" + d.slot_no),
-      element("span", "parallel-state", "АРХІВ MYSQL"));
-    card.appendChild(title);
+    const head = element("div", "parallel-device-head");
+    add(head, element("strong", "parallel-device-name", deviceLabel(device, i)),
+      element("span", "parallel-state", "MYSQL"));
+    card.appendChild(head);
     card.appendChild(element("p", "parallel-device-model",
-      "SUN-20K-SG05LP3-EU-SM2 · 20 кВт номінально"));
-    const values = results[i].status === "fulfilled" &&
-      results[i].value.simulation ? (results[i].value.values || {}) : {};
+      device.model || "SUN-20K-SG05LP3-EU-SM2"));
     const metrics = element("div", "parallel-metric-list");
     for (const [key, label] of [
       ["pv_power", "PV"], ["battery_power", "АКБ"], ["battery_soc", "SOC"]
     ]) {
-      const item = values[key];
-      const valid = item && item.quality === "simulated" &&
-        item.value_decimal !== null && item.value_decimal !== undefined;
       const tile = element("div", "parallel-reading");
       add(tile, element("small", "", label),
-        element("strong", "", valid ?
-          number(item.value_decimal) + " " + (item.unit || "") : "—"),
-        element("span", "", "Запис MySQL · джерело не підтверджене"));
+        element("strong", "", deviceReading(device.values, key)),
+        element("span", "", storedDeviceNote(device.values[key])));
       metrics.appendChild(tile);
     }
     card.appendChild(metrics);
-    const footer = element("div", "parallel-home-foot");
-    footer.appendChild(element("span", "", "Сирі регістри: " +
-      d.raw_registers + " · поля Modbus: " + d.decoded_fields));
-    const link = element("a", "parallel-open-link", "Переглянути обидва інвертори");
+    const link = element("a", "parallel-open-link", "Усі показники інверторів");
     link.href = "#/parallel";
-    footer.appendChild(link);
-    card.appendChild(footer);
+    card.appendChild(link);
     grid.appendChild(card);
-  });
-  main.appendChild(element("p", "parallel-readonly-note",
-    "Походження цих значень не підтверджене фізичним опитуванням. Спільна АКБ " +
-    "не має підтвердженого SOC; відсотки двох профілів не додаються."));
+  }
 }
-
 async function renderParallel(cycle) {
-  section("Два інвертори — одна система",
-    "Deye SUN-20K-SG05LP3-EU-SM2 · спільна акумуляторна батарея");
-  // Show populated database data BEFORE unconnected physical placeholders.
-  const archiveReady = await renderParallelDemo(cycle);
-  if (!current(cycle)) return;
-  let cachedTopology = null;
-  try { cachedTopology = await api("/parallel"); } catch (_error) {}
-  if (archiveReady && cachedTopology?.registered_inverters === 0) {
-    message("Фізичне підключення не підтверджене",
-      "Показано два збережені профілі MySQL без дублювання порожніх карток інверторів.");
-    return;
-  }
-  section("Фізичні інвертори — ще не підключені",
-    "Профілі фізичних Deye · підтверджених вимірювань поки немає");
-  const intro = panel("Паралельна система · 2 × 20 кВт",
-    "40 кВт — номінальна паспортна потужність двох інверторів, а не поточна генерація.");
-  intro.className += " parallel-intro";
-  const note = element("p", "parallel-warning",
-    "Фізичне підключення, ролі Master/Slave, адреси Modbus і джерело SOC ще не підтверджені. " +
-    "Rakurs не змінює налаштувань інверторів та не виконує команди запису.");
-  intro.appendChild(note);
-  main.appendChild(intro);
-  const detail = element("div", "parallel-devices");
-  main.appendChild(detail);
-  const battery = panel("Спільний акумулятор 48 В",
-    "Одна система зберігання енергії для обох інверторів");
-  battery.className += " parallel-shared";
-  add(battery, element("div", "shared-soc", "SOC: —"),
-    element("p", "subtle",
-      "Відсоток заряду не можна додавати. Він з'явиться після перевірки джерела BMS; " +
-      "дані одного інвертора не видаються за підтверджені загальні."));
-  main.appendChild(battery);
-  const systemNote = panel("Загальні показники",
-    "Суми енергії доступні лише після перевірки незалежних джерел і CT.");
-  const aggregate = element("div", "parallel-aggregate",
-    "Поточна сумарна потужність: — · Підтверджених джерел: 0 із 2");
-  systemNote.appendChild(aggregate);
-  main.appendChild(systemNote);
-  try {
-    const response = cachedTopology || await api("/parallel");
-    if (!current(cycle)) return;
-    const devices = response.devices || [];
-    aggregate.textContent = "Поточна сумарна потужність: — · Зареєстровано інверторів: " +
-      response.registered_inverters + " із " + response.expected_inverters +
-      ". Агрегація не підтверджена.";
-    const slots = Math.max(response.expected_inverters, devices.length);
-    for (let i = 0; i < slots; i++) {
-      const data = devices[i] || null;
-      const card = element("article", "parallel-device");
-      const head = element("div", "parallel-device-head");
-      add(head, element("div", "parallel-device-name",
-        "Інвертор №" + (i + 1)),
-        element("span", "parallel-state", data ?
-          "Зареєстрований · канал не перевірено" : "Не зареєстрований"));
-      card.appendChild(head);
-      card.appendChild(element("p", "parallel-device-model", response.model));
-      const facts = element("div", "parallel-facts");
-      const entries = [
-        ["Роль у паралелі", "Не підтверджена"],
-        ["Адреса Modbus", "Не визначена"],
-        ["Канал моніторингу", "Не перевірений"],
-        ["Серійний номер", data && data.serial_number ? data.serial_number : "Не встановлений"],
-        ["ID у базі", data ? data.device_key : "Не прив'язаний"]
-      ];
-      for (const [k, v] of entries) {
-        const pair = element("div", "parallel-fact");
-        add(pair, element("small", "", k), element("strong", "", v));
-        facts.appendChild(pair);
-      }
-      card.appendChild(facts);
-      const measures = element("div", "parallel-readings");
-      const keys = [
-        ["pv_power", "Сонце"],
-        ["battery_power", "АКБ"],
-        ["inverter_temperature", "Температура"]
-      ];
-      if (!data) {
-        card.appendChild(createEmpty("Зчитування ще не налаштоване",
-          "Rakurs не підставляє архівні значення як вимірювання іншого інвертора."));
-        detail.appendChild(card);
-        continue;
-      }
-      const place = element("div", "parallel-metric-list");
-      card.appendChild(place);
-      detail.appendChild(card);
-      const deviceQuery = "?device=" + encodeURIComponent(data.device_key);
-      const [latest, events, history, registers] = await Promise.allSettled([
-        api("/parallel/latest" + deviceQuery),
-        api("/parallel/events" + deviceQuery),
-        api("/parallel/history" + deviceQuery + "&key=pv_power&hours=24"),
-        api("/parallel/modbus-fields" + deviceQuery)
-      ]);
-      if (!current(cycle)) return;
-      if (latest.status !== "fulfilled") {
-        place.appendChild(createEmpty("Значення недоступні",
-          "Показники для цього інвертора не вдалося прочитати."));
-      } else {
-        const values = latest.value.values || {};
-        for (const [key, label] of keys) {
-          const reading = values[key];
-          const present = reading && reading.value_decimal !== null &&
-            reading.value_decimal !== undefined && reading.quality !== "simulated";
-          const cell = element("div", "parallel-reading");
-          add(cell, element("small", "", label),
-            element("strong", "", present ?
-              number(reading.value_decimal) + " " + (reading.unit || "") : "—"),
-            element("span", "", present ?
-              "Останній запис: " + time(reading.observed_at_utc) : "Вимірювання відсутнє"));
-          place.appendChild(cell);
-        }
-      }
-      const eventLabel = events.status === "fulfilled" ?
-        "Подій у журналі: " + (events.value.events || []).length :
-        "Журнал подій недоступний";
-      card.appendChild(element("p", "parallel-device-events", eventLabel));
-      card.appendChild(element("p", "parallel-device-events",
-        registers.status === "fulfilled" ?
-        "Перевірених полів Modbus: " + registers.value.count :
-        "Реєстр Modbus недоступний"));
-      const chartBox = element("section", "parallel-device-chart");
-      chartBox.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
-      if (history.status !== "fulfilled") {
-        chartBox.appendChild(createEmpty("Графік недоступний",
-          "Історію інвертора не вдалося прочитати."));
-      } else {
-        const points = history.value.points || [];
-        if (points.filter(point => point.value_decimal !== null).length < 2) {
-          chartBox.appendChild(createEmpty("Ще немає підтвердженої історії",
-            "Графік не підміняється вигаданими даними."));
-        } else {
-          chartBox.appendChild(svgChart(points, "кВт"));
-        }
-      }
-      card.appendChild(chartBox);
-    }
-    if (!devices.length) {
-      const explain = element("p", "parallel-readonly-note",
-        "У базі є архівні записи, однак вони не використовуються як " +
-        "підтвердження фізичного інвертора №1 чи №2.");
-      main.appendChild(explain);
-    }
-  } catch (_error) {
-    detail.appendChild(createEmpty("Не вдалося перевірити облік двох інверторів",
-      "Джерело даних недоступне. Схема та значення не припускаються."));
-  }
-}
-
-async function renderParallelDemo(cycle) {
-  section("Архів двох інверторів",
-    "Збережені записи MySQL · фізичне джерело не підтверджене");
-  const scope = panel("Архівні записи",
-    "Перевірка повноти архіву для кожного з двох профілів Deye.");
-  scope.className += "parallel-demo-panel";
-  const intro = element("p", "parallel-warning",
-    "Походження цих значень не підтверджене фізичним опитуванням. Їх не можна використовувати " +
-    "для керування живленням, розрахунків енергії чи діагностики аварій.");
-  scope.appendChild(intro);
-  main.appendChild(scope);
-  const cards = element("div", "parallel-devices");
-  scope.appendChild(cards);
-  let payload;
-  try {
-    payload = await api("/parallel/simulation");
-  } catch (_error) {
-    if (current(cycle)) cards.appendChild(createEmpty("Архів недоступний",
-      "Перевірте наявність таблиць MySQL для збереження Modbus."));
+  addStatusMessage();
+  section("Паралельна система Deye",
+    "SUN-20K-SG05LP3-EU-SM2 · два інвертори · спільна АКБ");
+  let devices;
+  try { devices = await fetchParallelDevices(cycle); }
+  catch (_error) {
+    main.appendChild(createEmpty("Не вдалося прочитати інвертори",
+      "Перевірте MySQL і повторіть запит."));
     return;
   }
   if (!current(cycle)) return;
-  const devices = payload.devices || [];
-  if (!payload.storage_ready || devices.length !== 2) {
-    cards.appendChild(createEmpty("Архів двох інверторів ще не заповнений",
-      "Не знайдено двох повних наборів архівних записів у MySQL. " +
-      "Для їх відображення потрібні записи з відповідних джерел."));
+  if (!devices?.length) {
+    main.appendChild(createEmpty("Інверторів у базі поки немає",
+      "Після очищення бази дані з'являться після першого завантаження."));
     return;
   }
-  for (const device of devices) {
+  const grid = element("div", "parallel-devices");
+  main.appendChild(grid);
+  for (const [i, device] of devices.entries()) {
+    const query = "?device=" + encodeURIComponent(device.device_key);
     const card = element("article", "parallel-device");
-    const title = element("div", "parallel-device-head");
-    add(title, element("strong", "parallel-device-name",
-      "Deye №" + device.slot_no),
-      element("span", "parallel-state", "АРХІВ MYSQL"));
-    card.appendChild(title);
+    const heading = element("div", "parallel-device-head");
+    add(heading, element("strong", "parallel-device-name", deviceLabel(device, i)),
+      element("span", "parallel-state", "MYSQL"));
+    card.appendChild(heading);
     card.appendChild(element("p", "parallel-device-model",
-      "SUN-20K-SG05LP3-EU-SM2 · архів MySQL"));
-    const summary = element("div", "parallel-demo-counters");
-    for (const [name, count] of [
-      ["Сирі регістри", device.raw_registers],
-      ["Поля Modbus", device.decoded_fields],
-      ["Показники", device.ui_fields]
+      device.model || "SUN-20K-SG05LP3-EU-SM2"));
+    const metrics = element("div", "parallel-metric-list");
+    for (const [key, label] of [
+      ["pv_power", "Генерація PV"], ["battery_power", "Потужність АКБ"],
+      ["battery_soc", "SOC"], ["load_power", "Навантаження"],
+      ["grid_power", "Мережа"], ["inverter_temperature", "Температура"]
     ]) {
-      const tile = element("div", "parallel-demo-counter");
-      add(tile, element("strong", "", String(count || 0)),
-        element("small", "", name));
-      summary.appendChild(tile);
+      const tile = element("div", "parallel-reading");
+      add(tile, element("small", "", label),
+        element("strong", "", deviceReading(device.values, key)),
+        element("span", "", storedDeviceNote(device.values[key])));
+      metrics.appendChild(tile);
     }
-    card.appendChild(summary);
-    const previews = element("div", "parallel-metric-list");
-    card.appendChild(previews);
-    cards.appendChild(card);
-    const query = encodeURIComponent(device.device_key);
-    try {
-      const result = await api("/parallel/simulation/latest?device=" + query);
-      if (!current(cycle)) return;
-      const keys = [
-        ["pv_power", "PV"], ["battery_soc", "SOC"], ["battery_power", "АКБ"]
-      ];
-      for (const [key, label] of keys) {
-        const reading = result.values && result.values[key];
-        const ready = reading && reading.quality === "simulated" &&
-          reading.value_decimal !== null && reading.value_decimal !== undefined;
-        const tile = element("div", "parallel-reading");
-        add(tile, element("small", "", label),
-          element("strong", "", ready ?
-            number(reading.value_decimal) + " " + (reading.unit || "") : "—"),
-          element("span", "", "Запис MySQL"));
-        previews.appendChild(tile);
-      }
-    } catch (_error) {
-      previews.appendChild(createEmpty("Архівні значення недоступні",
-        "Перевірка архіву не звертається до обладнання."));
+    card.appendChild(metrics);
+    grid.appendChild(card);
+    const result = await Promise.allSettled([
+      api("/parallel/history" + query + "&key=pv_power&hours=24"),
+      api("/parallel/modbus-fields" + query),
+      api("/parallel/raw" + query + "&limit=200"),
+      api("/parallel/events" + query),
+    ]);
+    if (!current(cycle)) return;
+    const [history, fields, raw, events] = result;
+    const fieldList = fields.status === "fulfilled" ?
+      (fields.value.fields || []) : [];
+    const rawRows = raw.status === "fulfilled" ?
+      (raw.value.raw_registers || []) : [];
+    const info = element("div", "parallel-demo-counters");
+    for (const [label, count] of [
+      ["Поля Modbus", fieldList.length],
+      ["Сирі регістри", raw.status === "fulfilled" ? raw.value.total : 0],
+      ["Події", events.status === "fulfilled" ? (events.value.events || []).length : 0]
+    ]) {
+      const item = element("div", "parallel-demo-counter");
+      add(item, element("strong", "", String(count || 0)),
+        element("small", "", label));
+      info.appendChild(item);
     }
-    const rawSection = element("section", "parallel-raw-viewer");
-    rawSection.appendChild(element("h3", "", "Повний архів сирих регістрів"));
-    const table = element("div", "parallel-raw-table");
-    rawSection.appendChild(table);
-    const button = element("button", "more-button", "Показати регістри (200)");
-    button.type = "button";
-    rawSection.appendChild(button);
-    let offset = 0;
-    button.addEventListener("click", async () => {
-      button.disabled = true;
+    card.appendChild(info);
+    const chart = element("section", "parallel-device-chart");
+    chart.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
+    const points = history.status === "fulfilled" ? (history.value.points || []) : [];
+    if (points.filter(p => p.value_decimal !== null).length < 2) {
+      chart.appendChild(createEmpty("Недостатньо даних для графіка",
+        "Для побудови графіка потрібні два збережені вимірювання."));
+    } else {
+      chart.appendChild(svgChart(points, "кВт"));
+    }
+    card.appendChild(chart);
+
+    const rawPanel = element("section", "parallel-raw-viewer");
+    rawPanel.appendChild(element("h3", "", "Регістри Modbus"));
+    const rawArea = element("div", "parallel-raw-table");
+    rawPanel.appendChild(rawArea);
+    const rawMore = element("button", "more-button", "Показати регістри");
+    rawMore.type = "button";
+    rawPanel.appendChild(rawMore);
+    card.appendChild(rawPanel);
+    let rawOffset = 0;
+    let rowsCache = rawRows;
+    const totalRaw = raw.status === "fulfilled" ? Number(raw.value.total || 0) : 0;
+    const pollUid = raw.status === "fulfilled" ? (raw.value.poll?.poll_uid || "") : "";
+    async function loadRaw() {
+      rawMore.disabled = true;
       try {
-        const page = await api("/parallel/simulation/raw?device=" + query +
-          "&offset=" + offset + "&limit=200");
+        const data = rawOffset === 0 && rowsCache ? rowsCache :
+          (await api("/parallel/raw" + query +
+            "&limit=200&offset=" + rawOffset +
+            (pollUid ? "&poll_uid=" + encodeURIComponent(pollUid) : ""))).raw_registers || [];
+        rowsCache = null;
         if (!current(cycle)) return;
-        const rows = page.raw_registers || [];
-        for (const item of rows) {
+        for (const entry of data) {
           const row = element("div", "parallel-raw-row");
-          add(row, element("code", "", String(item.register_address)),
-            element("span", "", "FC" + item.function_code),
-            element("strong", "", String(item.raw_uint16)),
-            element("small", "", "архів"));
-          table.appendChild(row);
+          add(row, element("code", "", String(entry.register_address)),
+            element("span", "", "FC" + entry.function_code),
+            element("strong", "", String(entry.raw_uint16)));
+          rawArea.appendChild(row);
         }
-        offset += rows.length;
-        button.textContent = "Показано " + offset + " із " + page.total +
-          (offset < page.total ? " · ще 200" : " · усі записи");
-        button.hidden = offset >= page.total;
+        rawOffset += data.length;
+        rawMore.textContent = "Показано " + rawOffset + " із " + totalRaw +
+          (rawOffset < totalRaw ? " · ще 200" : "");
+        rawMore.hidden = rawOffset >= totalRaw || data.length === 0;
       } catch (_error) {
-        table.appendChild(createEmpty("Не вдалося прочитати сирі регістри",
-          "Повторіть спробу після перевірки MySQL."));
+        rawArea.appendChild(createEmpty("Регістри недоступні",
+          "Не вдалося прочитати записи MySQL."));
       } finally {
-        if (current(cycle)) button.disabled = false;
+        if (current(cycle)) rawMore.disabled = false;
       }
-    });
-    card.appendChild(rawSection);
-    const decoded = element("section", "parallel-raw-viewer parallel-field-viewer");
-    decoded.appendChild(element("h3", "",
-      "Розшифровані поля Modbus — " + device.decoded_fields + " записів"));
-    const decodedRows = element("div", "parallel-raw-table");
-    decoded.appendChild(decodedRows);
-    const fieldButton = element("button", "more-button", "Переглянути поля Modbus (80)");
-    fieldButton.type = "button";
-    decoded.appendChild(fieldButton);
+    }
+    rawMore.addEventListener("click", loadRaw);
+    if (!totalRaw) {
+      rawMore.hidden = true;
+      rawArea.appendChild(createEmpty("Регістри відсутні",
+        "Поки немає збережених регістрів для цього інвертора."));
+    }
+
+    const fieldPanel = element("section", "parallel-raw-viewer parallel-field-viewer");
+    fieldPanel.appendChild(element("h3", "",
+      "Параметри Modbus — " + fieldList.length));
+    const fieldArea = element("div", "parallel-raw-table");
+    fieldPanel.appendChild(fieldArea);
+    const fieldMore = element("button", "more-button", "Показати параметри");
+    fieldMore.type = "button";
+    fieldPanel.appendChild(fieldMore);
+    card.appendChild(fieldPanel);
     let fieldOffset = 0;
-    fieldButton.addEventListener("click", async () => {
-      fieldButton.disabled = true;
-      try {
-        const result = await api("/parallel/simulation/fields?device=" + query +
-          "&offset=" + fieldOffset + "&limit=80");
-        if (!current(cycle)) return;
-        const items = result.fields || [];
-        for (const entry of items) {
-          const row = element("div", "parallel-field-row");
-          const shown = entry.value_decimal !== null && entry.value_decimal !== undefined ?
-            number(entry.value_decimal) : entry.value_text || "—";
-          add(row,
-            element("code", "", entry.field_key),
-            element("span", "", entry.field_name),
-            element("strong", "", shown + " " + (entry.unit || "")),
-            element("small", "", "АРХІВ MYSQL"));
-          decodedRows.appendChild(row);
-        }
-        fieldOffset += items.length;
-        fieldButton.textContent = "Показано " + fieldOffset + " із " + result.total +
-          (fieldOffset < result.total ? " · ще 80" : " · усі записи");
-        fieldButton.hidden = fieldOffset >= result.total;
-      } catch (_error) {
-        decodedRows.appendChild(createEmpty("Поля Modbus недоступні",
-          "Перевірте стан API та журнал сервера."));
-      } finally {
-        if (current(cycle)) fieldButton.disabled = false;
+    function loadFields() {
+      for (const entry of fieldList.slice(fieldOffset, fieldOffset + 80)) {
+        const row = element("div", "parallel-field-row");
+        const shown = entry.value_decimal !== null &&
+          entry.value_decimal !== undefined ? number(entry.value_decimal) :
+          (entry.value_text || "—");
+        add(row, element("code", "", entry.field_key),
+          element("span", "", entry.field_name),
+          element("strong", "", shown + " " + (entry.unit || "")));
+        fieldArea.appendChild(row);
       }
-    });
-    card.appendChild(decoded);
+      fieldOffset += Math.min(80, fieldList.length - fieldOffset);
+      fieldMore.textContent = "Показано " + fieldOffset + " із " + fieldList.length;
+      fieldMore.hidden = fieldOffset >= fieldList.length;
+    }
+    fieldMore.addEventListener("click", loadFields);
+    if (!fieldList.length) {
+      fieldMore.hidden = true;
+      fieldArea.appendChild(createEmpty("Поля Modbus відсутні",
+        "Для цього інвертора немає записів каталогу."));
+    }
   }
-  return true;
 }
 
 async function renderEvents(cycle) {
