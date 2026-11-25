@@ -342,7 +342,7 @@ class AuthenticationTests(unittest.TestCase):
         self.assertEqual(stable, js)
         self.assertIn('restoreServerReadings()', stable)
         self.assertIn('["modbus", "Modbus", "▤"]', js)
-        self.assertIn("const DEMO_MODE = false;", js)
+        self.assertNotIn("DEMO_MODE", js)
         self.assertIn("sha256sum", script)
         self.assertIn('https://$DOMAIN$ASSET_PATH', script)
         self.assertIn("VERSIONED_SCRIPT_IN_RENDERED_HTML=PASS", script)
@@ -353,10 +353,10 @@ class AuthenticationTests(unittest.TestCase):
 
     def test_primary_dashboard_displays_existing_samples_without_demo_url(self):
         js = (RAKURS / "standalone/static/app.js").read_text()
-        self.assertIn('const DEMO_MODE = false;', js)
+        self.assertNotIn('DEMO_MODE', js)
         self.assertIn('restoreServerReadings();', js)
         self.assertIn('critical.every(key => values[key]', js)
-        self.assertIn('const FORCE_REAL_MODE =', js)
+        self.assertNotIn('FORCE_REAL_MODE', js)
         self.assertIn('const url = base + path + suffix;', js)
         self.assertNotIn('window.location.replace(', js)
         self.assertNotIn('message("СИМУЛЯЦІЯ DEYE — НЕ РЕАЛЬНІ ВИМІРЮВАННЯ"', js)
