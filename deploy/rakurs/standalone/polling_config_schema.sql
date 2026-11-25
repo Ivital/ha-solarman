@@ -44,6 +44,16 @@ CREATE TABLE IF NOT EXISTS rakurs_poll_runtime (
   CONSTRAINT ck_rakurs_runtime_id CHECK (id=1)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- Required for idempotent, tamper-evident archival of verified wire captures.
+-- Existing earlier simulation archives are left unchanged.
+CREATE TABLE IF NOT EXISTS rakurs_modbus_poll_fingerprints (
+  poll_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  payload_sha256 CHAR(64) CHARACTER SET ascii COLLATE ascii_bin NOT NULL,
+  created_at_utc DATETIME(6) NOT NULL,
+  CONSTRAINT fk_rakurs_poll_fingerprint FOREIGN KEY (poll_id)
+    REFERENCES rakurs_modbus_poll_runs(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 INSERT IGNORE INTO rakurs_poll_settings
 (id,enabled,interval_seconds,updated_at_utc)
 VALUES (1,0,60,UTC_TIMESTAMP(6));
