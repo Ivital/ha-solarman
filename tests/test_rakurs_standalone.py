@@ -106,6 +106,8 @@ class StandaloneMySqlTests(unittest.TestCase):
                 return {"n": 316}
             if "SELECT 1 AS n FROM rakurs_samples LIMIT 1" in sql:
                 return {"n": 1}
+            if "FROM rakurs_poll_settings p" in sql:
+                return None
             raise AssertionError("Unexpected SQL in status: " + sql)
         self.data_one = lookup
         for suffix in ("", "?real=1", "?demo=1"):
@@ -114,6 +116,28 @@ class StandaloneMySqlTests(unittest.TestCase):
             self.assertEqual(status["mode"], "real")
             self.assertEqual(status["displayed_signals"], 316)
             self.assertTrue(status["has_real_samples"])
+
+    def test_collector_uses_heartbeat_success_and_state_not_just_switch(self):
+        from datetime import timezone, timedelta
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        runtime = {"enabled":1,"interval_seconds":60,"state":"active",
+                   "worker_heartbeat_utc":now,"last_success_utc":now}
+        self.data_one = lambda sql, _: runtime if "FROM rakurs_poll_settings p" in sql else None
+        result = self.client.get("/api/v1/status").get_json()
+        self.assertTrue(result["collector_active"])
+        self.assertFalse(result["collector"]["telemetry_decoder_ready"])
+        self.assertFalse(result["register_semantics_verified"])
+        runtime["last_success_utc"] = now-timedelta(hours=1)
+        self.assertFalse(self.client.get("/api/v1/status").get_json()["collector_active"])
+
+    def test_event_filter_validation(self):
+        self.assertEqual(self.client.get("/api/v1/events?severity=invalid").status_code,400)
+        self.assertEqual(self.client.get("/api/v1/events?limit=101").status_code,400)
+        result=self.client.get("/api/v1/events?severity=critical&device=deye_inverter_1&limit=25&offset=50")
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.get_json()["offset"],50)
+        self.assertIn("critical",self.data_calls[-1][2])
+        self.assertEqual(self.data_calls[-1][2][-2:],(26,50))
 
     def test_missing_latest_is_empty(self):
         self.assertEqual(

@@ -10,7 +10,8 @@ import logging
 import os
 import re
 import stat
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from functools import lru_cache
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 from pathlib import Path
@@ -329,11 +330,52 @@ def deye_modbus_snapshot():
         fields=result, count=len(result), summary=[], timestamp=None,
     )
 
+@lru_cache(maxsize=1)
+def catalog_data():
+    with CATALOG_FILE.open("r", encoding="utf-8") as source:
+        return json.load(source)
+
+
 @app.get("/api/v1/catalog")
 def catalog():
-    # Unverified planned catalog, NOT actual measured values.
-    with CATALOG_FILE.open("r", encoding="utf-8") as source:
-        return jsonify(json.load(source))
+    return jsonify(catalog_data())
+
+
+def collector_health():
+    """Distinguish a running probe from decoded, verified system telemetry."""
+    try:
+        runtime = one(
+            "SELECT p.enabled,p.interval_seconds,r.worker_heartbeat_utc,r.last_attempt_utc,"
+            "r.last_success_utc,r.last_device_id,r.state,r.last_error "
+            "FROM rakurs_poll_settings p LEFT JOIN rakurs_poll_runtime r ON r.id=p.id WHERE p.id=1")
+    except pymysql.ProgrammingError as error:
+        if not error.args or error.args[0] != 1146:
+            raise
+        runtime = None
+    runtime = runtime or {}
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    def age(key):
+        stamp = runtime.get(key)
+        if not isinstance(stamp, datetime):
+            return None
+        if stamp.tzinfo is not None:
+            stamp = stamp.astimezone(timezone.utc).replace(tzinfo=None)
+        return (now-stamp).total_seconds()
+    heartbeat, success = age("worker_heartbeat_utc"), age("last_success_utc")
+    online = heartbeat is not None and -30 <= heartbeat < 90
+    enabled = bool(runtime.get("enabled"))
+    interval = int(runtime.get("interval_seconds") or 60)
+    active = (enabled and online and runtime.get("state") == "active" and
+              success is not None and -30 <= success <= max(180,2*interval+10))
+    return {"enabled":enabled,"worker_online":online,"collector_active":active,
+            "interval_seconds":interval,"state":runtime.get("state") or "not_configured",
+            "last_attempt_utc":runtime.get("last_attempt_utc"),
+            "last_success_utc":runtime.get("last_success_utc"),
+            "last_device_id":runtime.get("last_device_id"),
+            "worker_heartbeat_utc":runtime.get("worker_heartbeat_utc"),
+            "last_error":runtime.get("last_error"),
+            "telemetry_decoder_ready":False}
+
 
 
 @app.get("/api/v1/status")
@@ -344,13 +386,16 @@ def status():
     )
     sample = one("SELECT 1 AS n FROM rakurs_samples LIMIT 1")
     total_signals = signals["n"] if signals else 0
+    collector = collector_health()
     return jsonify({
         "data_source": "mysql", "mode": "real", "database": SCHEMA,
         "mysql_host": HOST,
         "registered_devices": devices["n"] if devices else 0,
         "verified_signals": total_signals,
         "displayed_signals": total_signals,
-        "has_real_samples": bool(sample), "collector_active": False,
+        "has_real_samples": bool(sample), "collector_active": collector["collector_active"],
+        "collector": serialize(collector), "physical_topology_verified": False,
+        "register_semantics_verified": False,
         "home_assistant_dependency": False,
         "mysql_transport": mysql_transport_state(),
     })
@@ -411,6 +456,59 @@ def checked_key():
     return key
 
 
+def checked_utc(name):
+    value = request.args.get(name, "")
+    if len(value) > 40:
+        abort(400, description="Некоректний часовий інтервал")
+    try:
+        date = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if date.tzinfo is None or date.utcoffset() is None:
+            raise ValueError("timezone required")
+        return date.astimezone(timezone.utc).replace(tzinfo=None)
+    except (ValueError, OverflowError):
+        abort(400, description="Неправильна дата " + name)
+
+
+def device_archive_end(device_id):
+    item = one("SELECT MAX(observed_at_utc) AS stamp FROM rakurs_samples WHERE device_id=%s", (device_id,))
+    return item.get("stamp") if item else None
+
+
+def chart_points(device_id, key, start, end):
+    """Keep actual first/last/min/max samples per time bucket; never invent averages.
+    At most 960 points across the entire requested interval.
+    Full raw history remains available separately for audit and CSV export.
+    """
+    empty = {"points": [], "truncated": False, "sample_count": 0, "resolution": "raw",
+             "bucket_seconds": None, "start": serialize(start), "end": serialize(end)}
+    if device_id is None or not start or not end or end < start:
+        return empty
+    where = (" FROM rakurs_samples AS m JOIN rakurs_signals AS s ON s.id=m.signal_id "
+             "WHERE m.device_id=%s AND s.signal_key=%s "
+             "AND m.observed_at_utc >= %s AND m.observed_at_utc <= %s")
+    params = (device_id,key,start,end)
+    count = one("SELECT COUNT(*) AS n" + where,params)
+    n = int(count["n"]) if count else 0
+    if n <= MAX_HISTORY:
+        data = rows("SELECT m.observed_at_utc,m.value_decimal,m.raw_value,m.quality,s.unit" +
+                    where + " ORDER BY m.observed_at_utc ASC LIMIT %s",params+(MAX_HISTORY,))
+        return {**empty,"points":serialize(data),"sample_count":n}
+    bucket_us = max(1, (int((end-start).total_seconds()*1000000)+240)//240)
+    sql = (
+        "WITH samples AS (SELECT m.observed_at_utc,m.value_decimal,m.raw_value,m.quality,s.unit,"
+        "FLOOR(TIMESTAMPDIFF(MICROSECOND,%s,m.observed_at_utc)/%s) AS bucket_id" + where +
+        "), ranked AS (SELECT samples.*,"
+        "ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY observed_at_utc) AS first_rank,"
+        "ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY observed_at_utc DESC) AS last_rank,"
+        "ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY value_decimal IS NULL,value_decimal,observed_at_utc) AS min_rank,"
+        "ROW_NUMBER() OVER (PARTITION BY bucket_id ORDER BY value_decimal IS NULL,value_decimal DESC,observed_at_utc) AS max_rank "
+        "FROM samples) SELECT observed_at_utc,value_decimal,raw_value,quality,unit,bucket_id "
+        "FROM ranked WHERE first_rank=1 OR last_rank=1 OR min_rank=1 OR max_rank=1 ORDER BY observed_at_utc")
+    data = rows(sql,(start,bucket_us)+params)
+    return {**empty,"points":serialize(data),"sample_count":n,"resolution":"extrema",
+            "bucket_seconds":bucket_us/1000000}
+
+
 @app.get("/api/v1/history")
 def history():
     key = checked_key()
@@ -438,6 +536,12 @@ def history():
                         "hours": hours, "points": [], "truncated": False,
                         "primary_device_id": device_id,
                         "aggregate_verified": False})
+    if request.args.get("resolution") == "auto":
+        end = device_archive_end(device_id) if anchor == "latest" else datetime.now(timezone.utc).replace(tzinfo=None)
+        start = end-timedelta(hours=hours) if end else None
+        return jsonify({"data_source":"mysql","signal":signal,"hours":hours,
+                        "primary_device_id":device_id,"aggregate_verified":False,
+                        **chart_points(device_id,key,start,end)})
     # All signals of the selected device share one archive endpoint; do not
     # move the window independently for every graph.
     cutoff = ("(SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
@@ -479,7 +583,7 @@ def energy_period(anchor, period):
 def energy():
     """Read-only observed counter differences; never sum shared device reports."""
     period = request.args.get("period", "day")
-    if period not in {"day", "month", "year"}:
+    if period not in {"day", "month", "year", "all"}:
         abort(400, description="Некоректний період енергії")
     device_id = selected_overview_device_id()
     if device_id is None:
@@ -491,7 +595,11 @@ def energy():
         return jsonify({"period": period, "counters": [], "anchor": None})
     if anchor.tzinfo is not None:
         anchor = anchor.astimezone(timezone.utc).replace(tzinfo=None)
-    start = energy_period(anchor, period)
+    if period == "all":
+        opening = one("SELECT MIN(observed_at_utc) AS stamp FROM rakurs_samples WHERE device_id=%s",(device_id,))
+        start = (opening or {}).get("stamp") or anchor
+    else:
+        start = energy_period(anchor, period)
     placeholders = ",".join("%s" for _ in ENERGY_COUNTERS)
     # MySQL 8 window functions: inspect all stored numeric counter samples
     # within the requested period, including any decreases/resets.
@@ -518,7 +626,9 @@ def energy():
         result.append({"key": item["signal_key"], "unit": item["unit"],
                        "value": last-first if valid else None,
                        "samples": item["samples"], "first_at": item["first_at"],
-                       "last_at": item["last_at"], "decreases": item["decreases"]})
+                       "last_at": item["last_at"], "decreases": item["decreases"],
+                       "coverage_seconds": max(0,(item["last_at"]-item["first_at"]).total_seconds()),
+                       "requested_seconds": max(0,(anchor-start).total_seconds())})
     return jsonify(serialize({"period": period, "anchor": anchor, "start": start,
                               "counters": result, "aggregate_verified": False}))
 
@@ -527,19 +637,8 @@ def energy():
 def history_range():
     """Bounded historical export, preserving the selected Deye device."""
     key = checked_key()
-    def utc_arg(name):
-        value = request.args.get(name, "")
-        if len(value) > 40:
-            abort(400, description="Некоректний часовий інтервал")
-        try:
-            date = datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            abort(400, description="Неправильна дата " + name)
-        if date.tzinfo is None or date.utcoffset() is None:
-            abort(400, description="Дата має містити часову зону")
-        return date.astimezone(timezone.utc).replace(tzinfo=None)
-    start = utc_arg("start")
-    end = utc_arg("end")
+    start = checked_utc("start")
+    end = checked_utc("end")
     seconds = (end-start).total_seconds()
     if seconds <= 0 or seconds > 31*86400:
         abort(400, description="Діапазон має бути 1 секунда — 31 доба")
@@ -547,32 +646,60 @@ def history_range():
     if selected is None:
         return jsonify({"data_source":"mysql","signal_key":key,
                         "points":[],"truncated":False})
+    if request.args.get("resolution") == "auto":
+        return jsonify({"data_source":"mysql","signal_key":key,"primary_device_id":selected,
+                        **chart_points(selected,key,start,end)})
+    before = checked_utc("before") if request.args.get("before") else None
+    if before is not None and not start < before <= end:
+        abort(400, description="Некоректний курсор архіву")
     data=rows(
-        "SELECT m.observed_at_utc,m.value_decimal,m.raw_value,m.quality "
+        "SELECT m.observed_at_utc,m.value_decimal,m.raw_value,m.quality,s.unit "
         "FROM rakurs_samples AS m "
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
         "AND m.observed_at_utc >= %s AND m.observed_at_utc <= %s "
+        + ("AND m.observed_at_utc < %s " if before is not None else "") +
         "ORDER BY m.observed_at_utc DESC LIMIT %s",
-        (selected,key,start,end,MAX_HISTORY+1))
+        (selected,key,start,end)+((before,) if before is not None else ())+(MAX_HISTORY+1,))
     truncated=len(data)>MAX_HISTORY
     result=data[:MAX_HISTORY]
     result.reverse()
     return jsonify({"data_source":"mysql","signal_key":key,
                     "points":serialize(result),"truncated":truncated,
+                    "next_before":serialize(result[0]["observed_at_utc"]) if truncated and result else None,
                     "primary_device_id":selected,
                     "start":serialize(start),"end":serialize(end)})
 
 
 @app.get("/api/v1/events")
 def events():
+    offset, limit = parallel_page_options(100)
+    severity = request.args.get("severity","")
+    if severity not in {"","info","warning","critical"}:
+        abort(400,description="Некоректний рівень події")
+    device = request.args.get("device","")
+    if device and not KEY_RE.fullmatch(device):
+        abort(400,description="Некоректний пристрій")
+    filters, args = [], []
+    if device:
+        filters.append("d.device_key=%s"); args.append(device)
+    if severity:
+        levels = {"critical":("error","critical","alarm"),"warning":("warning","warn"),"info":("info",)}[severity]
+        filters.append("LOWER(e.severity) IN ("+",".join(["%s"]*len(levels))+")"); args.extend(levels)
+    if request.args.get("start"):
+        filters.append("e.observed_at_utc >= %s"); args.append(checked_utc("start"))
+    if request.args.get("end"):
+        filters.append("e.observed_at_utc <= %s"); args.append(checked_utc("end"))
+    where = "WHERE "+" AND ".join(filters)+" " if filters else ""
     result = rows(
         "SELECT e.observed_at_utc,e.severity,e.event_code,e.message,"
         "d.device_key FROM rakurs_device_events AS e "
         "JOIN rakurs_devices AS d ON d.id=e.device_id "
-        "ORDER BY e.observed_at_utc DESC LIMIT 50"
+        + where + "ORDER BY e.observed_at_utc DESC,e.id DESC LIMIT %s OFFSET %s",
+        tuple(args)+(limit+1,offset)
     )
-    return jsonify({"data_source": "mysql", "events": serialize(result)})
+    return jsonify({"data_source": "mysql", "events": serialize(result[:limit]),
+                    "limit":limit,"offset":offset,"has_more":len(result)>limit})
 
 
 @app.get("/api/v1/devices")
@@ -726,13 +853,21 @@ def parallel_device_history():
         abort(400, description="Некоректний проміжок часу")
     if not 1 <= hours <= 168:
         abort(400, description="Доступно 1–168 годин")
+    anchor = request.args.get("anchor","now")
+    if anchor not in {"now","latest"}:
+        abort(400,description="Некоректний період")
+    if request.args.get("resolution") == "auto":
+        end = device_archive_end(selected["id"]) if anchor == "latest" else datetime.now(timezone.utc).replace(tzinfo=None)
+        return jsonify({"data_source":"mysql","device_key":selected["device_key"],"signal_key":key,
+                        "hours":hours,"aggregation_verified":False,
+                        **chart_points(selected["id"],key,end-timedelta(hours=hours) if end else None,end)})
     data = rows(
         "SELECT m.observed_at_utc, m.value_decimal, m.quality, s.unit "
         "FROM rakurs_samples AS m "
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
         ""
-        "AND m.observed_at_utc >= UTC_TIMESTAMP(6) - INTERVAL %s HOUR "
+        "AND m.observed_at_utc >= " + ("(SELECT MAX(mx.observed_at_utc) FROM rakurs_samples mx WHERE mx.device_id=m.device_id)" if anchor=="latest" else "UTC_TIMESTAMP(6)") + " - INTERVAL %s HOUR "
         "ORDER BY m.observed_at_utc DESC LIMIT %s",
         (selected["id"], key, hours, MAX_HISTORY + 1),
     )

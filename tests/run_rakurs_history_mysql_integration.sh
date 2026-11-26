@@ -156,6 +156,14 @@ FROM rakurs_signals s CROSS JOIN (
   UNION ALL SELECT '2026-11-25 00:16:18',13.7,4
 ) t WHERE s.signal_key IN ('pv_energy_total','grid_import_total');
 SQL
+query <<'SQL'
+SET SESSION cte_max_recursion_depth=2000;
+INSERT INTO rakurs_samples(device_id,signal_id,observed_at_utc,received_at_utc,value_decimal,quality,ingest_source)
+WITH RECURSIVE seq(n) AS (SELECT 0 UNION ALL SELECT n+1 FROM seq WHERE n<1199)
+SELECT 2,s.id,TIMESTAMPADD(SECOND,n,'2026-11-24 12:30:00.123456'),
+'2026-11-24 13:00:00',CASE WHEN n=600 THEN 10000 WHEN n=601 THEN -9000 ELSE MOD(n,9) END,'generated','ci_chart_resolution'
+FROM rakurs_signals s CROSS JOIN seq WHERE s.signal_key='signal_316';
+SQL
 RAKURS_CI_CONTAINER="$NAME" RAKURS_CI_PASSWORD="$PASS" PYTHONPATH="$ROOT/deploy/rakurs" python3 - <<'PY'
 import os
 import subprocess
@@ -217,6 +225,28 @@ with patch.object(module, "selected_overview_device_id", return_value=2), patch.
     with module.app.test_request_context("/api/v1/history?key=pv_energy_total&hours=24&anchor=latest"):
         data = module.history().get_json()
         assert len(data["points"]) == 3, data
+    from datetime import timedelta
+    start=datetime(2026,11,24,12,30,0,123456)
+    end=start+timedelta(seconds=1199)
+    overview=module.chart_points(2,"signal_316",start,end)
+    assert overview["resolution"]=="extrema" and overview["sample_count"]==1200, overview["sample_count"]
+    points=overview["points"]
+    assert len(points)<=960
+    assert max(Decimal(r["value_decimal"]) for r in points)==Decimal("10000")
+    assert min(Decimal(r["value_decimal"]) for r in points)==Decimal("-9000")
+    assert points[0]["observed_at_utc"]==module.serialize(start)
+    assert points[-1]["observed_at_utc"]==module.serialize(end)
+    from urllib.parse import urlencode
+    params={"key":"signal_316","start":module.serialize(start),"end":module.serialize(end)}
+    with module.app.test_request_context("/api/v1/history/range?"+urlencode(params)):
+        first=module.history_range().get_json()
+    assert len(first["points"])==1000 and first["truncated"]
+    params["before"]=first["next_before"]
+    with module.app.test_request_context("/api/v1/history/range?"+urlencode(params)):
+        second=module.history_range().get_json()
+    assert len(second["points"])==200 and not second["truncated"]
+    assert len({r["observed_at_utc"] for r in first["points"]+second["points"]})==1200
+print("INTEGRATION_MYSQL_ADAPTIVE_HISTORY_AND_RAW_CURSOR=PASS")
 print("INTEGRATION_MYSQL_ANALYTICS_COUNTERS_BATCH_LATEST_AND_ARCHIVE=PASS")
 PY
 
