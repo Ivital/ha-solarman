@@ -5,9 +5,12 @@
  * Independent inverter reports may refer to the same node, or be inverter-local
  * contributions. Without register semantics verified, never add them and never
  * present one selected report as an authoritative system total.
- * Motion requires confirmed poll and fresh measurements. Read-only module. */
+ * Flow animation represents an ILLUSTRATION of a saved historical snapshot,
+ * not real-time measurement. Read-only module, no device writes. */
 (function (root) {
   const SLOT_KEYS = ["pv_power","load_power","grid_power","battery_power","battery_soc"];
+  let motionEnabled=true;
+  let motionSpeed="normal";
   const ukTime = value => {
     if (!value) return "час невідомий";
     const d = new Date(value);
@@ -98,17 +101,18 @@
     const doc=config.document||document;
     const s=snapshot(config);
     host.replaceChildren();
-    const board=make(doc,"section","energy-board"+(s.confirmed?" is-live":" is-archive"));
+    const board=make(doc,"section","energy-board"+(s.confirmed?" is-live":" is-archive")+
+      (motionEnabled?" is-animated":" is-paused")+" speed-"+motionSpeed);
     board.setAttribute("aria-label","Схема напрямків енергії системи Deye");
     const head=make(doc,"div","energy-board-header");
     const heading=make(doc,"div","energy-board-heading");
-    append(heading,make(doc,"span","energy-board-kicker","НА ОДНОМУ ЕКРАНІ"),
-      make(doc,"h2","","Енергетична схема системи"),
-      make(doc,"p","","Напрямки за останніми збереженими вимірюваннями. Натисніть на будь-який вузол, щоб дізнатися більше."));
+    append(heading,make(doc,"span","energy-board-kicker","ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ"),
+      make(doc,"h2","","Як рухається енергія"),
+      make(doc,"p","","Натисніть на елемент або лінію потоку, щоб переглянути його показники."));
     const flags=make(doc,"div","energy-board-flags");
     append(flags,make(doc,"span","energy-board-flag "+(s.confirmed?"is-online":"is-stale"),
       s.confirmed?"● Підтверджене опитування":"◷ Архівний зріз — не онлайн"),
-      make(doc,"span","energy-board-date","Найновіший запис: "+ukTime(s.last)+" · "+ageLabel(s.last)));
+      make(doc,"span","energy-board-date","Запис: "+ukTime(s.last)+" · "+ageLabel(s.last)));
     append(head,heading,flags);board.appendChild(head);
 
     const switches=make(doc,"div","energy-board-modes");
@@ -128,10 +132,35 @@
       });
       switches.appendChild(button);
     }
-    board.appendChild(switches);
+    const toolbar=make(doc,"div","energy-board-toolbar");
+    const motion=make(doc,"button","energy-board-motion","");
+    motion.type="button";
+    const speed=make(doc,"button","energy-board-speed","");
+    speed.type="button";
+    const caption=make(doc,"span","energy-board-visual-label",
+      s.confirmed?"Схема за підтвердженими даними":"Схематичний рух за архівним записом");
+    function paintMotion(){
+      board.className=board.className.replace(/\s+is-animated|\s+is-paused|\s+speed-(normal|slow|fast)/g,"")+
+        (motionEnabled?" is-animated":" is-paused")+" speed-"+motionSpeed;
+      motion.textContent=motionEnabled?"⏸ Пауза":"▶ Відтворити";
+      motion.setAttribute("aria-pressed",String(motionEnabled));
+      motion.setAttribute("aria-label",motionEnabled?"Зупинити рух на схемі":"Відтворити схематичний рух");
+      speed.textContent=motionSpeed==="slow"?"Швидкість: повільно":
+        motionSpeed==="fast"?"Швидкість: швидко":"Швидкість: звичайна";
+      speed.setAttribute("aria-label","Змінити швидкість анімації потоків");
+    }
+    motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;paintMotion();});
+    speed.addEventListener("click",()=>{
+      motionSpeed=motionSpeed==="normal"?"fast":motionSpeed==="fast"?"slow":"normal";
+      paintMotion();
+    });
+    paintMotion();
+    append(toolbar,caption,motion,speed);
+    board.appendChild(toolbar);
     const context=make(doc,"div","energy-board-context",s.focus==="system"?
-      "Фізична схема: два незалежні масиви PV → два паралельні Deye → ОДНЕ спільне навантаження, ОДНА мережа й ОДНА АКБ. Значення спільних вузлів — лише архівні покази обраного джерела, не підтверджені підсумки системи.":
-      "Спільні навантаження, мережа й АКБ залишаються ОДНИМИ вузлами. Змінюється тільки джерело архівного показу (Deye №"+(s.selected?.slot_no||"—")+").");
+      "Два масиви сонячних панелей, два Deye, один будинок, одна АКБ та одна мережа.":
+      "Показники з архіву Deye №"+(s.selected?.slot_no||"—")+
+        ". Будинок, акумулятор і мережа залишаються одними вузлами.");
     board.appendChild(context);
 
     const map=make(doc,"div","energy-board-map");
@@ -146,19 +175,18 @@
     const desc={
       solar1:"Фотоелектричні панелі відповідного Deye. Жодної суми без підтвердженої схеми.",
       solar2:"Показник фотоелектричних панелей другого Deye — окреме джерело.",
-      house:"Фізично одне спільне навантаження. Архівний регістр вибраного Deye не можна вважати перевіреним сумарним навантаженням.",
-      battery:"Фізично одна спільна АКБ. SOC не сумується. Знак регістра потужності потребує підтвердження для конкретного профілю.",
-      grid:"Фізично одне спільне підключення до мережі. Напрямок за знаком регістра потребує підтвердження; два покази не додаються."
+      house:"Навантаження будинку. Число взяте з архіву вибраного Deye і ще не підтверджене як загальний баланс.",
+      battery:"Заряд або розряд акумулятора. SOC не сумується; знак потужності уточнимо за реальними регістрами.",
+      grid:"Імпорт чи експорт електроенергії. Напрямок і одиниці виміру треба звірити з регістрами обладнання."
     };
     function node(kind,key,icon,label,num,detail,subtitle,diagnostics=[]){
-      const el=make(doc,"button","energy-board-node energy-board-"+kind+" is-shared","");
+      const el=make(doc,"button","energy-board-node energy-board-"+kind,"");
       el.type="button";
-      el.setAttribute("aria-label",label+": спільний фізичний вузол, архів "+pretty(num,"кВт"));
+      el.setAttribute("aria-label",label+": показ архіву "+pretty(num,"кВт"));
       append(el,make(doc,"span","energy-board-node-icon",icon),
         make(doc,"span","energy-board-node-name",label),
         make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
         make(doc,"span","energy-board-node-detail",detail));
-      el.appendChild(make(doc,"span","energy-board-shared-tag","СПІЛЬНИЙ ВУЗОЛ"));
       if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
       const diagnosticText=diagnostics.map(row=>
         "Deye №"+row.slot+": "+pretty(row.value,"кВт")+
@@ -167,15 +195,29 @@
         ", запис "+ukTime(row.last)).join("; ");
       interactive.push({el,key,label,num,
         detail:(desc[key]||"")+" "+(diagnosticText?
-          "Окремі звіти про ЦЕЙ самий фізичний вузол (не два навантаження): "+diagnosticText+".":"Немає окремих звітів."),
+          "Покази обох інверторів: "+diagnosticText+".":"Немає окремих звітів."),
         subtitle});
       return el;
     }
     function wire(key,direction,active,caption){
-      const item=make(doc,"div","energy-board-wire "+(active?"has-flow":"no-flow")+
-        (direction==="←"?" is-reverse":"")+" wire-"+key);
-      const arrow=make(doc,"span","energy-board-direction",active?direction:"—");
-      append(item,make(doc,"span","energy-board-wire-title",caption),arrow);
+      const item=make(doc,"button","energy-board-wire "+(active?"has-flow":"no-flow")+
+        (direction==="←"?" is-reverse":" is-forward")+" wire-"+key);
+      item.type="button";
+      item.setAttribute("aria-label",caption+" — "+(active?"напрямок "+direction:"немає підтвердженого потоку"));
+      item.setAttribute("aria-pressed","false");
+      item.title=caption+" · Натисніть для деталей";
+      const line=make(doc,"span","energy-board-flow-track");
+      line.setAttribute("aria-hidden","true");
+      if(active){
+        line.appendChild(make(doc,"span","energy-board-flow-head"));
+        for(let i=0;i<3;i++){
+          const particle=make(doc,"span","energy-board-flow-particle");
+          particle.setAttribute("aria-hidden","true");
+          line.appendChild(particle);
+        }
+      }
+      append(item,make(doc,"span","energy-board-wire-title",caption),line,
+        make(doc,"span","energy-board-direction",active?direction:"—"));
       wires[key]=item;return item;
     }
     // A shared load, grid, or battery has exactly one physical connection.
@@ -190,7 +232,7 @@
       choice.setAttribute("aria-label","Фотоелектричні панелі Deye №"+number+": "+pretty(power,"кВт"));
       const icon=make(doc,"span","energy-board-source-icon","☀");
       const details=make(doc,"div","energy-board-source-text");
-      append(details,make(doc,"small","","Панелі → Deye №"+number),
+      append(details,make(doc,"small","","Сонце · Deye №"+number),
         make(doc,"strong","",exists?pretty(power,"кВт"):"—"),
         make(doc,"span","",exists?"Запис: "+ukTime(measured(device.values)):
           s.loading?"Отримуємо дані з MySQL":"Немає даних цього інвертора"));
@@ -224,9 +266,9 @@
       });
     }
     const outputs=[
-      {key:"house",signal:"load_power",icon:"⌂",label:"Спільне навантаження"},
-      {key:"battery",signal:"battery_power",icon:"▣",label:"Спільна АКБ"},
-      {key:"grid",signal:"grid_power",icon:"⌁",label:"Спільна мережа"}
+      {key:"house",signal:"load_power",icon:"⌂",label:"Будинок"},
+      {key:"battery",signal:"battery_power",icon:"▣",label:"Акумулятор"},
+      {key:"grid",signal:"grid_power",icon:"⌁",label:"Мережа"}
     ];
     for(const info of outputs){
       const rows=diagnosticRows(info);
@@ -241,11 +283,10 @@
         present[0].state.direction!==present[1].state.direction;
       const diverged=present.length===2&&present[0].value!==present[1].value;
       const flow=incompatible?
-        {direction:"—",caption:"Напрямок не підтверджено",active:false}:
+        {direction:"—",caption:"Напрямок невідомий",active:false}:
         flowState(info.key,metricValue);
-      const subtitle=(referenceSlot?"Архів Deye №"+referenceSlot:"Архів без прив'язки до Deye")+
-        " · це не підтверджений загальний баланс"+
-        (diverged?" · покази двох Deye відрізняються":"");
+      const subtitle=(referenceSlot?"Архів Deye №"+referenceSlot:"Архів без джерела")+
+        (diverged?" · покази Deye різні":"");
       // Single line to the single physical node. Never create two arrows.
       sinkWires.appendChild(wire(info.key,flow.direction,flow.active,flow.caption));
       const stateNote=info.key==="battery"?
@@ -257,20 +298,20 @@
     append(map,sources,sourceWires,hub,sinkWires,sinks);board.appendChild(map);
     const legend=make(doc,"div","energy-board-legend");
     append(legend,
-      make(doc,"span","energy-board-legend-key","→ напрям до спільного вузла"),
-      make(doc,"span","energy-board-legend-key","← напрям від спільного вузла"),
-      make(doc,"span","energy-board-legend-key","— немає потоку / різні напрямки у звітах"));
+      make(doc,"span","energy-board-legend-key","☀ Генерація"),
+      make(doc,"span","energy-board-legend-key","⌂ Споживання"),
+      make(doc,"span","energy-board-legend-key","▣ Акумулятор"),
+      make(doc,"span","energy-board-legend-key","⌁ Мережа"));
     board.appendChild(legend);
     const foot=make(doc,"div","energy-board-foot");
     const inspector=make(doc,"div","energy-board-inspector");
     inspector.setAttribute("aria-live","polite");
-    append(inspector,make(doc,"strong","energy-board-inspector-title","Як читати схему"),
+    append(inspector,make(doc,"strong","energy-board-inspector-title","Натисніть на елемент"),
       make(doc,"p","energy-board-inspector-description",
-        "Натисніть на сонячні панелі, будинок, батарею або мережу — відповідний потік підсвітиться."));
+        "Сонце, будинок, акумулятор, мережа та лінії енергії відкривають пояснення і записи Deye."));
     const notice=make(doc,"p","energy-board-disclaimer",
-      "Топологія: два окремі PV, одна спільна АКБ, одна мережа й одне навантаження. " +
-      "Показане число — звіт одного Deye, не підтверджений сумарний баланс; перевірка призначення регістрів ще потрібна. " +
-      "Без підтвердженого опитування схема не є онлайн.");
+      "Анімація ілюструє останній збережений зріз, а не рух енергії зараз. " +
+      "Показники взято з обраного Deye, їх не додаємо без звірки регістрів.");
     append(foot,inspector,notice);board.appendChild(foot);
     function choose(item){
       for(const candidate of interactive){
@@ -281,6 +322,9 @@
         item.el.className+=" is-focused";
         for(const key of Object.keys(wires))wires[key].className=wires[key].className.replace(/\s+is-highlight/g,"");
         if(wires[item.key])wires[item.key].className+=" is-highlight";
+        for(const key of Object.keys(wires)){
+          wires[key].setAttribute("aria-pressed",String(key===item.key));
+        }
         inspector.replaceChildren();
         append(inspector,
           make(doc,"strong","energy-board-inspector-title",item.title||item.label+" · "+pretty(item.num,"кВт")),
@@ -289,7 +333,10 @@
             (item.subtitle?item.subtitle+" · ":"")+"Стан: "+(s.confirmed?"підтверджене опитування":"архівний запис")));
       }
     }
-    for(const item of interactive)item.el.addEventListener("click",()=>choose(item));
+    for(const item of interactive){
+      item.el.addEventListener("click",()=>choose(item));
+      if(wires[item.key])wires[item.key].addEventListener("click",()=>choose(item));
+    }
     host.appendChild(board);
     return {board,mode:s.focus,confirmed:s.confirmed,devices:s.devices.length};
   }
