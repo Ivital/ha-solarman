@@ -240,7 +240,7 @@ def run():
                 # Verify actual visibility before JavaScript and while the API is delayed.
                 for width,height in [(390,844),(1440,900)]:
                     server.scenario = "normal"
-                    nojs = browser.new_context(viewport={"width":width,"height":height},javascript_enabled=False)
+                    nojs = browser.new_context(viewport={"width":width,"height":height},java_script_enabled=False)
                     page = nojs.new_page()
                     page.goto(base+"/",wait_until="load")
                     assert has_real_ssr(page)
