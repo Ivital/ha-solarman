@@ -20,12 +20,13 @@ FILES=(
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
   static/rakurs-color-20261125.css static/register-reference-v1053.json
   static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js
+  static/rakurs-energy-board-20261126.js static/rakurs-energy-board-20261126.css
 )
 cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v1-20261126"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -35,6 +36,9 @@ grep -Fq 'href="/static/rakurs-color-20261125.css?v=rakurs-ux4-20261126-1"' "$HE
 grep -Fq 'case "registers": await renderRegisterReference(cycle)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'function dashboardConfigurator(deck,values)' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'id="refresh-data"' "$HERE/templates/index.html"
+grep -Fq 'rakurs-energy-board-20261126.css?v=rakurs-energy-v1-20261126' "$HERE/templates/index.html"
+grep -Fq 'rakurs-energy-board-20261126.js?v=rakurs-energy-v1-20261126' "$HERE/templates/index.html"
+grep -Fq 'window.RakursEnergyBoard.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -46,6 +50,7 @@ if command -v node >/dev/null 2>&1; then
   node --check "$HERE/static/app.js"
   node --check "$HERE/static/app-stable-20261124.js"
   node --check "$HERE/static/rakurs-page-theme-20261126.js"
+  node --check "$HERE/static/rakurs-energy-board-20261126.js"
   node tests/test_rakurs_clarity_ui.js
 fi
 bash -n "$HERE/audit_parallel_host_readonly.sh"
@@ -209,7 +214,8 @@ echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
 for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css \
             static/app.js static/app-stable-20261124.js \
             static/rakurs-color-20261125.css static/register-reference-v1053.json \
-            static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js; do
+            static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js \
+             static/rakurs-energy-board-20261126.js static/rakurs-energy-board-20261126.css; do
   expected="$(sha256sum "$HERE/$path" | awk '{print $1}')"
   tmp="$(mktemp)"
   for route in LOCAL PUBLIC; do

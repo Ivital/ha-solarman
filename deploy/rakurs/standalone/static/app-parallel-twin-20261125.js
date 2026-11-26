@@ -532,7 +532,41 @@ async function renderOverview(cycle, primedValues = null) {
   }
   if (!current(cycle)) return;
 
-  main.appendChild(overviewHero());
+  const boardHost = element("div","energy-board-host");
+  main.appendChild(boardHost);
+  const twinPromise = fetchParallelDevices(cycle).catch(() => null);
+  let boardDevices = [];
+  function showBoard(devices,loading) {
+    if (!current(cycle)) return;
+    if (!window.RakursEnergyBoard || typeof window.RakursEnergyBoard.render !== "function") {
+      clear(boardHost);
+      boardHost.appendChild(createEmpty("Енергетична схема поки недоступна",
+        "Збережені показники доступні нижче. Оновіть сторінку."));
+      return;
+    }
+    window.RakursEnergyBoard.render(boardHost,{
+      document, devices:devices||[], fallbackValues:values,
+      selectedDeviceKey:state.selectedDeviceKey, selectedSlotNo:state.selectedSlotNo,
+      mode:state.energyBoardMode||"system", status:state.status, loading,
+      onMode:(mode)=>{
+        state.energyBoardMode=mode;
+        if (mode!=="system") {
+          const chosen=(boardDevices||[]).find(d=>String(d.slot_no)===mode);
+          if (chosen) {
+            state.selectedDeviceKey=chosen.device_key;
+            state.selectedSlotNo=chosen.slot_no;
+            try {localStorage.setItem("rakurs.selectedDeye",chosen.device_key);}catch(_error){}
+          }
+        }
+        render();
+      }
+    });
+  }
+  showBoard([],true);
+  const resolvedDevices=await twinPromise;
+  if(!current(cycle))return;
+  boardDevices=resolvedDevices||[];
+  showBoard(boardDevices,false);
   main.appendChild(overviewInsights(values));
   section("Ключові показники · Deye №" + state.selectedSlotNo,
     "Збережені вимірювання обраного інвертора · не сума двох пристроїв");
@@ -541,11 +575,8 @@ async function renderOverview(cycle, primedValues = null) {
   main.appendChild(dashboardConfigurator(deck,values));
   main.appendChild(deck);
   main.appendChild(overviewQuickLinks());
-  await renderTwinSummary(cycle);
+  await renderTwinSummary(cycle,boardDevices);
   if (!current(cycle)) return;
-
-  section("Енергетична схема", "Напрямки потужності для збереженого зрізу");
-  main.appendChild(energyFlow(values));
 
   section("На дату останнього запису",
     "Добові підсумки за дату вимірювання, не обов’язково за сьогодні");
@@ -980,9 +1011,11 @@ async function fetchParallelDevices(cycle) {
     values: responses[i].status === "fulfilled" ? (responses[i].value.values || {}) : {},
   }));
 }
-async function renderTwinSummary(cycle) {
-  let devices;
-  try { devices = await fetchParallelDevices(cycle); } catch (_error) { return; }
+async function renderTwinSummary(cycle,preloadedDevices=null) {
+  let devices=preloadedDevices;
+  if (!Array.isArray(devices)) {
+    try {devices=await fetchParallelDevices(cycle);} catch(_error){return;}
+  }
   if (!current(cycle) || !devices?.length) return;
   if (state.selectedDeviceKey) {
     const selected = devices.find(d => d.device_key === state.selectedDeviceKey);
@@ -1955,6 +1988,7 @@ async function boot() {
       if(!picked)return;
       state.selectedDeviceKey=picked.device_key;
       state.selectedSlotNo=picked.slot_no;
+      state.energyBoardMode=String(picked.slot_no);
       try {if(typeof localStorage!=="undefined")
         localStorage.setItem("rakurs.selectedDeye",picked.device_key);
       } catch(_error) {}

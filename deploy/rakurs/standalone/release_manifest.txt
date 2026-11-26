@@ -26,3 +26,5 @@ static/rakurs-color-20261125.css
 static/register-reference-v1053.json
 static/rakurs-pages-20261126.css
 static/rakurs-page-theme-20261126.js
+static/rakurs-energy-board-20261126.js
+static/rakurs-energy-board-20261126.css
