@@ -262,3 +262,25 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-warning-details summary{cursor:pointer;padding:10px 14px;font-weight:700}
 .rv7-warning-details ul{margin:0;padding:0 16px 13px 32px;line-height:1.55}
 .rv7-warning-details li+li{margin-top:5px}
+
+/* A compact application toolbar is essential for first-screen readability.
+   This opt-in host layout only applies to the V7 overview on mobile. */
+@media(max-width:760px){
+ body[data-theme].rakurs-v7-overview .topbar{
+  min-height:0;padding:6px 12px;gap:0;align-items:stretch}
+ body[data-theme].rakurs-v7-overview .topbar .mobile-heading-row{
+  display:none}
+ body[data-theme].rakurs-v7-overview .topbar .updated,
+ body[data-theme].rakurs-v7-overview .topbar .mode-indicator,
+ body[data-theme].rakurs-v7-overview .topbar .connection{
+  display:none}
+ body[data-theme].rakurs-v7-overview .topbar .top-actions{
+  display:flex;justify-content:space-between;align-items:center;gap:6px;flex-wrap:wrap}
+ body[data-theme].rakurs-v7-overview .topbar .refresh-data,
+ body[data-theme].rakurs-v7-overview .topbar .theme-toggle,
+ body[data-theme].rakurs-v7-overview .topbar .logout-button{
+  padding:6px 8px;min-height:33px;font-size:11px;line-height:1.3}
+ body[data-theme].rakurs-v7-overview .topbar .device-select-wrap select{
+  min-width:100px;padding:5px 7px}
+ body[data-theme].rakurs-v7-overview .content{padding-top:6px}
+}

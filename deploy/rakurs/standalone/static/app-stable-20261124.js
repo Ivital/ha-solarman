@@ -1901,6 +1901,10 @@ async function render() {
   let v7PreflightFailed = false;
   const v7Overview = state.route === "overview" &&
     Boolean(window.RakursV7 && window.RakursV7.enabled());
+  // Full application toolbar becomes compact only for the V7 overview.
+  // Other routes and V6 retain their original presentation.
+  if (typeof document.body?.classList?.toggle === "function")
+    document.body.classList.toggle("rakurs-v7-overview",v7Overview);
   if (v7Overview) {
     try { preparedV7Devices = await fetchParallelDevices(cycle); }
     catch (_error) { v7PreflightFailed = true; }
@@ -1913,6 +1917,8 @@ async function render() {
       // The server-rendered MySQL readings are trusted more than a failed
       // twin API. Never wipe them or misattribute a single-inverter reading.
       if (window.RakursV7?.disposeAll) window.RakursV7.disposeAll();
+      if (typeof document.body?.classList?.remove === "function")
+        document.body.classList.remove("rakurs-v7-overview");
       restoreServerReadings();
       message("V7 тимчасово недоступний",
         "Не вдалося підтвердити читання двох Deye. Збережено серверні показники MySQL.", true);

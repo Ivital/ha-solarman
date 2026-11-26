@@ -210,6 +210,17 @@ def run():
                     assert "5,43 кВт" in page.locator(
                         ".rv7 [data-node='pv2'] .rv7-node-value").first.text_content()
                     assert not has_real_ssr(page), "Trusted SSR should be replaced only by verified twin response"
+                    if width < 600:
+                        assert page.locator("body.rakurs-v7-overview").count() == 1
+                        assert not page.locator(".topbar .mobile-heading-row").is_visible()
+                        first_screen = page.evaluate("""() => ({
+                          navTop: document.querySelector(".mobile-tabs").getBoundingClientRect().top,
+                          gridBottom: document.querySelector(
+                            ".rv7-mobile [data-node='grid']").getBoundingClientRect().bottom,
+                          batteryBottom: document.querySelector(
+                            ".rv7-mobile [data-node='battery']").getBoundingClientRect().bottom
+                        })""")
+                        assert max(first_screen["gridBottom"], first_screen["batteryBottom"]) <                             first_screen["navTop"] - 6,                             "V7 critical energy nodes must be fully above the mobile bottom nav: " + str(first_screen)
                     assert not page.locator(".rv7 .rv7-pill.is-live").count()
                     assert page.locator(".rv7 .rv7-warnings").count() == 1
                     assert page.evaluate(
@@ -231,6 +242,7 @@ def run():
                         page.locator(".rv7-mobile [data-node='bus']").click()
                         page.locator(".rv7-panel a[href='#/parallel']").click()
                         page.wait_for_function("location.hash === '#/parallel'")
+                        assert page.locator("body.rakurs-v7-overview").count() == 0
                         page.wait_for_function("document.querySelector('#content')?.textContent.includes('Паралельна система Deye')")
                         page.go_back()
                         wait_rendered(page)
