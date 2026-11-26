@@ -40,22 +40,55 @@
     const values=selected?.values && Object.keys(selected.values).length?
       selected.values:config.fallbackValues||{};
     const focus=String(config.mode||"system");
-    const sourceDevices=devices.length?devices:[{
-      device_key:config.selectedDeviceKey||"unverified",
-      slot_no:config.selectedSlotNo||1,values:config.fallbackValues||{},
-      model:"Deye"
-    }];
+    // Do not invent a device when the MySQL parallel-device API is unavailable.
+    const sourceDevices=devices;
     const wanted=focus==="system"?selected:
       sourceDevices.find(d=>String(d.slot_no)===focus)||selected;
     const outputValues=wanted?.values && Object.keys(wanted.values).length?
       wanted.values:focus==="system"||wanted?.device_key===config.selectedDeviceKey?
       config.fallbackValues||{}:{};
-    const last=measured(outputValues);
-    const fresh=last!==null&&Date.now()-new Date(last).getTime()>=-60000&&
-      Date.now()-new Date(last).getTime()<=120000;
+    const measuredTimes=focus==="system" && sourceDevices.length ?
+      sourceDevices.map(device=>measured(device.values)).filter(Boolean) :
+      [measured(outputValues)].filter(Boolean);
+    const last=measuredTimes.length ?
+      new Date(Math.max(...measuredTimes.map(value=>new Date(value).getTime()))).toISOString():null;
+    const inWindow=value=>{
+      if(!value)return false;
+      const age=Date.now()-new Date(value).getTime();
+      return age>=-60000 && age<=120000;
+    };
+    const fresh=focus==="system"?
+      sourceDevices.length===2 && sourceDevices.every(device=>inWindow(measured(device.values))) :
+      inWindow(last);
+    // All three gates must be explicitly verified; archival data are never animated.
     const confirmed=Boolean(config.status?.collector_active&&config.status?.physical_topology_verified&&fresh);
     return {devices:sourceDevices,selected:wanted,values:outputValues,last,
       fresh,confirmed,focus,loading:config.loading===true};
+  }
+  function flowState(key,value) {
+    if(value===null||value===undefined)return {direction:"—",caption:"Немає даних",active:false};
+    if(value===0)return {direction:"—",caption:"Без обміну",active:false};
+    if(key==="battery")return value>0?
+      {direction:"←",caption:"Розряд",active:true}:
+      {direction:"→",caption:"Заряд",active:true};
+    if(key==="grid")return value>0?
+      {direction:"←",caption:"Імпорт",active:true}:
+      {direction:"→",caption:"Експорт",active:true};
+    if(key==="house")return value>0?
+      {direction:"→",caption:"До навантаження",active:true}:
+      {direction:"—",caption:"Перевірте знак",active:false};
+    return value>0?
+      {direction:"→",caption:"Генерація",active:true}:
+      {direction:"—",caption:"Перевірте знак",active:false};
+  }
+  function ageLabel(timestamp) {
+    if(!timestamp)return "давність невідома";
+    const minutes=Math.floor((Date.now()-new Date(timestamp).getTime())/60000);
+    if(!Number.isFinite(minutes)||minutes<0)return "час потребує перевірки";
+    if(minutes<2)return "запис щойно";
+    if(minutes<60)return minutes+" хв тому";
+    if(minutes<1440)return Math.floor(minutes/60)+" год "+minutes%60+" хв тому";
+    return Math.floor(minutes/1440)+" дн "+Math.floor(minutes%1440/60)+" год тому";
   }
   function render(host,config={}) {
     if(!host || !host.replaceChildren) return;
@@ -72,7 +105,7 @@
     const flags=make(doc,"div","energy-board-flags");
     append(flags,make(doc,"span","energy-board-flag "+(s.confirmed?"is-online":"is-stale"),
       s.confirmed?"● Підтверджене опитування":"◷ Архівний зріз — не онлайн"),
-      make(doc,"span","energy-board-date","Запис: "+ukTime(s.last)));
+      make(doc,"span","energy-board-date","Найновіший запис: "+ukTime(s.last)+" · "+ageLabel(s.last)));
     append(head,heading,flags);board.appendChild(head);
 
     const switches=make(doc,"div","energy-board-modes");
@@ -94,10 +127,9 @@
     }
     board.appendChild(switches);
     const context=make(doc,"div","energy-board-context",s.focus==="system"?
-      "Два інвертори окремо. Праворуч — значення "+(s.selected?"Deye №"+s.selected.slot_no:"обраного інвертора")+
-        "; показники спільних вузлів не сумуються.":
-      "Детальний зріз Deye №"+s.selected?.slot_no+
-        ". Спільна батарея, навантаження й мережа відображаються за записами цього інвертора.");
+      "Повна система: ліворуч генерація кожного Deye, праворуч ОКРЕМІ покази №1 та №2 для спільних вузлів. Значення не підсумовуються.":
+      "Детальний архівний зріз Deye №"+(s.selected?.slot_no||"—")+
+      ". Покази спільної батареї, будинку та мережі належать обраному інвертору.");
     board.appendChild(context);
 
     const map=make(doc,"div","energy-board-map");
@@ -116,15 +148,47 @@
       battery:"Спільна батарея. Знак потужності трактуємо як розряд (+) або заряд (−) за профілем; SOC двох Deye не додаємо.",
       grid:"Додатне значення — імпорт із мережі; від’ємне — експорт. Нуль — відсутність обміну."
     };
-    function node(kind,key,icon,label,num,detail,subtitle){
-      const el=make(doc,"button","energy-board-node energy-board-"+kind,"");
-      el.type="button";el.setAttribute("aria-label",label+": "+pretty(num,kind==="battery"?"кВт":"кВт"));
-      append(el,make(doc,"span","energy-board-node-icon",icon),
-        make(doc,"span","energy-board-node-name",label),
-        make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
-        make(doc,"span","energy-board-node-detail",detail));
-      if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
-      interactive.push({el,key,label,num,detail,subtitle});
+    function node(kind,key,icon,label,num,detail,subtitle,rows=null){
+      const comparing=Array.isArray(rows)&&rows.length>0;
+      const el=make(doc,"button","energy-board-node energy-board-"+kind+
+        (comparing?" is-comparison":""),"");
+      el.type="button";
+      el.setAttribute("aria-label",comparing?
+        label+": окремі показники Deye №1 та Deye №2, без підсумовування":
+        label+": "+pretty(num,"кВт"));
+      if(comparing){
+        const title=make(doc,"span","energy-board-node-top");
+        append(title,make(doc,"span","energy-board-node-icon",icon),
+          make(doc,"strong","energy-board-node-name",label),
+          make(doc,"span","energy-board-node-unit","без суми"));
+        el.appendChild(title);
+        const details=make(doc,"span","energy-board-comparison");
+        for(const row of rows){
+          const cell=make(doc,"span","energy-board-reading-row"+(row.value===null?" is-missing":""));
+          append(cell,make(doc,"span","energy-board-reading-label","Deye №"+row.slot),
+            make(doc,"strong","energy-board-reading-value",pretty(row.value,"кВт")),
+            make(doc,"small","energy-board-reading-state",
+              row.state.caption+(row.soc!==null?" · SOC "+pretty(row.soc,"%"):"")));
+          details.appendChild(cell);
+        }
+        el.appendChild(details);
+      }else{
+        append(el,make(doc,"span","energy-board-node-icon",icon),
+          make(doc,"span","energy-board-node-name",label),
+          make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
+          make(doc,"span","energy-board-node-detail",detail));
+        if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
+      }
+      const detailMessage=comparing?
+        rows.map(row=>"Deye №"+row.slot+": "+pretty(row.value,"кВт")+
+          " ("+row.state.caption+")"+
+          (row.soc!==null?" · SOC "+pretty(row.soc,"%"):"")+
+          " · "+ukTime(row.last)).join("; "):
+        detail;
+      interactive.push({el,key,label,num:comparing?null:num,
+        title:comparing?label+" · 2 незалежні покази":null,
+        detail:comparing?detailMessage+"; спільні показники не сумуються.":detail,
+        subtitle:comparing?null:subtitle});
       return el;
     }
     function wire(key,direction,active,caption){
@@ -132,6 +196,22 @@
       const arrow=make(doc,"span","energy-board-direction",active?direction:"—");
       append(item,make(doc,"span","energy-board-wire-title",caption),arrow);
       wires[key]=item;return item;
+    }
+    function comparisonWire(key,rows){
+      const active=rows.some(row=>row.state.active);
+      const item=make(doc,"div","energy-board-wire is-comparison-wire "+
+        (active?"has-flow":"no-flow")+" wire-"+key);
+      for(const row of rows){
+        const lane=make(doc,"span","energy-board-wire-lane "+
+          (row.state.active?"has-flow":"no-flow"));
+        lane.setAttribute("title","Deye №"+row.slot+": "+row.state.caption);
+        append(lane,make(doc,"span","energy-board-wire-number","№"+row.slot),
+          make(doc,"strong","energy-board-wire-arrow",
+            row.state.active?row.state.direction:"—"));
+        item.appendChild(lane);
+      }
+      wires[key]=item;
+      return item;
     }
     const source1=s.devices.find(d=>Number(d.slot_no)===1)||null;
     const source2=s.devices.find(d=>Number(d.slot_no)===2)||null;
@@ -168,25 +248,39 @@
     hub.setAttribute("role","img");
     hub.setAttribute("aria-label","Спільна схема двох Deye, без розрахунку непідтвердженої суми");
     const load=value("load_power"),battery=value("battery_power"),soc=value("battery_soc"),grid=value("grid_power");
+    const systemMode=s.focus==="system"&&s.devices.length>0;
+    const slots=[1,2].map(slot=>({slot,device:s.devices.find(d=>Number(d.slot_no)===slot)||null}));
+    function comparisonRows(info){
+      return slots.map(({slot,device})=>{
+        const v=device?metric(device.values,info.signal):null;
+        return {slot,value:v,state:flowState(info.key,v),
+          soc:info.key==="battery"&&device?metric(device.values,"battery_soc"):null,
+          last:device?measured(device.values):null};
+      });
+    }
+    const sourceLabel="Дані "+(s.selected?"Deye №"+s.selected.slot_no:"запису MySQL");
     const outputs=[
-      {key:"house",icon:"⌂",label:"Будинок",v:load,dir:"→",
-        active:load!==null&&load>0,caption:load===null?"Немає даних":load===0?"Без споживання":"До навантаження",
-        extra:"Дані Deye №"+(s.selected?.slot_no||1)},
-      {key:"battery",icon:"▣",label:"Спільна АКБ",v:battery,
-        dir:battery===null||battery===0?"—":battery>0?"←":"→",
-        active:battery!==null&&battery!==0,caption:battery===null?"Немає даних":battery===0?"Без обміну":battery>0?"Розряд":"Заряд",
-        extra:soc===null?"SOC —":("SOC "+pretty(soc,"%")+" · дані Deye №"+(s.selected?.slot_no||1))},
-      {key:"grid",icon:"⌁",label:"Електромережа",v:grid,
-        dir:grid===null||grid===0?"—":grid>0?"←":"→",
-        active:grid!==null&&grid!==0,caption:grid===null?"Немає даних":grid===0?"Без обміну":grid>0?"Імпорт":"Експорт",
-        extra:"Дані Deye №"+(s.selected?.slot_no||1)}
+      {key:"house",signal:"load_power",icon:"⌂",label:"Будинок",v:load,extra:sourceLabel},
+      {key:"battery",signal:"battery_power",icon:"▣",label:"Спільна АКБ",v:battery,
+        extra:soc===null?"SOC —":("SOC "+pretty(soc,"%")+" · "+sourceLabel)},
+      {key:"grid",signal:"grid_power",icon:"⌁",label:"Електромережа",v:grid,extra:sourceLabel}
     ];
     for(const info of outputs){
-      sinkWires.appendChild(wire(info.key,info.dir,info.active,info.caption));
+      const state=flowState(info.key,info.v);
+      const rows=systemMode?comparisonRows(info):null;
+      sinkWires.appendChild(systemMode?
+        comparisonWire(info.key,rows):
+        wire(info.key,state.direction,state.active,state.caption));
       sinks.appendChild(node(info.key,info.key,info.icon,info.label,
-        info.v,info.caption,info.extra));
+        info.v,state.caption,info.extra,rows));
     }
     append(map,sources,sourceWires,hub,sinkWires,sinks);board.appendChild(map);
+    const legend=make(doc,"div","energy-board-legend");
+    append(legend,
+      make(doc,"span","energy-board-legend-key","→ напрям до вузла"),
+      make(doc,"span","energy-board-legend-key","← напрям від вузла"),
+      make(doc,"span","energy-board-legend-key","— немає потоку / даних"));
+    board.appendChild(legend);
     const foot=make(doc,"div","energy-board-foot");
     const inspector=make(doc,"div","energy-board-inspector");
     inspector.setAttribute("aria-live","polite");
@@ -208,7 +302,7 @@
         if(wires[item.key])wires[item.key].className+=" is-highlight";
         inspector.replaceChildren();
         append(inspector,
-          make(doc,"strong","energy-board-inspector-title",item.label+" · "+pretty(item.num,"кВт")),
+          make(doc,"strong","energy-board-inspector-title",item.title||item.label+" · "+pretty(item.num,"кВт")),
           make(doc,"p","energy-board-inspector-description",item.detail),
           make(doc,"small","energy-board-inspector-timestamp",
             (item.subtitle?item.subtitle+" · ":"")+"Стан: "+(s.confirmed?"підтверджене опитування":"архівний запис")));
@@ -218,5 +312,5 @@
     host.appendChild(board);
     return {board,mode:s.focus,confirmed:s.confirmed,devices:s.devices.length};
   }
-  root.RakursEnergyBoard=Object.freeze({render,snapshot,metric});
+  root.RakursEnergyBoard=Object.freeze({render,snapshot,metric,flowState});
 })(window);
