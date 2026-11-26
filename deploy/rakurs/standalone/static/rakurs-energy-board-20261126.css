@@ -417,3 +417,193 @@ body[data-theme] .energy-board-disclaimer{font-size:10px;line-height:1.45}
  body[data-theme] .energy-board .energy-board-node,
  body[data-theme] .energy-board .energy-board-source{transition:none!important}
 }
+
+
+/* MOBILE V5: each output branch keeps its wire physically attached to its node.
+   Layout is responsive topology, not five unrelated flex blocks. */
+
+/* Desktop: preserve the original five-column bus with three aligned outputs. */
+body[data-theme] .energy-board-map{
+  grid-template-rows:repeat(3,minmax(76px,auto));align-items:stretch}
+body[data-theme] .energy-board-sources{
+  grid-column:1;grid-row:1/4;min-height:0}
+body[data-theme] .source-wires{
+  grid-column:2;grid-row:1/4;min-height:0}
+body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  grid-column:3;grid-row:1/4}
+body[data-theme] .energy-board-outputs,
+body[data-theme] .energy-board-output-row{display:contents}
+body[data-theme] .energy-board-output-row.output-house>.energy-board-wire{
+  grid-column:4;grid-row:1}
+body[data-theme] .energy-board-output-row.output-house>.energy-board-node{
+  grid-column:5;grid-row:1}
+body[data-theme] .energy-board-output-row.output-battery>.energy-board-wire{
+  grid-column:4;grid-row:2}
+body[data-theme] .energy-board-output-row.output-battery>.energy-board-node{
+  grid-column:5;grid-row:2}
+body[data-theme] .energy-board-output-row.output-grid>.energy-board-wire{
+  grid-column:4;grid-row:3}
+body[data-theme] .energy-board-output-row.output-grid>.energy-board-node{
+  grid-column:5;grid-row:3}
+body[data-theme] .energy-board-ssr .energy-board-map{
+  grid-template-rows:auto}
+@media(min-width:601px) and (max-width:960px){
+ body[data-theme] .energy-board-map{
+   grid-template-rows:repeat(4,minmax(78px,auto));align-items:stretch}
+ body[data-theme] .energy-board-sources{grid-column:1;grid-row:1}
+ body[data-theme] .source-wires{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+   grid-column:3;grid-row:1}
+ body[data-theme] .energy-board-output-row.output-house>.energy-board-wire{
+   grid-column:2;grid-row:2}
+ body[data-theme] .energy-board-output-row.output-house>.energy-board-node{
+   grid-column:1;grid-row:2}
+ body[data-theme] .energy-board-output-row.output-battery>.energy-board-wire{
+   grid-column:2;grid-row:3}
+ body[data-theme] .energy-board-output-row.output-battery>.energy-board-node{
+   grid-column:1;grid-row:3}
+ body[data-theme] .energy-board-output-row.output-grid>.energy-board-wire{
+   grid-column:2;grid-row:4}
+ body[data-theme] .energy-board-output-row.output-grid>.energy-board-node{
+   grid-column:1;grid-row:4}
+}
+@media(max-width:600px){
+ /* Reset inherited 100% heights and implicit multi-row wire grids,
+    the cause of the large empty spaces on a 360px Android viewport. */
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-map{
+   display:flex!important;flex-direction:column!important;
+   align-items:stretch!important;justify-content:flex-start!important;
+   grid-template-columns:none!important;grid-template-rows:none!important;
+   gap:0!important;min-height:0!important;height:auto!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-sources{
+   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+   grid-template-rows:minmax(0,1fr)!important;
+   gap:8px!important;width:100%;height:auto!important;min-height:0!important;
+   flex:none!important;align-content:stretch!important}
+ body[data-theme] .energy-board .energy-board-source{
+   height:auto;min-height:94px;padding:10px 8px;gap:7px;
+   border-radius:14px;align-items:flex-start}
+ body[data-theme] .energy-board .energy-board-source-icon{
+   width:24px;flex:none;font-size:22px}
+ body[data-theme] .energy-board .energy-board-source-text small{
+   font-size:10px;line-height:1.35}
+ body[data-theme] .energy-board .energy-board-source-text strong{
+   font-size:clamp(15px,4.5vw,18px);line-height:1.3}
+ body[data-theme] .energy-board .energy-board-source-text span{
+   font-size:9px;line-height:1.35}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .source-wires{
+   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+   grid-template-rows:48px!important;align-content:start!important;
+   gap:8px!important;width:100%;height:48px!important;
+   min-height:0!important;max-height:48px!important;
+   flex:none!important;padding:0!important;margin:0!important;
+   transform:none!important}
+ body[data-theme] .energy-board .source-wires .energy-board-wire{
+   min-height:0!important;max-height:48px!important;
+   height:48px!important;width:100%!important;min-width:0!important;
+   margin:0!important;padding:0!important}
+ body[data-theme] .energy-board .source-wires .energy-board-wire-title{
+   display:none!important}
+ /* Turn only the two PV connections vertically toward the inverter bus. */
+ body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+   position:absolute!important;top:6px!important;left:50%!important;
+   right:auto!important;bottom:auto!important;
+   width:6px!important;height:34px!important;transform:translateX(-50%)!important;
+   border-radius:999px}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-head{
+   position:absolute!important;left:50%!important;right:auto!important;
+   top:auto!important;bottom:-3px!important;
+   width:17px;height:15px;
+   transform:translateX(-50%)!important;
+   clip-path:polygon(0 0,100% 0,50% 100%)}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-particle{
+   position:absolute;top:0;left:50%;
+   transform:translate(-50%,-50%);width:9px;height:9px}
+ body[data-theme] .energy-board.is-animated .source-wires
+   .energy-board-wire.has-flow .energy-board-flow-particle{
+   animation-name:rakurs-stream-down!important}
+ @keyframes rakurs-stream-down{
+   0%{top:0;opacity:0;transform:translate(-50%,-50%) scale(.55)}
+   12%{opacity:1}88%{opacity:1}
+   100%{top:calc(100% - 7px);opacity:0;transform:translate(-50%,-50%) scale(1)}
+ }
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+   position:relative;width:100%;min-height:78px!important;
+   height:auto!important;max-height:none!important;
+   padding:12px!important;gap:5px!important;
+   border-radius:17px;margin:0 0 13px!important;flex:none!important;
+   box-sizing:border-box}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub::after{
+   content:"";position:absolute;left:50%;bottom:-14px;
+   width:3px;height:14px;background:var(--ux-line);transform:translateX(-50%)}
+ body[data-theme] .energy-board-hub-icon{
+   width:38px!important;height:38px!important;font-size:20px!important}
+ body[data-theme] .energy-board-hub strong{
+   font-size:12px;line-height:1.3}
+ body[data-theme] .energy-board-hub small{font-size:10px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs{
+   position:relative;display:flex!important;flex-direction:column!important;
+   gap:9px;width:100%;min-width:0;
+   box-sizing:border-box;padding:13px 0 0 27px!important;
+   margin:0!important;flex:none!important}
+ /* One trunk fed by the inverter bus, three independent horizontal branches. */
+ body[data-theme] .energy-board-outputs::before{
+   content:"";position:absolute;left:10px;top:0;bottom:40px;
+   width:3px;border-radius:4px;background:var(--ux-line)}
+ body[data-theme] .energy-board-outputs::after{
+   content:"";position:absolute;left:10px;top:0;
+   width:calc(50% - 10px);height:3px;background:var(--ux-line)}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+   position:relative;display:grid!important;
+   grid-template-columns:clamp(53px,19vw,68px) minmax(0,1fr)!important;
+   gap:7px;align-items:center;width:100%;min-width:0;min-height:76px}
+ body[data-theme] .energy-board-output-row::before{
+   content:"";position:absolute;left:-17px;top:50%;
+   width:17px;height:3px;background:var(--ux-line);border-radius:4px}
+ body[data-theme] .energy-board-output-row.output-house::before{background:var(--ux-load)}
+ body[data-theme] .energy-board-output-row.output-battery::before{background:var(--ux-battery)}
+ body[data-theme] .energy-board-output-row.output-grid::before{background:var(--ux-grid)}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+   position:relative;grid-column:1!important;grid-row:1!important;
+   min-height:70px!important;height:70px!important;max-height:70px!important;
+   width:100%!important;margin:0!important;padding:0!important;transform:none!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+   grid-column:2!important;grid-row:1!important;
+   min-width:0;min-height:76px;padding:10px;
+   border-radius:14px;gap:3px 7px;
+   grid-template-columns:24px minmax(0,1fr) auto}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-icon{
+   font-size:20px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-name{
+   font-size:13px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+   font-size:clamp(15px,4vw,18px)}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-detail{
+   font-size:10px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-note{
+   font-size:9px;line-height:1.3;overflow-wrap:anywhere}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-wire-title{
+   top:8px!important;left:50%!important;transform:translateX(-50%)!important;
+   font-size:9px!important;line-height:1.2!important;
+   white-space:normal!important;max-width:100%!important;
+   padding:1px 2px!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-track{
+   top:61%!important;left:0!important;right:0!important;
+   height:6px!important;width:auto!important;transform:none!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-direction{
+   top:61%!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-wire.no-flow
+   .energy-board-flow-track{height:4px!important}
+ body[data-theme] .energy-board-legend{margin-top:9px}
+ body[data-theme] .energy-board-foot{margin-top:9px}
+}
+@media(max-width:390px){
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-note{
+   display:none}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+   font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board.is-animated .source-wires
+  .energy-board-flow-particle{display:none!important;animation:none!important}
+}
