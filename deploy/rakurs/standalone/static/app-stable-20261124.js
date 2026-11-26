@@ -153,6 +153,7 @@ function buildNav() {
 function updateConnection(connected) {
   const node = document.getElementById("connection");
   node.className = "connection " + (connected ? "ok" : "error");
+  node.title = connected ? "Працює база MySQL, а не обов’язково зв’язок із Deye" : "Немає підтвердження з’єднання з MySQL";
   node.replaceChildren();
   add(node, element("i", ""), document.createTextNode(connected ? "MySQL доступна" : "MySQL недоступна"));
   document.getElementById("updated").textContent = "З’єднання перевірено: " + time(new Date().toISOString());
@@ -231,7 +232,7 @@ function flowNode(label, icon, value, unit, tone, detail) {
   return node;
 }
 function energyFlow(values) {
-  const root = panel("Як рухається енергія", "Поточний баланс потужності · значення з MySQL");
+  const root = panel("Як рухалася енергія", "Архівний зріз · дата вимірювання зазначена на картках");
   root.className += " energy-panel";
   const pv = reading(values, "pv_power");
   const load = reading(values, "load_power");
@@ -262,11 +263,15 @@ function energyFlow(values) {
       element("span", "flow-arrow", direction));
     return link;
   };
-  add(diagram, solar, arrow("Генерація", "→", "solar"), center,
-    arrow("Споживання", "→", "load"), consumer,
-    utility, arrow(grid >= 0 ? "Імпорт" : "Експорт", grid >= 0 ? "→" : "←", "grid"),
+  add(diagram, solar,
+    arrow(pv === 0 ? "Без генерації" : "Генерація", pv === 0 ? "—" : "→", "solar"), center,
+    arrow(load === 0 ? "Без споживання" : "Споживання", load === 0 ? "—" : "→", "load"), consumer,
+    utility,
+    arrow(grid === 0 ? "Без обміну" : grid > 0 ? "Імпорт" : "Експорт",
+      grid === 0 ? "—" : grid > 0 ? "→" : "←", "grid"),
     element("div", "energy-spacer"),
-    arrow(battery >= 0 ? "Розряд" : "Заряд", battery >= 0 ? "←" : "→", "battery"),
+    arrow(battery === 0 ? "Без обміну" : battery > 0 ? "Розряд" : "Заряд",
+      battery === 0 ? "—" : battery > 0 ? "←" : "→", "battery"),
     accumulator);
   root.appendChild(diagram);
   const note = element("p", "energy-note",
@@ -385,13 +390,14 @@ async function renderOverview(cycle, primedValues = null) {
   await renderTwinSummary(cycle);
   if (!current(cycle)) return;
 
-  section("Енергетична схема", "Зрозумілий напрямок потужності");
+  section("Енергетична схема", "Напрямки потужності для збереженого зрізу");
   main.appendChild(energyFlow(values));
 
-  section("За сьогодні", "Додаткові показники з MySQL");
+  section("На дату останнього запису",
+    "Добові підсумки за дату вимірювання, не обов’язково за сьогодні");
   const extras = element("div", "details-grid");
-  extras.appendChild(detailMetric("Вироблено сонцем", "pv_energy_today", values, "☀"));
-  extras.appendChild(detailMetric("Спожито", "load_energy_today", values, "⌂"));
+  extras.appendChild(detailMetric("Вироблено за добу", "pv_energy_today", values, "☀"));
+  extras.appendChild(detailMetric("Спожито за добу", "load_energy_today", values, "⌂"));
   extras.appendChild(detailMetric("Потужність АКБ", "battery_power", values,
     batteryPower !== null && batteryPower < 0 ? "↙" : "↗"));
   extras.appendChild(detailMetric("Температура інвертора", "inverter_temperature", values, "♨"));
@@ -424,14 +430,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     const btn = element("button", value === hours ? "active" : "", label);
     btn.type = "button";
     btn.setAttribute("aria-pressed", String(value === hours));
-    btn.addEventListener("click", () => {
-      hours = value;
-      buttons.forEach((other, i) => {
-        other.className = frames[i][0] === hours ? "active" : "";
-        other.setAttribute("aria-pressed", String(frames[i][0] === hours));
-      });
-      refresh();
-    });
+    btn.addEventListener("click", () => selectHours(value));
     ranges.appendChild(btn);
     return btn;
   });
@@ -440,6 +439,10 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
   root.appendChild(heading);
   const grid = element("div", "trend-grid");
   root.appendChild(grid);
+  const compactEmpty = element("div", "trend-empty-summary");
+  compactEmpty.hidden = true;
+  compactEmpty.setAttribute("aria-live","polite");
+  root.appendChild(compactEmpty);
   const series = [
     ["pv_power", "Сонячна генерація", "кВт", "solar"],
     ["load_power", "Навантаження", "кВт", "load"],
@@ -458,12 +461,53 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
   });
   main.appendChild(root);
   let requestIndex = 0;
+  function selectHours(value) {
+    hours = value;
+    buttons.forEach((button, i) => {
+      button.className = frames[i][0] === hours ? "active" : "";
+      button.setAttribute("aria-pressed", String(frames[i][0] === hours));
+    });
+    refresh();
+  }
   async function refresh() {
     const index = ++requestIndex;
     bodies.forEach(body => body.replaceChildren(element("p", "subtle", "Завантаження графіка…")));
     const results = await Promise.allSettled(series.map(([key]) =>
       api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours)));
     if (!current(cycle) || index !== requestIndex) return;
+    const allEmpty = results.every(result => result.status === "fulfilled" &&
+      !(result.value.points || []).some(point => point.value_decimal !== null &&
+        point.value_decimal !== undefined && Number.isFinite(Number(point.value_decimal))));
+    const allFailed = results.every(result => result.status === "rejected");
+    if (allEmpty || allFailed) {
+      grid.hidden = true;
+      compactEmpty.hidden = false;
+      clear(compactEmpty);
+      add(compactEmpty,
+        element("div","trend-empty-symbol",allFailed ? "!" : "◷"),
+        element("strong","",allFailed ? "Графіки зараз недоступні" : "За обраний період вимірювань немає"),
+        element("p","",allFailed ?
+          "Дані архіву не змінено. Можна повторити запит." :
+          "Це не означає, що архів порожній. Виберіть довший період або відкрийте історію."));
+      const actions = element("div","trend-empty-actions");
+      if (allFailed) {
+        const retry = element("button","trend-empty-button","Повторити");
+        retry.type="button";retry.addEventListener("click",refresh);actions.appendChild(retry);
+      } else if (hours < 168) {
+        const target = hours === 24 ? 72 : 168;
+        const next = element("button","trend-empty-button",
+          target === 72 ? "Показати 3 доби" : "Показати 7 діб");
+        next.type="button";next.addEventListener("click",()=>selectHours(target));
+        actions.appendChild(next);
+      }
+      const link=element("a","trend-history-link","Відкрити історію");
+      link.href="#/history";actions.appendChild(link);
+      compactEmpty.appendChild(actions);
+      return;
+    }
+    grid.hidden=false;
+    compactEmpty.hidden=true;
+    clear(compactEmpty);
     results.forEach((result, i) => {
       const body = bodies[i];
       clear(body);
@@ -1722,9 +1766,10 @@ async function boot() {
   const mode = document.getElementById("mode-indicator");
   if (mode) {
     const empty = !state.status?.has_real_samples;
-    mode.textContent = empty ? "Очікування показників" : "Дані MySQL";
-    mode.className = "mode-indicator " + (empty ? "mode-pending" : "mode-real");
-    mode.title = empty ? "У базі ще немає вимірювань" : "Показники з бази MySQL";
+    mode.textContent = empty ? "Очікування показників" : "Архів MySQL";
+    mode.className = "mode-indicator " + (empty ? "mode-pending" : "mode-archive");
+    mode.title = empty ? "У базі ще немає вимірювань" :
+      "Архівні вимірювання — це не підтвердження зв’язку з інвертором";
   }
   // Styling and data selection use the same operational mode.
   updateConnection(state.status !== null);
