@@ -295,6 +295,11 @@ async function run() {
     "System must show independently scoped values, NOT a fabricated sum");
   assert.equal(boardWindow.RakursEnergyBoard.metric(separate.values,"battery_soc"),72,
     "Never sum shared battery SOC across inverters");
+  assert.equal(boardWindow.RakursEnergyBoard.metric(separate.values,"load_power"),null);
+  assert(!energyBoardJs.includes("comparisonWire("),
+    "The UI must not redraw physically shared nodes as independent physical branches");
+  assert(!energyBoardJs.includes("is-comparison-wire"));
+
   assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",2).direction,"←");
   assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",-2).direction,"→");
   assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",0).active,false);
@@ -347,40 +352,64 @@ async function run() {
       {device_key:"inv2",slot_no:2,values:sampleDeye2}
     ],selectedDeviceKey:"inv2",mode:"system",
     status:{collector_active:false,physical_topology_verified:false}});
-  const compareNodes=byClass(compareHost,"energy-board-node");
-  assert.equal(compareNodes.length,3);
-  assert.equal(byClass(compareHost,"energy-board-reading-row").length,6,
-    "System mode must show TWO independent figures for EACH shared node");
-  const house=compareNodes.find(node=>node.className.includes("energy-board-house"));
-  const houseReadings=byClass(house,"energy-board-reading-value").map(n=>n.textContent);
-  assert(houseReadings[0].includes("6,4")&&houseReadings[1].includes("6,816"),
-    "House must preserve both Deye readouts, not use only Deye2");
-  const battery=compareNodes.find(node=>node.className.includes("energy-board-battery"));
-  assert(descendants(battery).some(node=>String(node.textContent||"").includes("SOC 72")));
+  const sharedNodes=byClass(compareHost,"energy-board-node");
+  assert.equal(sharedNodes.length,3,"There is ONE physical load, ONE grid and ONE battery");
+  assert.equal(byClass(compareHost,"energy-board-source").length,2,
+    "Only PV arrays are separate, one for each Deye");
+  assert.equal(byClass(compareHost,"energy-board-wire").length,5,
+    "Two PV links and exactly three common-node links");
+  assert.equal(byClass(compareHost,"energy-board-wire-lane").length,0,
+    "One physical common node must NOT split into per-Deye physical flow lanes");
+  assert.equal(byClass(compareHost,"energy-board-reading-row").length,0,
+    "Two telemetry reports must NOT be represented as two physical loads");
+  assert.equal(byClass(compareHost,"energy-board-shared-tag").length,3);
+  const house=sharedNodes.find(node=>node.className.includes("energy-board-house"));
+  assert.equal(byClass(house,"energy-board-node-value").length,1,
+    "Common load must have ONE displayed reference figure");
+  assert(byClass(house,"energy-board-node-value")[0].textContent.includes("6,816"),
+    "System mode uses clearly labeled selected Deye report; NOT an invented system total");
+  assert(descendants(house).some(node=>
+    String(node.textContent||"").includes("Архів Deye №2")));
+  assert(descendants(house).some(node=>
+    String(node.textContent||"").includes("покази двох Deye відрізняються")));
+  house.listeners.click();
+  const details=byClass(compareHost,"energy-board-inspector-description")[0].textContent;
+  assert(details.includes("Deye №1: 6,4")&&details.includes("Deye №2: 6,816"),
+    "Both inverter reports remain available on click, as diagnostics of ONE shared load");
+  const battery=sharedNodes.find(node=>node.className.includes("energy-board-battery"));
+  assert.equal(byClass(battery,"energy-board-node-value").length,1);
   assert(descendants(battery).some(node=>String(node.textContent||"").includes("SOC 73,8")));
   battery.listeners.click();
-  assert(byClass(compareHost,"energy-board-inspector-description")[0].textContent.includes("Deye №1"));
-  assert(byClass(compareHost,"energy-board-inspector-description")[0].textContent.includes("Deye №2"));
-  const wireGrid=byClass(compareHost,"wire-grid")[0];
-  const arrows=byClass(wireGrid,"energy-board-wire-arrow").map(n=>n.textContent);
-  assert.equal(arrows.join(","),"←,→",
-    "Opposite import and export readings need separate, opposite arrows");
-  const oppositeLanes=byClass(wireGrid,"energy-board-wire-lane");
-  assert(oppositeLanes[0].className.includes("is-reverse"));
-  assert(!oppositeLanes[1].className.includes("is-reverse"));
-  assert(energyBoardCss.includes("energy-dot-reverse"),
-    "Direction-aware animation must move in the actual arrow direction");
-  assert(energyBoardCss.includes(".energy-board-wire.is-comparison-wire::after"),
-    "A shared moving dot must not contradict independent inverter flows");
+  const batteryInfo=byClass(compareHost,"energy-board-inspector-description")[0].textContent;
+  assert(batteryInfo.includes("SOC 72")&&batteryInfo.includes("SOC 73,8"));
+  const grid=sharedNodes.find(node=>node.className.includes("energy-board-grid"));
+  grid.listeners.click();
+  const sharedGridWire=byClass(compareHost,"wire-grid");
+  assert.equal(sharedGridWire.length,1,"Shared power grid has only ONE connection");
+  assert(sharedGridWire[0].className.includes("no-flow"),
+    "Opposite report signs cannot be rendered as a known common-grid direction");
+  assert.equal(byClass(sharedGridWire[0],"energy-board-direction")[0].textContent,"—");
+  assert(descendants(grid).some(node=>
+    String(node.textContent||"").includes("Напрямок не підтверджено")));
+  const selectedOneHost=new Node("div");
+  boardWindow.RakursEnergyBoard.render(selectedOneHost,{document:doc,
+    devices:[
+      {device_key:"inv1",slot_no:1,values:sampleDeye1},
+      {device_key:"inv2",slot_no:2,values:sampleDeye2}
+    ],selectedDeviceKey:"inv1",mode:"1",
+    status:{collector_active:false,physical_topology_verified:false}});
+  const selectedHouse=byClass(selectedOneHost,"energy-board-house")[0];
+  assert(byClass(selectedHouse,"energy-board-node-value")[0].textContent.includes("6,4"));
+  assert.equal(byClass(selectedOneHost,"energy-board-node").length,3);
   assert.equal(byClass(compareHost,"energy-board-legend").length,1);
   const wholeText=descendants(compareHost).map(node=>String(node.textContent||"")).join(" ");
   assert(!wholeText.includes("13,216")&&!wholeText.includes("2,685"),
-    "Do not invent totals from shared battery or load readings");
-  console.log("CLARITY_FULL_SYSTEM_TWO_INDEPENDENT_OUTPUTS_AND_OPPOSITE_FLOWS=PASS");
-  assert(energyBoardCss.includes(".energy-board-reading-row"));
-  assert(energyBoardCss.includes(".energy-board-wire-lane"));
+    "Do not fabricate shared-node totals from separate inverter reports");
+  assert(energyBoardCss.includes(".energy-board-node.is-shared"));
+  assert(!energyBoardCss.includes(".energy-board-wire-lane"));
   assert(energyBoardCss.includes("@media(max-width:600px)"));
-  console.log("CLARITY_READABLE_ENERGY_FLOWS_ON_DESKTOP_AND_MOBILE=PASS");
+  console.log("CLARITY_ONE_COMMON_LOAD_GRID_BATTERY_TWO_SEPARATE_PV=PASS");
+  console.log("CLARITY_SHARED_TELEMETRY_DIAGNOSTICS_NO_AGGREGATION=PASS");
   for(const scenario of ["fail","partial"]) {
     const app=prepare(scenario);
     await settle();
