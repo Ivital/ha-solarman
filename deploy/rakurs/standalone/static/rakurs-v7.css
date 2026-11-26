@@ -248,3 +248,8 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-diagram .rv7-wire-pv2{stroke:var(--v7-pv)}
 /* Zero grid exchange is neutral, never a directional purple import/export. */
 .rv7-diagram .rv7-wire.is-unknown{stroke:var(--v7-line)}
+
+/* Make partial archive API failures visible without shifting empty-state layout. */
+.rv7-history-error{margin:5px 16px 10px;padding:9px 12px;border:1px solid var(--v7-load);
+ border-radius:9px;background:var(--v7-load-soft);color:var(--v7-ink);font-size:12px}
+.rv7-history-error:empty{display:none}

@@ -1912,6 +1912,7 @@ async function render() {
     if (v7PreflightFailed && SSR_PRESENT && !state.selectedDeviceKey) {
       // The server-rendered MySQL readings are trusted more than a failed
       // twin API. Never wipe them or misattribute a single-inverter reading.
+      if (window.RakursV7?.disposeAll) window.RakursV7.disposeAll();
       restoreServerReadings();
       message("V7 тимчасово недоступний",
         "Не вдалося підтвердити читання двох Deye. Збережено серверні показники MySQL.", true);
@@ -1959,6 +1960,8 @@ async function render() {
   }
   if (!current(cycle)) return;
   state.twinFallbackCycle = null;
+  // A route change must release V7 archive timers and dialog listeners.
+  if (window.RakursV7?.disposeAll) window.RakursV7.disposeAll();
   clear(main);
   switch (state.route) {
     case "overview":

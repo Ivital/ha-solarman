@@ -16,8 +16,6 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
 
-from jinja2 import Environment, FileSystemLoader
-from playwright.sync_api import sync_playwright
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -25,7 +23,7 @@ STATIC = ROOT / "deploy/rakurs/standalone/static"
 TEMPLATES = ROOT / "deploy/rakurs/standalone/templates"
 OUT = Path(os.environ.get("RAKURS_V7_SCREENSHOTS", "artifacts/rakurs-v7")).resolve()
 OUT.mkdir(parents=True, exist_ok=True)
-TEMPLATE = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True).get_template("index.html")
+TEMPLATE = None  # assigned by run(); importable by other unittest suites
 MEASURED = "2026-11-25T00:16:18Z"
 D1 = "integration_deye_1"
 D2 = "integration_deye_2"
@@ -180,6 +178,10 @@ def has_real_ssr(page):
 
 
 def run():
+    global TEMPLATE
+    from jinja2 import Environment, FileSystemLoader
+    from playwright.sync_api import sync_playwright
+    TEMPLATE = Environment(loader=FileSystemLoader(str(TEMPLATES)), autoescape=True).get_template("index.html")
     server = TestServer()
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
@@ -226,7 +228,8 @@ def run():
                         page.get_by_role("tab", name="Інженерний режим").click()
                         assert page.locator(".rv7-engineer tbody tr").count() == 5
                         page.get_by_role("tab", name="Огляд").click()
-                        page.locator(".rv7 .rv7-chip[href='#/parallel']").first.click()
+                        page.locator(".rv7-mobile [data-node='bus']").click()
+                        page.locator(".rv7-panel a[href='#/parallel']").click()
                         page.wait_for_url("**/#/parallel")
                         assert "Паралельна система Deye" in page.locator("#content").inner_text()
                         page.go_back()
@@ -261,9 +264,7 @@ def run():
                             ".rv7-mobile [data-node='pv2'] .rv7-node-value").inner_text()
                         assert "5,1 кВт" in page.locator(
                             ".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
-                        assert "Не вдалося прочитати покази Deye №2" in \
-                            page.locator(".rv7-warnings").get_attribute("outerHTML") or \
-                            page.locator(".rv7-warnings").count() == 1
+                        assert page.locator(".rv7-warnings").count() == 1
                         page.get_by_role("tab", name="Інженерний режим").click()
                         assert "—" in page.locator(".rv7-engineer").inner_text()
                     elif scenario == "empty":
