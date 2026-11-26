@@ -179,7 +179,7 @@
    "◷ До фізичної перевірки Modbus адреси та масштаби регістрів залишаються непідтвердженими."));
   container.appendChild(zone);
  }
- function paintHistory(container,snap,config,scope,onFrame){
+ function paintHistory(container,snap,config,scope,onFrame,onRestore){
   const card=h("section","rv7-card rv7-chart-card"),heading=h("div","rv7-card-head");
   heading.appendChild(h("strong","rv7-card-title","Історія"));
   const ranges=h("div","rv7-ranges");
@@ -191,7 +191,31 @@
   card.appendChild(h("p","rv7-note",
    "Дані MySQL. Натисніть на графік або перемістіть повзунок часу."));
   container.appendChild(card);
-  let series=[],revision=0,explicitSelection=false;
+  let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
+  const play=h("button","rv7-play","▶ Відтворити архів");
+  play.type="button";
+  play.setAttribute("aria-pressed","false");
+  function stopPlayback(){
+   if(timer!==null){clearInterval(timer);timer=null;}
+   play.setAttribute("aria-pressed","false");
+   play.textContent="▶ Відтворити архів";
+   card.classList.remove("is-playing");
+  }
+  scope.onDispose=stopPlayback;
+  play.addEventListener("click",()=>{
+   if(timer!==null){stopPlayback();return;}
+   if(availableTimes.length<2)return;
+   play.setAttribute("aria-pressed","true");
+   play.textContent="⏸ Пауза";
+   card.classList.add("is-playing");
+   timer=setInterval(()=>{
+    if(scope.cancelled){stopPlayback();return;}
+    const i=availableTimes.indexOf(chosenTime);
+    chosenTime=availableTimes[(i+1)%availableTimes.length];
+    explicitSelection=true;
+    chart();
+   },1200);
+  });
   const metadata=[
    ["pv1","PV 1","pv_power",1,"var(--v7-pv)"],
    ["pv2","PV 2","pv_power",2,"var(--v7-primary)"],
@@ -208,7 +232,9 @@
     role:"img","aria-label":"Архівний графік"});
    for(const y of [20,60,100,140])layer.appendChild(s("line",{
     x1:8,y1:y,x2:473,y2:y,class:"rv7-chart-gridline"}));
+   availableTimes=timestamps;
    if(!timestamps.length){
+    stopPlayback();
     chartbox.replaceChildren(h("div","rv7-chart-status",
      "За цей період немає архівних вимірювань"));
     control.replaceChildren();time.textContent="";return;
@@ -254,10 +280,11 @@
    const row=h("label");
    put(row,h("span","","Час вимірювання"),
     h("span","",timestamps.length+" записів"));
-   control.replaceChildren(row,slider);
+   control.replaceChildren(row,slider,play);
   }
   async function fetchSeries(){
    const current=++revision;
+   stopPlayback();
    chartbox.replaceChildren(h("div","rv7-chart-status","Завантаження архіву…"));
    legend.replaceChildren();time.textContent="";control.replaceChildren();
    if(typeof config.historyLoader!=="function"){
@@ -296,7 +323,9 @@
     const button=h("button","rv7-range",label);
     button.type="button";button.setAttribute("aria-pressed",String(hours===value));
     button.addEventListener("click",()=>{
-     hours=value;chosenTime=null;explicitSelection=false;drawRanges();fetchSeries();
+     hours=value;chosenTime=null;explicitSelection=false;
+     if(typeof onRestore==="function")onRestore();
+     drawRanges();fetchSeries();
     });
     ranges.appendChild(button);
    }
@@ -305,7 +334,8 @@
  }
  function render(host,config={}){
   if(!M)throw Error("RakursV7Model not loaded");
-  const last=handlers.get(host);if(last)last.cancelled=true;
+  const last=handlers.get(host);
+  if(last){last.cancelled=true;if(last.onDispose)last.onDispose();}
   const scope={cancelled:false};handlers.set(host,scope);
   const snap=M.snapshot(config),app=h("div","rv7");
   app.setAttribute("aria-label","Енергосистема Rakurs V7");
@@ -374,6 +404,10 @@
     paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
       "Архів · "+M.ukTime(timestamp);
+   },()=>{
+    displayed=snap;paint();
+    diagramCard.querySelector(".rv7-card-meta").textContent=
+      snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
    layout.appendChild(shell);
    if(snap.warnings.length){
@@ -413,7 +447,9 @@
    layout.appendChild(more);
   }
   host.replaceChildren(app);
-  return Object.freeze({snapshot:snap,root:app,dispose:()=>{scope.cancelled=true;}});
+  return Object.freeze({snapshot:snap,root:app,dispose:()=>{
+    scope.cancelled=true;if(scope.onDispose)scope.onDispose();
+   }});
  }
  function enabled(){
   return new URLSearchParams(root.location.search).get("ux")==="v7";

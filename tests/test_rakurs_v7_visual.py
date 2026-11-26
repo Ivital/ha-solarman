@@ -149,6 +149,16 @@ if __name__ == '__main__':
             assert first_label != after_label, (first_label, after_label)
             assert "Архів" in page.locator(".rv7-card-meta").first.inner_text()
             page.screenshot(path=str(OUT / "mobile_archive_cursor.png"), full_page=True)
+            play = page.get_by_role("button", name="Відтворити архів")
+            play.click()
+            assert play.get_attribute("aria-pressed") == "true"
+            old = page.locator(".rv7-time-control input[type='range']").input_value()
+            page.wait_for_timeout(1450)
+            advanced = page.locator(".rv7-time-control input[type='range']").input_value()
+            assert advanced != old, "Explicit archived playback must move the timestamp"
+            page.get_by_role("button", name="Пауза").click()
+            assert page.get_by_role("button", name="Відтворити архів").get_attribute("aria-pressed") == "false"
+            print("V7_BROWSER_EXPLICIT_ARCHIVE_PLAY_PAUSE=PASS")
             print("V7_BROWSER_HISTORY_CURSOR_UPDATES_SVG=PASS")
 
             # Dedicated engineering workspace, both physical device reports and registers.
