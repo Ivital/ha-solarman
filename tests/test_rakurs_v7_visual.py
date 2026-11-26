@@ -80,6 +80,34 @@ if __name__ == '__main__':
         assert page.locator(selector + " [data-flow='pv1'].rv7-wire-pv1").count() == 1
         assert page.locator(selector + " [data-flow='pv2'].rv7-wire-pv2").count() == 1
         assert page.locator(selector + " [data-flow='grid'].is-unknown").count() == 1
+        # Geometry regression: no wire may run under another node card.
+        # The previous desktop PV1 path crossed the entire PV2 card.
+        intersections = page.evaluate("""sel => {
+          const svg = document.querySelector(sel);
+          const nodes = [...svg.querySelectorAll('[data-node]')];
+          const lines = [...svg.querySelectorAll('[data-flow]')];
+          const collisions = [];
+          for (const line of lines) {
+            const owner = line.getAttribute('data-flow');
+            const length = line.getTotalLength();
+            for (const node of nodes) {
+              const id = node.getAttribute('data-node');
+              if (id === owner || id === 'bus') continue;
+              const b = node.querySelector('rect').getBBox();
+              for (let n = 1; n < 100; n++) {
+                const p = line.getPointAtLength(length * n / 100);
+                if (p.x > b.x + 1 && p.x < b.x + b.width - 1 &&
+                    p.y > b.y + 1 && p.y < b.y + b.height - 1) {
+                  collisions.push(owner + ' crosses ' + id);
+                  break;
+                }
+              }
+            }
+          }
+          return collisions;
+        }""", selector)
+        assert not intersections, f"SVG wires hidden under unrelated cards: {intersections}"
+
 
 
 
