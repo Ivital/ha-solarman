@@ -78,6 +78,8 @@ const points=[
 ];
 assert.deepEqual(M.normalizeHistory(points).map(p=>p.number),[0,3.2]);
 assert.equal(M.historicalValue(points,"2026-11-25T00:11:00Z").number,3.2);
+assert.equal(M.historicalValue(M.normalizeHistory(points),"2026-11-25T00:11:00Z").number,3.2,
+  "Already-normalized history must be safe to use for V7 SVG snapshot playback");
 assert.equal(M.historicalValue(points,"2026-11-25T01:00:00Z"),null,
   "Must not carry old historical values beyond the bounded time tolerance");
 console.log("V7_HISTORY_NEAREST_WITH_TOLERANCE_NO_FABRICATION=PASS");

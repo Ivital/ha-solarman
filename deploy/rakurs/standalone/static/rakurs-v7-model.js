@@ -140,9 +140,9 @@
   function normalizeHistory(points){
     if(!Array.isArray(points))return [];
     return points.map(point=>{
-      const timestamp=date(point?.observed_at_utc||point?.recorded_at_utc||
-        point?.timestamp_utc||point?.timestamp);
-      const number=NUM(point?.value_decimal);
+      const timestamp=date(point?.timestamp||point?.observed_at_utc||
+        point?.recorded_at_utc||point?.timestamp_utc);
+      const number=NUM(point?.number??point?.value_decimal);
       return {timestamp,number,unit:String(point?.unit||"")};
     }).filter(p=>p.timestamp&&p.number!==null)
       .sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
