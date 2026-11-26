@@ -823,6 +823,7 @@ function renderTechnicalSummary(groups,values){
         const row=element("div","product-phase-row"),r=read(key);
         add(row,element("span","",label),element("strong","",show(key)));
         if(r?.observed_at_utc)row.title=time(r.observed_at_utc);
+        if(type==="grid"&&key.startsWith("ct"))row.appendChild(element("small","subtle","CT"));
         card.appendChild(row);
       }grid.appendChild(card);
     }box.appendChild(grid);main.appendChild(box);return;
@@ -831,7 +832,14 @@ function renderTechnicalSummary(groups,values){
   add(box,element("h2","","Діагностика BMS"),element("p","subtle","Збережені показники модулів, без припущень про їхню фізичну наявність."));
   const overview=element("div","product-phase-grid");
   for(const [key,label] of [["battery_soc","SOC"],["battery_soh","SOH"],["battery_temperature","Температура"],["bms_voltage","Напруга BMS"],["bms_max_charge_current","Макс. зарядний струм"],["bms_max_discharge_current","Макс. розрядний струм"]]){
-    const card=element("div","product-phase-card");add(card,element("small","",label),element("strong","",show(key)));overview.appendChild(card);
+    const card=element("div","product-phase-card");add(card,element("small","",label),element("strong","",show(key)));
+    const value=read(key);
+    if((key==="battery_soc"||key==="battery_soh")&&value&&value.unit==="%"&&Number(value.value_decimal)>=0&&Number(value.value_decimal)<=100){
+      const gauge=element("div","product-bms-gauge"),fill=element("span","");
+      gauge.setAttribute("role","meter");gauge.setAttribute("aria-label",label);gauge.setAttribute("aria-valuemin","0");gauge.setAttribute("aria-valuemax","100");gauge.setAttribute("aria-valuenow",String(Number(value.value_decimal)));
+      fill.style.width=Number(value.value_decimal)+"%";gauge.appendChild(fill);card.appendChild(gauge);
+    }
+    overview.appendChild(card);
   }box.appendChild(overview);
   const modules=element("div","product-bms-modules");
   for(let n=1;n<=20;n++){
@@ -1248,7 +1256,7 @@ async function renderParallel(cycle) {
     const card = element("article", "parallel-device");
     const heading = element("div", "parallel-device-head");
     add(heading, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", "MYSQL"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
     card.appendChild(heading);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));

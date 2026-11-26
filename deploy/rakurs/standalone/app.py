@@ -499,19 +499,19 @@ def energy():
         "WITH ordered AS ("
         "SELECT s.signal_key,s.unit,m.observed_at_utc,m.value_decimal,"
         "LAG(m.value_decimal) OVER (PARTITION BY s.id ORDER BY m.observed_at_utc) AS prev,"
-        "FIRST_VALUE(m.value_decimal) OVER (PARTITION BY s.id ORDER BY m.observed_at_utc) AS first_value,"
+        "FIRST_VALUE(m.value_decimal) OVER (PARTITION BY s.id ORDER BY m.observed_at_utc) AS opening_value,"
         "ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY m.observed_at_utc DESC) AS last_rank "
         "FROM rakurs_signals s JOIN rakurs_samples m ON m.signal_id=s.id "
         "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
         "AND m.observed_at_utc BETWEEN %s AND %s AND m.value_decimal IS NOT NULL) "
         "SELECT signal_key,unit,COUNT(*) AS samples,MIN(observed_at_utc) AS first_at,"
-        "MAX(observed_at_utc) AS last_at,MAX(CASE WHEN last_rank=1 THEN value_decimal END) AS last_value,"
-        "MAX(first_value) AS first_value,SUM(CASE WHEN prev>value_decimal THEN 1 ELSE 0 END) AS decreases "
+        "MAX(observed_at_utc) AS last_at,MAX(CASE WHEN last_rank=1 THEN value_decimal END) AS closing_value,"
+        "MAX(first_value) AS opening_value,SUM(CASE WHEN prev>value_decimal THEN 1 ELSE 0 END) AS decreases "
         "FROM ordered GROUP BY signal_key,unit",
         (device_id,) + ENERGY_COUNTERS + (start, anchor))
     result = []
     for item in data:
-        first, last = item["first_value"], item["last_value"]
+        first, last = item["opening_value"], item["closing_value"]
         valid = (item["samples"] >= 2 and not item["decreases"] and
                  first is not None and last is not None and last >= first and
                  item["unit"] in {"кВт·год", "кВт⋅год", "кВт*год", "kWh", "кВт·г"})

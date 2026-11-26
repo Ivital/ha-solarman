@@ -140,3 +140,82 @@ fi
 echo 'INTEGRATION_MYSQL_POSTVERIFY=PASS'
 echo 'INTEGRATION_IDEMPOTENCE_GUARD=PASS'
 echo 'HARDWARE_MODBUS_COMMANDS=0'
+
+
+# Execute the actual application analytics SELECTs against this isolated database.
+# Test counters are inserted only after the history import and exact-count checks.
+query <<'SQL'
+INSERT INTO rakurs_signals(signal_key,label_uk,unit,verified,verification_note)
+VALUES ('pv_energy_total','PV counter','кВт·год',0,'CI fixture'),
+       ('grid_import_total','Import counter','кВт·год',0,'CI fixture');
+INSERT INTO rakurs_samples(device_id,signal_id,observed_at_utc,received_at_utc,value_decimal,quality,ingest_source)
+SELECT 2,s.id,t.stamp,t.stamp,CASE WHEN s.signal_key='pv_energy_total' THEN t.pv ELSE t.imp END,'generated','ci_energy_counter'
+FROM rakurs_signals s CROSS JOIN (
+  SELECT '2026-11-25 00:00:00' AS stamp,10.5 AS pv,7 AS imp
+  UNION ALL SELECT '2026-11-25 00:10:00',11.7,3
+  UNION ALL SELECT '2026-11-25 00:16:18',13.7,4
+) t WHERE s.signal_key IN ('pv_energy_total','grid_import_total');
+SQL
+RAKURS_CI_CONTAINER="$NAME" RAKURS_CI_PASSWORD="$PASS" PYTHONPATH="$ROOT/deploy/rakurs" python3 - <<'PY'
+import os
+import subprocess
+from datetime import datetime
+from decimal import Decimal
+from unittest.mock import patch
+from standalone import app as module
+
+def literal(value):
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, datetime):
+        value = value.isoformat(sep=" ")
+    assert isinstance(value, str)
+    assert chr(92) not in value
+    return "'" + value.replace("'", "''") + "'"
+
+def query(sql, params=()):
+    assert sql.lstrip().upper().startswith(("SELECT ", "WITH "))
+    statement = sql % tuple(literal(p) for p in params)
+    cmd = ["docker", "exec", "-i", os.environ["RAKURS_CI_CONTAINER"], "mysql",
+           "-uroot", "-p" + os.environ["RAKURS_CI_PASSWORD"], "rakurs", "--batch", "--raw"]
+    result = subprocess.run(cmd, input=statement, text=True, capture_output=True, check=True)
+    lines = result.stdout.splitlines()
+    if len(lines) < 2:
+        return []
+    names = lines[0].split("\t")
+    rows = []
+    for line in lines[1:]:
+        row = dict(zip(names, line.split("\t")))
+        for key, value in row.items():
+            if value == "NULL":
+                row[key] = None
+            elif key in {"stamp", "first_at", "last_at", "observed_at_utc", "received_at_utc"}:
+                row[key] = datetime.fromisoformat(value)
+            elif key in {"samples", "decreases"}:
+                row[key] = int(value)
+            elif key in {"opening_value", "closing_value", "value_decimal"}:
+                row[key] = Decimal(value)
+        rows.append(row)
+    return rows
+
+def one(sql, params=()):
+    result = query(sql, params)
+    return result[0] if result else None
+
+with patch.object(module, "selected_overview_device_id", return_value=2), patch.object(module, "one", side_effect=one), patch.object(module, "rows", side_effect=query):
+    with module.app.test_request_context("/api/v1/energy?period=day"):
+        data = module.energy().get_json()
+        items = {r["key"]: r for r in data["counters"]}
+        assert Decimal(items["pv_energy_total"]["value"]) == Decimal("3.2"), items
+        assert items["grid_import_total"]["value"] is None, items
+        assert items["grid_import_total"]["decreases"] == 1
+        assert data["start"] == "2026-11-24T22:00:00Z", data
+    with module.app.test_request_context("/api/v1/latest?keys=pv_energy_total,grid_import_total"):
+        result = module.latest().get_json()
+        assert Decimal(result["values"]["pv_energy_total"]["value_decimal"]) == Decimal("13.7")
+        assert Decimal(result["values"]["grid_import_total"]["value_decimal"]) == Decimal("4")
+    with module.app.test_request_context("/api/v1/history?key=pv_energy_total&hours=24&anchor=latest"):
+        data = module.history().get_json()
+        assert len(data["points"]) == 3, data
+print("INTEGRATION_MYSQL_ANALYTICS_COUNTERS_BATCH_LATEST_AND_ARCHIVE=PASS")
+PY

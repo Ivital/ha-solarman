@@ -513,3 +513,7 @@ body[data-theme] .product-zoom-plot{touch-action:pan-y}
  body[data-theme] .product-phase-row{display:grid;gap:2px;font-size:11px}
  body[data-theme] .product-zoom-controls button{min-height:40px;min-width:40px}
 }
+
+body[data-theme] .product-bms-gauge{height:7px;background:var(--ux-line);border-radius:6px;overflow:hidden;margin-top:8px}
+body[data-theme] .product-bms-gauge>span{height:100%;display:block;background:var(--v7-battery,#168269);border-radius:6px;transition:width .25s ease}
+@media(prefers-reduced-motion:reduce){body[data-theme] .product-bms-gauge>span{transition:none}}

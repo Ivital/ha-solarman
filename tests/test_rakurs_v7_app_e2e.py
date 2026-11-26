@@ -27,7 +27,7 @@ TEMPLATE = None  # assigned by run(); importable by other unittest suites
 MEASURED = "2026-11-25T00:16:18.000786Z"
 D1 = "integration_deye_1"
 D2 = "integration_deye_2"
-PAGE_GROUPS = {"pv": [("pv_power","Сонячна генерація")], "battery": [("battery_soc","Заряд"),("battery_power","Потужність АКБ")], "grid": [("grid_power","Мережа")], "load": [("load_power","Споживання")], "inverter": [("inverter_temperature","Температура")]}
+PAGE_GROUPS = {"pv": [("pv_power","Сонячна генерація")], "battery": [("battery_soc","Заряд"),("battery_power","Потужність АКБ"),("battery_soh","SOH")], "grid": [("grid_power","Мережа"),("grid_l1_voltage","Напруга L1"),("grid_l2_voltage","Напруга L2"),("grid_l3_voltage","Напруга L3")], "load": [("load_power","Споживання")], "inverter": [("inverter_temperature","Температура")], "bms_module_1":[("bms_1_min_cell_voltage","Мін. комірка"),("bms_1_max_cell_voltage","Макс. комірка"),("bms_1_voltage","Модуль 1")]}
 
 
 def reading(value, unit="кВт", stamp=MEASURED):
@@ -160,7 +160,7 @@ class Handler(BaseHTTPRequestHandler):
             if scenario == "legacy-down":
                 self.reply({"error": "API offline"}, 503)
             else:
-                self.reply({"values": device_values(1)})
+                self.reply({"values": {**device_values(1),"battery_soh":reading(98,"%"),"grid_l1_voltage":reading(230,"В"),"grid_l2_voltage":reading(231,"В"),"grid_l3_voltage":reading(229,"В"),"bms_1_min_cell_voltage":reading(3.31,"В"),"bms_1_max_cell_voltage":reading(3.35,"В"),"bms_1_voltage":reading(53.2,"В")}})
         elif path == "/api/v1/energy":
             self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
@@ -389,6 +389,12 @@ def run():
                             assert page.locator(".product-phase-grid .product-phase-card").count()==3
                         if route=="battery":
                             assert page.locator(".bms-summary").count()==1
+                            assert page.locator(".product-bms-gauge").count()==2
+                            module=page.locator(".product-bms-module").first
+                            module.locator("summary").click()
+                            assert "40 мВ" in module.locator(".product-bms-delta").text_content()
+                        if route=="grid":
+                            assert "230 В" in page.locator(".product-phase-grid").inner_text()
                         if route=="archive":
                             assert page.locator("input[type=datetime-local]").last.input_value()=="2026-11-25T02:16"
                         if route in {"history","archive","trends","parallel"}:

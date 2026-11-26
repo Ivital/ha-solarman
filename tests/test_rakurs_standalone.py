@@ -224,8 +224,8 @@ class StandaloneMySqlTests(unittest.TestCase):
     def test_energy_counter_observed_window_and_reset(self):
         self.data_one = lambda sql, params: ({"id": 7} if "SELECT d.id AS id" in sql else {"stamp": datetime(2026, 11, 25, 2, 30)} if "MAX(observed_at_utc)" in sql else None)
         self.data_rows = lambda sql, params: [
-            {"signal_key":"pv_energy_total","unit":"кВт·год","samples":4,"first_at":datetime(2026,11,25,0,0),"last_at":datetime(2026,11,25,2,30),"first_value":Decimal("10.5"),"last_value":Decimal("13.7"),"decreases":0},
-            {"signal_key":"grid_import_total","unit":"кВт·год","samples":4,"first_at":datetime(2026,11,25,0,0),"last_at":datetime(2026,11,25,2,30),"first_value":Decimal("2"),"last_value":Decimal("4"),"decreases":1}]
+            {"signal_key":"pv_energy_total","unit":"кВт·год","samples":4,"first_at":datetime(2026,11,25,0,0),"last_at":datetime(2026,11,25,2,30),"opening_value":Decimal("10.5"),"closing_value":Decimal("13.7"),"decreases":0},
+            {"signal_key":"grid_import_total","unit":"кВт·год","samples":4,"first_at":datetime(2026,11,25,0,0),"last_at":datetime(2026,11,25,2,30),"opening_value":Decimal("2"),"closing_value":Decimal("4"),"decreases":1}]
         result=self.client.get("/api/v1/energy?period=month")
         self.assertEqual(result.status_code,200)
         payload=result.get_json()
