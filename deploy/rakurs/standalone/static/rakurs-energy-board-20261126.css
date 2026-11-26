@@ -226,3 +226,194 @@ body[data-theme] .energy-board.is-live .energy-board-wire.has-flow.is-reverse::a
 @media(prefers-reduced-motion:reduce){
  body[data-theme] .energy-board.is-live .energy-board-wire::after{animation:none!important;display:none!important}
 }
+
+
+/* RAKURS STREAM UX: continuous directions, accessible interaction, illustrative archive motion.
+   The archive label stays visible while particles move; animation never means real-time. */
+body[data-theme] .energy-board{
+ --flow-duration:2s;
+ background:radial-gradient(circle at 49% 51%,rgba(89,207,177,.055),transparent 35%),
+   var(--ux-surface);
+ overflow:hidden}
+body[data-theme] .energy-board.speed-slow{--flow-duration:3.7s}
+body[data-theme] .energy-board.speed-fast{--flow-duration:1.1s}
+body[data-theme] .energy-board-heading p{font-size:13px;line-height:1.55}
+body[data-theme] .energy-board-toolbar{
+ display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;
+ gap:8px 10px;margin:-1px 0 11px}
+body[data-theme] .energy-board-visual-label{
+ color:var(--ux-muted);font-weight:650;font-size:11px;margin-right:auto}
+body[data-theme] .energy-board-motion,
+body[data-theme] .energy-board-speed{
+ appearance:none;min-height:37px;padding:8px 12px;
+ border-radius:11px;border:1px solid var(--ux-line);
+ background:var(--ux-subtle);color:var(--ux-title);
+ font:inherit;font-size:11px;font-weight:760;cursor:pointer;
+ transition:background .2s ease,transform .2s ease,border-color .2s ease}
+body[data-theme] .energy-board-motion:hover,
+body[data-theme] .energy-board-speed:hover{
+ border-color:var(--ux-accent);background:var(--ux-raised);transform:translateY(-1px)}
+body[data-theme] .energy-board-motion[aria-pressed=true]{
+ border-color:var(--ux-battery-line);background:var(--ux-battery-bg);color:var(--ux-battery)}
+body[data-theme] .energy-board-context{
+ font-size:11px;font-weight:600;line-height:1.5;padding:10px 13px;
+ margin:0 0 11px;background:var(--ux-subtle);border-radius:12px}
+body[data-theme] .energy-board-map{
+ grid-template-columns:minmax(180px,1.18fr) minmax(77px,.31fr)
+ minmax(156px,.83fr) minmax(77px,.31fr) minmax(190px,1.16fr);
+ gap:10px;min-height:265px}
+body[data-theme] .energy-board .energy-board-wire{
+ --stream-color:var(--ux-accent);
+ position:relative;width:100%;height:100%;min-height:74px;
+ padding:0 1px;border:0;background:transparent;
+ display:block;cursor:pointer;font:inherit;color:var(--ux-ink);
+ isolation:isolate;overflow:visible}
+body[data-theme] .energy-board .energy-board-wire.wire-solar1,
+body[data-theme] .energy-board .energy-board-wire.wire-solar2{--stream-color:var(--ux-solar)}
+body[data-theme] .energy-board .energy-board-wire.wire-house{--stream-color:var(--ux-load)}
+body[data-theme] .energy-board .energy-board-wire.wire-battery{--stream-color:var(--ux-battery)}
+body[data-theme] .energy-board .energy-board-wire.wire-grid{--stream-color:var(--ux-grid)}
+body[data-theme] .energy-board .energy-board-wire::before,
+body[data-theme] .energy-board .energy-board-wire::after{
+ content:none!important;border:0!important;animation:none!important}
+body[data-theme] .energy-board .energy-board-wire-title{
+ position:absolute;left:50%;top:14%;transform:translateX(-50%);
+ width:max-content;max-width:150px;
+ display:block;text-align:center;white-space:normal;font-size:11px;
+ font-weight:740;line-height:1.3;padding:2px 5px;
+ background:var(--ux-surface);color:var(--ux-muted);
+ border-radius:7px;z-index:3}
+body[data-theme] .energy-board-flow-track{
+ position:absolute;left:0;right:0;top:58%;height:7px;
+ border-radius:999px;display:block;z-index:1;
+ background:var(--stream-color);
+ box-shadow:0 0 0 3px color-mix(in srgb,var(--stream-color) 12%,transparent),
+   0 0 15px color-mix(in srgb,var(--stream-color) 20%,transparent);
+ pointer-events:none;transition:height .2s ease,box-shadow .2s ease}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-track{
+ height:4px;background:repeating-linear-gradient(90deg,var(--ux-line) 0 9px,transparent 9px 16px);
+ box-shadow:none}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-wire-title{
+ color:var(--ux-muted)}
+body[data-theme] .energy-board-flow-head{
+ position:absolute;top:50%;width:19px;height:19px;
+ background:var(--stream-color);clip-path:polygon(0 0,100% 50%,0 100%);
+ transform:translateY(-50%);
+ filter:drop-shadow(0 0 5px var(--stream-color));
+ right:-2px}
+body[data-theme] .energy-board-wire.is-reverse .energy-board-flow-head{
+ right:auto;left:-2px;transform:translateY(-50%) rotate(180deg)}
+body[data-theme] .energy-board .energy-board-direction{
+ font-size:0;position:absolute;top:58%;left:50%;
+ transform:translate(-50%,-50%);z-index:2;
+ width:1px;height:1px;padding:0;background:transparent;line-height:0}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-direction{
+ font-size:18px;line-height:1;color:var(--ux-muted);
+ width:26px;height:25px;display:grid;place-items:center;
+ border-radius:50%;background:var(--ux-surface)}
+body[data-theme] .energy-board-flow-particle{
+ --particle-delay:0s;
+ position:absolute;top:50%;left:0;width:9px;height:9px;
+ border:2px solid var(--ux-surface);border-radius:50%;
+ transform:translateY(-50%);background:var(--stream-color);
+ box-shadow:0 0 9px 2px var(--stream-color);
+ opacity:0;pointer-events:none}
+body[data-theme] .energy-board-flow-particle:nth-child(2){--particle-delay:-.66s}
+body[data-theme] .energy-board-flow-particle:nth-child(3){--particle-delay:-1.33s}
+body[data-theme] .energy-board-flow-particle:nth-child(4){--particle-delay:-.33s}
+body[data-theme] .energy-board.is-animated .energy-board-wire.has-flow .energy-board-flow-particle{
+ animation:rakurs-stream var(--flow-duration) linear var(--particle-delay) infinite}
+body[data-theme] .energy-board.is-animated .energy-board-wire.has-flow.is-reverse .energy-board-flow-particle{
+ animation-name:rakurs-stream-reverse}
+body[data-theme] .energy-board.is-paused .energy-board-flow-particle{display:none}
+@keyframes rakurs-stream{
+ 0%{left:0;opacity:0;transform:translateY(-50%) scale(.55)}
+ 12%{opacity:1}88%{opacity:1}
+ 100%{left:calc(100% - 8px);opacity:0;transform:translateY(-50%) scale(1)}
+}
+@keyframes rakurs-stream-reverse{
+ 0%{left:calc(100% - 8px);opacity:0;transform:translateY(-50%) scale(.55)}
+ 12%{opacity:1}88%{opacity:1}
+ 100%{left:0;opacity:0;transform:translateY(-50%) scale(1)}
+}
+body[data-theme] .energy-board .energy-board-wire.has-flow:hover .energy-board-flow-track,
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-flow-track{
+ height:10px;box-shadow:0 0 0 4px color-mix(in srgb,var(--stream-color) 19%,transparent),
+  0 0 20px color-mix(in srgb,var(--stream-color) 38%,transparent)}
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-wire-title{
+ color:var(--ux-title);font-weight:830}
+body[data-theme] .energy-board .energy-board-wire:focus-visible{
+ outline:3px solid var(--ux-accent);outline-offset:4px;border-radius:12px}
+body[data-theme] .energy-board-node{
+ min-height:83px;padding:13px;gap:3px 8px;
+ transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+body[data-theme] .energy-board-node-name{font-size:14px}
+body[data-theme] .energy-board-node-value{font-size:21px}
+body[data-theme] .energy-board-node-note{font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-node-detail{font-size:11px}
+body[data-theme] .energy-board-node:active,
+body[data-theme] .energy-board-source:active{transform:scale(.985)}
+body[data-theme] .energy-board.is-animated .energy-board-hub-icon{
+ animation:rakurs-hub-glow 3s ease-in-out infinite}
+@keyframes rakurs-hub-glow{
+ 0%,100%{box-shadow:0 0 0 8px rgba(45,185,135,.1)}
+ 50%{box-shadow:0 0 0 14px rgba(45,185,135,.18)}
+}
+body[data-theme] .energy-board.is-animated .energy-board-source-icon{
+ animation:rakurs-solar-breathe 3.2s ease-in-out infinite}
+@keyframes rakurs-solar-breathe{
+ 0%,100%{transform:scale(1);opacity:.85}
+ 50%{transform:scale(1.13);opacity:1}
+}
+body[data-theme] .energy-board-legend{
+ display:flex;align-items:center;justify-content:space-evenly;
+ gap:12px;flex-wrap:wrap;background:var(--ux-subtle);
+ padding:10px 14px;margin:13px 0 0;border:1px solid var(--ux-line)}
+body[data-theme] .energy-board-legend-key{font-size:11px;color:var(--ux-muted);font-weight:750}
+body[data-theme] .energy-board-inspector{transition:box-shadow .2s ease}
+body[data-theme] .energy-board-foot{gap:9px;margin-top:10px}
+body[data-theme] .energy-board-disclaimer{font-size:10px;line-height:1.45}
+@media(max-width:1180px){
+ body[data-theme] .energy-board-map{
+   grid-template-columns:minmax(165px,1fr) minmax(70px,.27fr)
+   minmax(135px,.72fr) minmax(70px,.27fr) minmax(165px,1fr)}
+ body[data-theme] .energy-board-wire-title{font-size:10px}
+}
+@media(max-width:960px){
+ body[data-theme] .energy-board-map{
+  grid-template-columns:minmax(0,1fr) minmax(50px,.18fr) minmax(0,1fr);
+  gap:8px}
+ body[data-theme] .energy-board-flow-track{top:58%}
+ body[data-theme] .sink-wires{transform:none}
+ body[data-theme] .energy-board-source,
+ body[data-theme] .energy-board-node{padding:11px}
+ body[data-theme] .energy-board-toolbar{justify-content:flex-start}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board-map{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+ body[data-theme] .energy-board-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;height:auto}
+ body[data-theme] .energy-board-hub{min-height:90px}
+ body[data-theme] .energy-board-sinks{display:grid;grid-template-columns:1fr;gap:8px;height:auto}
+ body[data-theme] .energy-board-wires{display:grid!important;
+   grid-template-columns:repeat(2,minmax(0,1fr));
+   gap:10px;width:100%;height:auto;min-height:40px;transform:none}
+ body[data-theme] .energy-board-wires.sink-wires{grid-template-columns:repeat(3,minmax(0,1fr))}
+ body[data-theme] .energy-board .energy-board-wire{
+   min-height:53px;max-height:none;height:53px;transform:none}
+ body[data-theme] .energy-board .energy-board-wire-title{
+   font-size:10px;top:5%;max-width:100%;white-space:nowrap}
+ body[data-theme] .energy-board .energy-board-flow-track{top:71%}
+ body[data-theme] .energy-board .energy-board-direction{top:71%}
+ body[data-theme] .energy-board-visual-label{flex-basis:100%;font-size:11px}
+ body[data-theme] .energy-board-motion,body[data-theme] .energy-board-speed{flex:1}
+ body[data-theme] .energy-board-node-name{font-size:13px}
+ body[data-theme] .energy-board-node-value{font-size:18px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-flow-particle{animation:none!important;display:none!important}
+ body[data-theme] .energy-board .energy-board-hub-icon,
+ body[data-theme] .energy-board .energy-board-source-icon{animation:none!important}
+ body[data-theme] .energy-board .energy-board-wire,
+ body[data-theme] .energy-board .energy-board-node,
+ body[data-theme] .energy-board .energy-board-source{transition:none!important}
+}
