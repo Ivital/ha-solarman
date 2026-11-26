@@ -201,11 +201,16 @@ def run():
                     context = browser.new_context(
                         viewport={"width": width, "height": height},
                         color_scheme=theme, locale="uk-UA", reduced_motion="reduce")
+                    # The real app deliberately persists its own theme preference.
+                    # Color-scheme emulation alone does not activate the dark UI.
+                    context.add_init_script(
+                        script=f"localStorage.setItem('rakurs_theme','{theme}')")
                     page = context.new_page()
                     page_errors = []
                     page.on("pageerror", lambda error: page_errors.append(str(error)))
                     page.goto(base + "/?ux=v7#/overview", wait_until="load")
                     wait_rendered(page)
+                    assert page.locator("body").get_attribute("data-theme") == theme
                     assert not page_errors, page_errors
                     assert "5,1 кВт" in page.locator(
                         ".rv7 [data-node='pv1'] .rv7-node-value").first.text_content()
