@@ -610,7 +610,8 @@ async function run() {
   console.log("CLARITY_READONLY_MANUAL_REFRESH=PASS");
   assert.equal(byClass(app.main,"energy-board-map").length,1);
   assert(descendants(app.main).some(x=>String(x.textContent||"").includes("На дату останнього запису")));
-  assert(descendants(app.main).some(x=>String(x.textContent||"").includes("Без обміну")));
+  assert(byClass(app.main,"wire-grid")[0].attributes["aria-label"].includes("Без обміну"),
+    "Zero exchange remains accessible without an explanatory label on the dashboard");
   assert(!descendants(app.main).some(x=>String(x.textContent||"").includes("За сьогодні")));
   console.log("CLARITY_ARCHIVED_DAY_AND_ZERO_FLOW=PASS");
   assert.equal(byClass(app.main,"parallel-home-device").length,2);
