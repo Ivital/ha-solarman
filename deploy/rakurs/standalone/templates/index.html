@@ -10,9 +10,9 @@
   <link rel="stylesheet" href="/static/events-ui-20261124.css">
   <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1">
   <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-ux4-20261126-1">
-  <link rel="stylesheet" href="/static/rakurs-energy-board-20261126.css?v=rakurs-energy-v3-20261126">
-  <script defer src="/static/rakurs-energy-board-20261126.js?v=rakurs-energy-v3-20261126"></script>
-  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v3-20261126"></script>
+  <link rel="stylesheet" href="/static/rakurs-energy-board-20261126.css?v=rakurs-flow-v4-20261126">
+  <script defer src="/static/rakurs-energy-board-20261126.js?v=rakurs-flow-v4-20261126"></script>
+  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126"></script>
 </head>
 <body data-theme="light">
   <div class="layout">
@@ -50,8 +50,8 @@
         <section class="energy-board energy-board-ssr" aria-label="Енергетична схема останніх збережених показників">
           <div class="energy-board-header">
             <div class="energy-board-heading">
-              <span class="energy-board-kicker">НА ОДНОМУ ЕКРАНІ · ОСТАННІ ДАНІ MYSQL</span>
-              <h2>Енергетична схема системи</h2>
+              <span class="energy-board-kicker">ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ · АРХІВ</span>
+              <h2>Як рухається енергія</h2>
               <p>Останній збережений стан. Без підтвердженого опитування це не дані реального часу.</p>
             </div>
             <span class="energy-board-flag is-stale">◷ Архівний зріз — не онлайн</span>
@@ -81,11 +81,11 @@
             </div>
             <div class="energy-board-sinks">
               <div class="energy-board-node energy-board-house"><small>⌂ Будинок</small><strong>{{ initial_cards[1].value }} {{ initial_cards[1].unit }}</strong></div>
-              <div class="energy-board-node energy-board-battery"><small>▣ Спільна АКБ · SOC</small><strong>{{ initial_cards[3].value }} {{ initial_cards[3].unit }}</strong></div>
+              <div class="energy-board-node energy-board-battery"><small>▣ Акумулятор · SOC</small><strong>{{ initial_cards[3].value }} {{ initial_cards[3].unit }}</strong></div>
               <div class="energy-board-node energy-board-grid"><small>⌁ Мережа</small><strong>{{ initial_cards[2].value }} {{ initial_cards[2].unit }}</strong></div>
             </div>
           </div>
-          <p class="energy-board-disclaimer">Без JavaScript напрямки не визначаються, спільні значення не сумуються. Збережені картки нижче доступні навіть за збою API.</p>
+          <p class="energy-board-disclaimer">Схема показує архів, а не поточний стан. Інтерактивний рух доступний після завантаження сторінки. Дані нижче збережено у MySQL.</p>
         </section>
         <section class="insight-strip" aria-label="Джерело та актуальність показників">
           <div class="insight-item"><span class="insight-icon">▣</span><span class="insight-copy"><small>Джерело даних</small><strong>Збережений архів MySQL</strong></span></div>

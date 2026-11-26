@@ -263,7 +263,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v3-20261126"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -362,7 +362,8 @@ async function run() {
     "One physical common node must NOT split into per-Deye physical flow lanes");
   assert.equal(byClass(compareHost,"energy-board-reading-row").length,0,
     "Two telemetry reports must NOT be represented as two physical loads");
-  assert.equal(byClass(compareHost,"energy-board-shared-tag").length,3);
+  assert.equal(byClass(compareHost,"energy-board-shared-tag").length,0,
+    "No repeated common/shared physical node tags in card faces");
   const house=sharedNodes.find(node=>node.className.includes("energy-board-house"));
   assert.equal(byClass(house,"energy-board-node-value").length,1,
     "Common load must have ONE displayed reference figure");
@@ -390,7 +391,7 @@ async function run() {
     "Opposite report signs cannot be rendered as a known common-grid direction");
   assert.equal(byClass(sharedGridWire[0],"energy-board-direction")[0].textContent,"—");
   assert(descendants(grid).some(node=>
-    String(node.textContent||"").includes("Напрямок не підтверджено")));
+    String(node.textContent||"").includes("Напрямок невідомий")));
   const selectedOneHost=new Node("div");
   boardWindow.RakursEnergyBoard.render(selectedOneHost,{document:doc,
     devices:[
@@ -402,12 +403,31 @@ async function run() {
   assert(byClass(selectedHouse,"energy-board-node-value")[0].textContent.includes("6,4"));
   assert.equal(byClass(selectedOneHost,"energy-board-node").length,3);
   assert.equal(byClass(compareHost,"energy-board-legend").length,1);
+  assert.equal(byClass(compareHost,"energy-board-flow-track").length,5);
+  const gridTrack=byClass(sharedGridWire[0],"energy-board-flow-track")[0];
+  assert(gridTrack);
+  assert.equal(byClass(sharedGridWire[0],"energy-board-flow-particle").length,0,
+    "No movement for conflicting grid directions");
+  const batteryWire=byClass(compareHost,"wire-battery")[0];
+  assert(batteryWire.className.includes("is-reverse")===false,
+    "Selected Deye №2 reports charge, not discharge");
+  assert.equal(byClass(batteryWire,"energy-board-flow-particle").length,3);
+  batteryWire.listeners.click();
+  assert.equal(batteryWire.attributes["aria-pressed"],"true",
+    "Flow track is clickable and selects the battery");
+  assert(byClass(compareHost,"energy-board-inspector-title")[0].textContent.includes("Акумулятор"));
+  console.log("CLARITY_ACCESSIBLE_STREAM_INTERACTION_AND_NO_FAKE_FLOW=PASS");
   const wholeText=descendants(compareHost).map(node=>String(node.textContent||"")).join(" ");
   assert(!wholeText.includes("13,216")&&!wholeText.includes("2,685"),
     "Do not fabricate shared-node totals from separate inverter reports");
-  assert(energyBoardCss.includes(".energy-board-node.is-shared"));
+  assert(energyBoardCss.includes(".energy-board-flow-track"));
+  assert(energyBoardCss.includes("@keyframes rakurs-stream"));
+  assert(energyBoardCss.includes("@keyframes rakurs-stream-reverse"));
   assert(!energyBoardCss.includes(".energy-board-wire-lane"));
   assert(energyBoardCss.includes("@media(max-width:600px)"));
+  assert(energyBoardCss.includes("prefers-reduced-motion"));
+  assert(energyBoardCss.includes("flow-forward")===false || energyBoardCss.includes("flow-forward"));
+  console.log("CLARITY_STREAM_RESPONSIVE_AND_REDUCED_MOTION=PASS");
   console.log("CLARITY_ONE_COMMON_LOAD_GRID_BATTERY_TWO_SEPARATE_PV=PASS");
   console.log("CLARITY_SHARED_TELEMETRY_DIAGNOSTICS_NO_AGGREGATION=PASS");
   for(const scenario of ["fail","partial"]) {
@@ -437,6 +457,36 @@ async function run() {
     "◷ Архівний зріз — не онлайн");
   assert.equal(byClass(app.main,"energy-board")[0].className.includes("is-live"),false);
   console.log("CLARITY_ENERGY_FLOW_ON_TOP_ARCHIVE_NOT_LIVE=PASS");
+  const energyMotion=byClass(app.main,"energy-board-motion")[0];
+  const energySpeed=byClass(app.main,"energy-board-speed")[0];
+  assert(energyMotion&&energySpeed);
+  assert.equal(byClass(app.main,"energy-board-wire").length,5);
+  assert.equal(byClass(app.main,"energy-board-flow-track").length,5);
+  assert.equal(byClass(app.main,"energy-board-flow-particle").length,12,
+    "Two active PV, house and battery have illustrative particles; grid zero has none");
+  assert(byClass(app.main,"energy-board")[0].className.includes("is-animated"));
+  assert(byClass(app.main,"energy-board-visual-label")[0].textContent.includes("архівним"),
+    "Animated archive must be clearly labeled as historical visualization");
+  energyMotion.listeners.click();
+  assert.equal(energyMotion.attributes["aria-pressed"],"false");
+  assert(byClass(app.main,"energy-board")[0].className.includes("is-paused"));
+  assert(!byClass(app.main,"energy-board")[0].className.includes("is-animated"));
+  energySpeed.listeners.click();
+  assert(byClass(app.main,"energy-board")[0].className.includes("speed-fast"));
+  energySpeed.listeners.click();
+  assert(byClass(app.main,"energy-board")[0].className.includes("speed-slow"));
+  energySpeed.listeners.click();
+  assert(byClass(app.main,"energy-board")[0].className.includes("speed-normal"));
+  energyMotion.listeners.click();
+  assert.equal(energyMotion.attributes["aria-pressed"],"true");
+  assert(byClass(app.main,"energy-board")[0].className.includes("is-animated"));
+  console.log("CLARITY_ARCHIVE_FLOW_ANIMATION_PAUSE_AND_SPEED=PASS");
+  assert.equal(byClass(app.main,"energy-board-shared-tag").length,0);
+  for(const label of ["Будинок","Акумулятор","Мережа"]){
+    assert(byClass(app.main,"energy-board-node-name").some(item=>item.textContent===label));
+  }
+  assert(!byClass(app.main,"energy-board-context")[0].textContent.includes("спільн"));
+  console.log("CLARITY_CLEAN_ENERGY_LABELS=PASS");
   assert.equal(byClass(app.main,"insight-item").length,3);
   assert.equal(byClass(app.main,"quick-link").length,3);
   console.log("CLARITY_NEW_HOME_HIERARCHY=PASS");
@@ -532,7 +582,7 @@ async function run() {
   gridNode.listeners.click();
   assert.equal(gridNode.attributes["aria-pressed"],"true");
   assert(byClass(app.main,"energy-board-inspector")[0].childNodes.some(x=>
-    String(x.textContent||"").includes("Спільна мережа")));
+    String(x.textContent||"").includes("Мережа")));
   assert.equal(byClass(app.main,"energy-board-wire").filter(x=>x.className.includes("is-live")).length,0);
   assert(byClass(app.main,"energy-board-wire").some(x=>
     x.className.includes("wire-grid")&&x.className.includes("no-flow")),
