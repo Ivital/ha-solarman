@@ -10,7 +10,7 @@ import logging
 import os
 import re
 import stat
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timezone
 from zoneinfo import ZoneInfo
 from decimal import Decimal
 from pathlib import Path
@@ -506,7 +506,7 @@ def energy():
         "AND m.observed_at_utc BETWEEN %s AND %s AND m.value_decimal IS NOT NULL) "
         "SELECT signal_key,unit,COUNT(*) AS samples,MIN(observed_at_utc) AS first_at,"
         "MAX(observed_at_utc) AS last_at,MAX(CASE WHEN last_rank=1 THEN value_decimal END) AS closing_value,"
-        "MAX(first_value) AS opening_value,SUM(CASE WHEN prev>value_decimal THEN 1 ELSE 0 END) AS decreases "
+        "MAX(opening_value) AS opening_value,SUM(CASE WHEN prev>value_decimal THEN 1 ELSE 0 END) AS decreases "
         "FROM ordered GROUP BY signal_key,unit",
         (device_id,) + ENERGY_COUNTERS + (start, anchor))
     result = []
