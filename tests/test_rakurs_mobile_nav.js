@@ -7,6 +7,7 @@ const vm=require("node:vm");
 const root=path.join(__dirname,"../deploy/rakurs/standalone");
 const html=fs.readFileSync(path.join(root,"templates/index.html"),"utf8");
 const css=fs.readFileSync(path.join(root,"static/rakurs-mobile-nav-20261126.css"),"utf8");
+const boardCss=fs.readFileSync(path.join(root,"static/rakurs-energy-board-20261126.css"),"utf8");
 const source=fs.readFileSync(path.join(root,"static/rakurs-mobile-nav-20261126.js"),"utf8");
 const dashboard=fs.readFileSync(path.join(root,"static/app-parallel-twin-20261125.js"),"utf8");
 
@@ -52,6 +53,7 @@ const document={
 document.body=new E("body",document);
 const el=id=>{const item=document.createElement(id==="mobile-more"||id==="mobile-pages-close"?"button":"div");document.elements.set(id,item);return item;};
 const tabs=el("mobile-tabs"),more=el("mobile-more"),panel=el("mobile-pages");
+const back=el("mobile-route-back");
 const overlay=el("mobile-pages-backdrop"),close=el("mobile-pages-close");
 const input=el("mobile-pages-search"),list=el("mobile-page-list");
 panel.hidden=true;overlay.hidden=true;
@@ -85,6 +87,8 @@ assert.equal(tabs.childNodes.filter(e=>e.tagName==="a").length,4);
 assert(tabs.childNodes[0].classList.contains("is-active"));
 assert.equal(tabs.childNodes[0].getAttribute("aria-current"),"page");
 assert(panel.hidden&&overlay.hidden);
+assert.equal(back.hidden,true,"Back must be hidden on initial overview");
+assert.equal(back.disabled,true);
 
 document.activeElement=more;
 more.trigger("click");
@@ -114,6 +118,9 @@ battery.trigger("click");
 assert(panel.hidden,"Navigating from sheet must close it");
 assert.equal(document.activeElement,more,"Choosing a route restores focus to visible navigation");
 win.location.hash="#/battery";events.hashchange();
+assert.equal(back.hidden,false);
+assert.equal(back.disabled,false);
+assert.equal(back.getAttribute("aria-label"),"Назад: Огляд");
 assert(more.classList.contains("is-active"),"Unpinned page activates More tab");
 assert(more.getAttribute("aria-label").includes("Акумулятор"));
 assert.equal(battery.getAttribute("aria-current"),"page");
@@ -124,6 +131,19 @@ assert(tabs.childNodes[1].classList.contains("is-active"));
 assert.equal(tabs.childNodes[1].getAttribute("aria-current"),"page");
 assert(!more.classList.contains("is-active"));
 assert.equal(battery.getAttribute("aria-current"),null);
+assert.equal(back.getAttribute("aria-label"),"Назад: Акумулятор");
+back.trigger("click");
+assert.equal(win.location.hash,"#/battery");
+events.hashchange();
+assert.equal(back.getAttribute("aria-label"),"Назад: Огляд",
+  "Back to previous mobile route without leaving Rakurs");
+assert(more.classList.contains("is-active"));
+back.trigger("click");
+assert.equal(win.location.hash,"#/overview");
+events.hashchange();
+assert(back.hidden&&back.disabled,"Returning to overview clears navigation trail");
+assert(tabs.childNodes[0].classList.contains("is-active"));
+console.log("MOBILE_NAV_IN_APP_BACK_TRAIL_NO_EXTERNAL_EXIT=PASS");
 console.log("MOBILE_NAV_15_ROUTES_AND_ACTIVE_TAB=PASS");
 
 more.trigger("click");
@@ -154,8 +174,9 @@ for(const fragment of [
   'id="mobile-tabs"','id="mobile-more"','id="mobile-pages"',
   'id="mobile-pages-close"','id="mobile-pages-search"',
   'role="dialog" aria-modal="true"','aria-controls="mobile-pages"',
-  '/static/rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v1',
-  '/static/rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v1'
+  '/static/rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2',
+  '/static/rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2',
+  'id="mobile-route-back"'
 ])assert(html.includes(fragment),"Missing HTML mobile navigation element: "+fragment);
 for(const route of ["overview","parallel","pv","history"])
   assert(html.includes('data-route="'+route+'" href="#/'+route+'"'));
@@ -164,6 +185,17 @@ assert(html.indexOf("rakurs-mobile-nav-20261126.js")>html.indexOf("app-parallel-
 assert(css.includes("@media(max-width:760px)")&&css.includes(".sidebar{display:none!important}"));
 assert(css.includes("env(safe-area-inset-bottom"));
 assert(css.includes("max-height:min(72dvh,650px)"));
+assert(css.includes(".mobile-route-back:not([hidden])"));
+assert(css.includes("body[data-theme] #content>*"));
+assert(css.includes("@keyframes rakurs-page-enter"));
+assert(css.includes("@keyframes rakurs-mobile-sheet-in"));
+assert(css.includes("@media(prefers-reduced-motion:reduce)"));
+assert(boardCss.includes("grid-template-rows:min-content!important"));
+assert(boardCss.includes("min-height:74px!important"));
+assert(boardCss.includes("grid-template-rows:37px!important"));
+assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-mobile-compact-v2"));
+assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-compact-v2"));
+console.log("MOBILE_NAV_COMPACT_PV_AND_SMOOTH_PAGE_TRANSITIONS=PASS");
 assert(css.includes(".workarea")&&css.includes("padding-bottom:calc(76px"));
 assert(css.includes(".mobile-tabs a.is-active"));
 assert(css.includes("@media(min-width:761px)"));
