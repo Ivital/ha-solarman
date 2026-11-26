@@ -177,6 +177,7 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertEqual(r.status_code, 200)
         self.assertEqual(r.get_json()["points"], [])
         self.assertEqual(len(self.data_calls), 1)
+        self.assertEqual(self.client.get("/api/v1/history?key=pv_power&hours=24&anchor=invalid").status_code, 400)
         for value in ("0", "169", "abc"):
             self.assertEqual(
                 self.client.get("/api/v1/history?key=pv_power&hours="+value).status_code, 400

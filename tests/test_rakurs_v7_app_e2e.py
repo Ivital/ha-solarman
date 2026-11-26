@@ -356,7 +356,7 @@ def run():
                 }
                 for width,height,theme in [(390,844,"light"),(1440,900,"dark")]:
                     server.scenario = "normal"
-                    context = browser.new_context(viewport={"width":width,"height":height},locale="uk-UA",reduced_motion="reduce")
+                    context = browser.new_context(viewport={"width":width,"height":height},locale="uk-UA",timezone_id="America/New_York",reduced_motion="reduce")
                     context.add_init_script(script=f"localStorage.setItem('rakurs_theme','{theme}')")
                     page = context.new_page()
                     errors = []
@@ -373,6 +373,8 @@ def run():
                             assert page.locator(".topbar").bounding_box()["height"] <= 110, f"Oversized header: {route}"
                         nav_icon = page.locator(".mobile-tabs a[data-route=overview] .mobile-tab-symbol" if width < 761 else '.nav a[href="#/overview"] .symbol').first
                         assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
+                        if route=="archive":
+                            assert page.locator("input[type=datetime-local]").last.input_value()=="2026-11-25T02:16"
                         if route in {"history","archive","trends","parallel"}:
                             chart=page.locator("#content .product-timeseries").first
                             label=chart.locator(".product-chart-label")

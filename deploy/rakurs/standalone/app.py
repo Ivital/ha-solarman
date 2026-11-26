@@ -408,6 +408,9 @@ def history():
         return jsonify({"error": "Некоректний проміжок часу"}), 400
     if not 1 <= hours <= 168:
         return jsonify({"error": "Доступно 1–168 годин"}), 400
+    anchor = request.args.get("anchor", "now")
+    if anchor not in {"now", "latest"}:
+        abort(400, description="Некоректна прив'язка періоду")
     device_id = selected_overview_device_id()
     if device_id is None:
         return jsonify({"data_source": "mysql", "signal": None,
@@ -423,12 +426,16 @@ def history():
                         "hours": hours, "points": [], "truncated": False,
                         "primary_device_id": device_id,
                         "aggregate_verified": False})
+    # All signals of the selected device share one archive endpoint; do not
+    # move the window independently for every graph.
+    cutoff = ("(SELECT MAX(mx.observed_at_utc) FROM rakurs_samples AS mx "
+              "WHERE mx.device_id=m.device_id)" if anchor == "latest" else "UTC_TIMESTAMP(6)")
     data = rows(
         "SELECT m.observed_at_utc,m.received_at_utc,m.value_decimal,"
         "m.raw_value,m.quality FROM rakurs_samples AS m "
         "JOIN rakurs_signals AS s ON s.id=m.signal_id "
         "WHERE m.device_id=%s AND s.signal_key=%s "
-        "AND m.observed_at_utc>=UTC_TIMESTAMP(6)-INTERVAL %s HOUR "
+        "AND m.observed_at_utc>=" + cutoff + "-INTERVAL %s HOUR "
         "ORDER BY m.observed_at_utc DESC LIMIT %s",
         (device_id, key, hours, MAX_HISTORY + 1),
     )

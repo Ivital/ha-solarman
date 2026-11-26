@@ -28,7 +28,7 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126-product3"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126-product4"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"

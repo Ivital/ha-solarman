@@ -676,11 +676,11 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     const index = ++requestIndex;
     bodies.forEach(body => body.replaceChildren(element("p", "subtle", "Завантаження графіка…")));
     const results = await Promise.allSettled(series.map(([key]) =>
-      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours)));
+      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours+"&anchor=latest")));
     if (!current(cycle) || index !== requestIndex) return;
     const allEmpty = results.every(result => result.status === "fulfilled" &&
       !(result.value.points || []).some(point => point.value_decimal !== null &&
-        point.value_decimal !== undefined && Number.isFinite(Number(point.value_decimal))));
+        point.value_decimal !== undefined && point.value_decimal !== "" && Number.isFinite(Number(point.value_decimal))));
     const allFailed = results.every(result => result.status === "rejected");
     if (allEmpty || allFailed) {
       grid.hidden = true;
@@ -932,7 +932,7 @@ async function renderHistory(cycle, archived) {
     clear(tableArea);
     try {
       const result = await api("/history?key=" +
-        encodeURIComponent(picker.value) + "&hours=" + range.value);
+        encodeURIComponent(picker.value) + "&hours=" + range.value + "&anchor=latest");
       if (!current(cycle) || id !== requestId) return;
       clear(plot);
       const points = result.points || [];
@@ -1790,12 +1790,29 @@ async function renderArchive(cycle) {
   }
   const picker=settingsField(controls,"Показник","pv_power","select",
     signals.map(x=>[x.signal_key,x.label_uk+" · "+x.signal_key]));
+  // The controls are explicitly Kyiv wall time, regardless of client timezone.
+  const kyivFormatter=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  const localValue=date=>{
+    const p=Object.fromEntries(kyivFormatter.formatToParts(date).map(x=>[x.type,x.value]));
+    return p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute;
+  };
+  const parseKyiv=(value,upper)=>{
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return new Date(NaN);
+    const wall=Date.parse(value+":00Z");
+    if(!Number.isFinite(wall))return new Date(NaN);
+    const candidates=[];
+    for(let offset=-180;offset<=180;offset+=30){
+      const d=new Date(wall-offset*60000);
+      if(localValue(d)===value)candidates.push(d.getTime());
+    }
+    if(!candidates.length)return new Date(NaN);
+    // During autumn overlap include both occurrences, without losing samples.
+    return new Date(upper?Math.max(...candidates)+59999:Math.min(...candidates));
+  };
   const now=new Date();
-  const localValue=date=>new Date(date.getTime()-date.getTimezoneOffset()*60000)
-    .toISOString().slice(0,16);
-  const start=settingsField(controls,"Від (місцевий час)",
+  const start=settingsField(controls,"Від (час Києва)",
     localValue(new Date(now.getTime()-72*3600*1000)),"datetime-local");
-  const end=settingsField(controls,"До (місцевий час)",
+  const end=settingsField(controls,"До (час Києва)",
     localValue(now),"datetime-local");
   root.appendChild(controls);
   const button=element("button","settings-save","Знайти в архіві");
@@ -1810,11 +1827,12 @@ async function renderArchive(cycle) {
     clear(resultArea);
     resultArea.appendChild(element("p","subtle","Читання архіву MySQL…"));
     try{
-      const from=new Date(start.value),to=new Date(end.value);
+      const from=parseKyiv(start.value,false),to=parseKyiv(end.value,true);
       if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||
          from>=to||(to-from)>31*86400*1000)
         throw Error("Вкажіть коректний інтервал тривалістю до 31 доби");
-      const response=await api("/history/range?key="+encodeURIComponent(picker.value)+
+      const requestedKey=picker.value,requestedSlot=state.selectedSlotNo;
+      const response=await api("/history/range?key="+encodeURIComponent(requestedKey)+
         "&start="+encodeURIComponent(from.toISOString())+
         "&end="+encodeURIComponent(to.toISOString()));
       if(!current(cycle)||token!==request)return;
@@ -1827,21 +1845,23 @@ async function renderArchive(cycle) {
           "Виберіть іншу дату або інший показник."));
         return;
       }
-      resultArea.appendChild(svgChart(points,response.signal?.unit||""));
+      resultArea.appendChild(svgChart(points,response.signal?.unit||signals.find(s=>s.signal_key===requestedKey)?.unit||""));
       const exportButton=element("button","settings-save","Експорт CSV");
       exportButton.type="button";
       exportButton.disabled=Boolean(response.truncated);
       exportButton.title=response.truncated?"Звузьте інтервал: ліміт 1000 записів":"";
       exportButton.addEventListener("click",()=>{
+        const csvCell=value=>'"'+String(value??"").replaceAll('"','""')+'"';
+        const safeText=value=>/^[=+\-@\t\r\n]/.test(String(value??""))?"'"+value:value;
         const lines=["observed_at_utc,value_decimal,quality"];
         for(const p of points) lines.push([
-          p.observed_at_utc||"",p.value_decimal??"",p.quality||""].join(","));
+          csvCell(safeText(p.observed_at_utc)),csvCell(p.value_decimal),csvCell(safeText(p.quality))].join(","));
         const blob=new Blob(["\ufeff"+lines.join("\r\n")],
           {type:"text/csv;charset=utf-8"});
         const url=URL.createObjectURL(blob);
         const link=document.createElement("a");
-        link.href=url;link.download="rakurs-"+picker.value+"-Deye"+
-          state.selectedSlotNo+".csv";
+        link.href=url;link.download="rakurs-"+requestedKey+"-Deye"+
+          requestedSlot+".csv";
         document.body.appendChild(link);
         link.click();link.remove();URL.revokeObjectURL(url);
       });
@@ -1853,6 +1873,7 @@ async function renderArchive(cycle) {
         th.appendChild(element("th","",x)));
       const head=element("thead","");head.appendChild(th);table.appendChild(head);
       const body=element("tbody","");
+      if(points.length>50)resultArea.appendChild(element("p","subtle","У таблиці — останні 50 записів. У CSV — весь доступний результат."));
       for(const p of points.slice(-50).reverse()){
         const row=element("tr","");
         [time(p.observed_at_utc),p.value_decimal==null?"—":number(p.value_decimal)]
@@ -1868,7 +1889,14 @@ async function renderArchive(cycle) {
     }
   }
   button.addEventListener("click",refresh);
-  await refresh();
+  // Prefer the actual latest saved measurement over the current clock.
+  try{
+    const latest=await api("/latest?keys=pv_power,load_power,battery_power,grid_power,battery_soc");
+    if(!current(cycle))return;
+    const stamps=Object.values(latest.values||{}).map(r=>Date.parse(r.observed_at_utc)).filter(Number.isFinite);
+    if(stamps.length){const anchor=Math.max(...stamps);end.value=localValue(new Date(anchor));start.value=localValue(new Date(anchor-72*3600*1000+60000));}
+  }catch(_error){/* manual search remains available */}
+  if(current(cycle))await refresh();
 }
 async function renderSystem(cycle) {
   addStatusMessage();
