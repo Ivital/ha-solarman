@@ -91,7 +91,8 @@ function prepare(mode = "seeded") {
     updated: new Node("span"), "view-title": new Node("h1"),
     "mode-indicator": new Node("span"),
     "device-select": new Node("select"),
-    "theme-toggle": new Node("button")
+    "theme-toggle": new Node("button"),
+    "refresh-data": new Node("button")
   };
   const body = new Node("body");
   const storage = new Map();
@@ -227,6 +228,11 @@ async function run() {
   assert(loginHtml.includes('id="page-theme-toggle"'));
   assert(deyeHtml.includes('id="page-theme-toggle"'));
   assert(html.includes("hero-layout") && html.includes("insight-strip"));
+  assert(html.includes('id="refresh-data"'));
+  assert(html.includes("dashboard-toolbar-ssr"));
+  assert(colorCss.includes(".dashboard-options") && colorCss.includes(".nav-search") &&
+    colorCss.includes(".refresh-data"));
+  console.log("CLARITY_PERSONAL_DASHBOARD_ASSETS=PASS");
   console.log("CLARITY_LIGHT_ALL_COMPONENTS_AND_EXTRA_PAGES=PASS");
   assert(colorCss.includes("prefers-reduced-motion"));
   assert(colorCss.includes(".trend-grid[hidden]") &&
@@ -243,8 +249,8 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux3-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux3-20261126-1"'));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux4-20261126-1"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -281,6 +287,54 @@ async function run() {
   assert.equal(byClass(app.main,"insight-item").length,3);
   assert.equal(byClass(app.main,"quick-link").length,3);
   console.log("CLARITY_NEW_HOME_HIERARCHY=PASS");
+  assert.equal(byClass(app.main,"dashboard-preferences").length,1);
+  const customButton=byClass(app.main,"dashboard-config-button")[0];
+  assert.equal(customButton.attributes["aria-expanded"],"false");
+  customButton.listeners.click();
+  assert.equal(customButton.attributes["aria-expanded"],"true");
+  assert.equal(byClass(app.main,"dashboard-options")[0].hidden,false);
+  const allMetrics=byClass(app.main,"dashboard-preset").find(x=>x.textContent==="Усі 8");
+  allMetrics.listeners.click();
+  assert.equal(byClass(app.main,"kpi").length,8);
+  assert.equal(app.storage.get("rakurs.dashboard.metrics.v1").split(",").length,8);
+  const dashboardCheckboxes=byClass(app.main,"dashboard-check");
+  assert.equal(dashboardCheckboxes.length,8);
+  dashboardCheckboxes[7].checked=false;
+  dashboardCheckboxes[7].listeners.change();
+  assert.equal(byClass(app.main,"kpi").length,7);
+  assert(!app.storage.get("rakurs.dashboard.metrics.v1").includes("load_energy_today"));
+  const moveDown=byClass(app.main,"dashboard-option-row")[0];
+  const reorder=byClass(moveDown,"dashboard-order-button")[1];
+  reorder.listeners.click();
+  assert.equal(app.storage.get("rakurs.dashboard.metrics.v1").split(",")[0],"load_power");
+  const defaults=byClass(app.main,"dashboard-preset").find(x=>x.textContent==="Основні 4");
+  defaults.listeners.click();
+  assert.equal(byClass(app.main,"kpi").length,4);
+  assert.equal(app.storage.get("rakurs.dashboard.metrics.v1"),"pv_power,load_power,battery_soc,grid_power");
+  customButton.listeners.click();
+  assert.equal(byClass(app.main,"dashboard-options")[0].hidden,true);
+  console.log("CLARITY_KPI_PREFERENCES_PERSIST_AND_REORDER=PASS");
+  const navSearch=byClass(app.nav,"nav-search")[0];
+  assert(navSearch);
+  navSearch.value="Modbus";
+  navSearch.listeners.input();
+  assert.equal(app.nav.childNodes.filter(x=>x.tagName==="a"&&!x.hidden).length,1);
+  assert.equal(byClass(app.nav,"nav-group-label").filter(x=>!x.hidden).length,1);
+  navSearch.value="неіснуючий-розділ";
+  navSearch.listeners.input();
+  assert.equal(byClass(app.nav,"nav-empty")[0].hidden,false);
+  navSearch.listeners.keydown({key:"Escape"});
+  assert.equal(app.nav.childNodes.filter(x=>x.tagName==="a"&&!x.hidden).length,15);
+  console.log("CLARITY_SIDEBAR_SEARCH_AND_EMPTY=PASS");
+  const reloadButton=app.elements["refresh-data"];
+  assert(reloadButton.listeners.click);
+  const prevRequests=app.fetchCalls.length;
+  await reloadButton.listeners.click();
+  await settle();
+  assert(app.fetchCalls.length>prevRequests);
+  assert.equal(reloadButton.disabled,false);
+  assert.equal(reloadButton.textContent,"↻ Оновити");
+  console.log("CLARITY_READONLY_MANUAL_REFRESH=PASS");
   assert.equal(byClass(app.main,"energy-diagram").length,1);
   assert(descendants(app.main).some(x=>String(x.textContent||"").includes("На дату останнього запису")));
   assert(descendants(app.main).some(x=>String(x.textContent||"").includes("Без обміну")));
