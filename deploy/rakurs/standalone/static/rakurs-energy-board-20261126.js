@@ -104,16 +104,14 @@
     const board=make(doc,"section","energy-board"+(s.confirmed?" is-live":" is-archive")+
       (motionEnabled?" is-animated":" is-paused")+" speed-"+motionSpeed);
     board.setAttribute("aria-label","Схема напрямків енергії системи Deye");
-    const head=make(doc,"div","energy-board-header");
-    const heading=make(doc,"div","energy-board-heading");
-    append(heading,make(doc,"span","energy-board-kicker","ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ"),
-      make(doc,"h2","","Як рухається енергія"),
-      make(doc,"p","","Натисніть на елемент або лінію потоку, щоб переглянути його показники."));
+    const topbar=make(doc,"div","energy-board-topbar");
     const flags=make(doc,"div","energy-board-flags");
-    append(flags,make(doc,"span","energy-board-flag "+(s.confirmed?"is-online":"is-stale"),
-      s.confirmed?"● Підтверджене опитування":"◷ Архівний зріз — не онлайн"),
-      make(doc,"span","energy-board-date","Запис: "+ukTime(s.last)+" · "+ageLabel(s.last)));
-    append(head,heading,flags);board.appendChild(head);
+    flags.title=s.confirmed?"Підтверджене опитування":
+      "Архівні вимірювання; фізичне опитування інверторів не підтверджено";
+    flags.setAttribute("aria-label",flags.title);
+    flags.appendChild(make(doc,"span","energy-board-flag "+(s.confirmed?"is-online":"is-stale"),
+      s.confirmed?"● Онлайн":"◷ Архів"));
+    if(s.last)flags.appendChild(make(doc,"time","energy-board-date",ukTime(s.last)));
 
     const switches=make(doc,"div","energy-board-modes");
     switches.setAttribute("role","group");
@@ -132,23 +130,25 @@
       });
       switches.appendChild(button);
     }
-    board.appendChild(switches);
+    topbar.appendChild(switches);
+    topbar.appendChild(flags);
     const toolbar=make(doc,"div","energy-board-toolbar");
     const motion=make(doc,"button","energy-board-motion","");
     motion.type="button";
     const speed=make(doc,"button","energy-board-speed","");
     speed.type="button";
-    const caption=make(doc,"span","energy-board-visual-label",
-      s.confirmed?"Схема за підтвердженими даними":"Схематичний рух за архівним записом");
     function paintMotion(){
       board.className=board.className.replace(/\s+is-animated|\s+is-paused|\s+speed-(normal|slow|fast)/g,"")+
         (motionEnabled?" is-animated":" is-paused")+" speed-"+motionSpeed;
-      motion.textContent=motionEnabled?"⏸ Пауза":"▶ Відтворити";
+      motion.textContent=motionEnabled?"⏸":"▶";
       motion.setAttribute("aria-pressed",String(motionEnabled));
-      motion.setAttribute("aria-label",motionEnabled?"Зупинити рух на схемі":"Відтворити схематичний рух");
-      speed.textContent=motionSpeed==="slow"?"Швидкість: повільно":
-        motionSpeed==="fast"?"Швидкість: швидко":"Швидкість: звичайна";
-      speed.setAttribute("aria-label","Змінити швидкість анімації потоків");
+      motion.setAttribute("aria-label",motionEnabled?"Зупинити анімацію":"Відтворити анімацію");
+      motion.title=motionEnabled?"Пауза":"Відтворити";
+      speed.textContent=motionSpeed==="slow"?"0,5×":
+        motionSpeed==="fast"?"2×":"1×";
+      speed.setAttribute("aria-label","Змінити швидкість анімації");
+      speed.title="Швидкість: "+(motionSpeed==="slow"?"повільно":
+        motionSpeed==="fast"?"швидко":"звичайна");
     }
     motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;paintMotion();});
     speed.addEventListener("click",()=>{
@@ -156,13 +156,9 @@
       paintMotion();
     });
     paintMotion();
-    append(toolbar,caption,motion,speed);
-    board.appendChild(toolbar);
-    const context=make(doc,"div","energy-board-context",s.focus==="system"?
-      "Два масиви сонячних панелей, два Deye, один будинок, одна АКБ та одна мережа.":
-      "Показники з архіву Deye №"+(s.selected?.slot_no||"—")+
-        ". Будинок, акумулятор і мережа залишаються одними вузлами.");
-    board.appendChild(context);
+    append(toolbar,motion,speed);
+    topbar.appendChild(toolbar);
+    board.appendChild(topbar);
 
     const map=make(doc,"div","energy-board-map");
     const sources=make(doc,"div","energy-board-sources");
@@ -188,9 +184,9 @@
       el.setAttribute("aria-label",label+": показ архіву "+pretty(num,"кВт"));
       append(el,make(doc,"span","energy-board-node-icon",icon),
         make(doc,"span","energy-board-node-name",label),
-        make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
-        make(doc,"span","energy-board-node-detail",detail));
-      if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
+        make(doc,"strong","energy-board-node-value",pretty(num,"кВт")));
+      if(detail)el.appendChild(make(doc,"span","energy-board-node-detail",detail));
+      if(subtitle)el.title=subtitle;
       const diagnosticText=diagnostics.map(row=>
         "Deye №"+row.slot+": "+pretty(row.value,"кВт")+
         " ("+row.state.caption+")"+
@@ -219,8 +215,7 @@
           line.appendChild(particle);
         }
       }
-      append(item,make(doc,"span","energy-board-wire-title",caption),line,
-        make(doc,"span","energy-board-direction",active?direction:"—"));
+      append(item,line,make(doc,"span","energy-board-direction",active?direction:"—"));
       wires[key]=item;return item;
     }
     // A shared load, grid, or battery has exactly one physical connection.
@@ -236,9 +231,9 @@
       const icon=make(doc,"span","energy-board-source-icon","☀");
       const details=make(doc,"div","energy-board-source-text");
       append(details,make(doc,"small","","Сонце · Deye №"+number),
-        make(doc,"strong","",exists?pretty(power,"кВт"):"—"),
-        make(doc,"span","",exists?"Запис: "+ukTime(measured(device.values)):
-          s.loading?"Отримуємо дані з MySQL":"Немає даних цього інвертора"));
+        make(doc,"strong","",exists?pretty(power,"кВт"):"—"));
+      choice.title=exists?"Архів: "+ukTime(measured(device.values)):
+        "Архівних показників немає";
       append(choice,icon,details);
       const key="solar"+number;
       interactive.push({el:choice,key,label:"Генерація Deye №"+number,
@@ -251,11 +246,7 @@
       sourceWires.appendChild(wire(key,"→",modeOn&&power!==null&&power>0,"PV "+number));
     }
     append(hub,make(doc,"span","energy-board-hub-icon","⚡"),
-      make(doc,"strong","","ЕНЕРГЕТИЧНА ШИНА"),
-      make(doc,"small","",s.focus==="system"?"Deye №1 + Deye №2":"Deye №"+s.selected?.slot_no),
-      make(doc,"span","energy-board-hub-note",""));
-    const hubNote=hub.childNodes[hub.childNodes.length-1];
-    hubNote.textContent="Зв’язки показано за збереженим зрізом";
+      make(doc,"strong","","ЕНЕРГЕТИЧНА ШИНА"));
     hub.setAttribute("role","img");
     hub.setAttribute("aria-label","Спільна схема двох Deye, без розрахунку непідтвердженої суми");
     const systemMode=s.focus==="system";
@@ -293,31 +284,20 @@
       // Single physical branch; mobile layout keeps wire and destination together.
       const branch=make(doc,"div","energy-board-output-row output-"+info.key);
       const connector=wire(info.key,flow.direction,flow.active,flow.caption);
-      const stateNote=info.key==="battery"?
-        " · SOC "+pretty(reported!==null?
-          metric(s.values,"battery_soc"):reference?.soc??null,"%"):"";
+      const batterySoc=info.key==="battery"?
+        (reported!==null?metric(s.values,"battery_soc"):reference?.soc??null):null;
+      const compactDetail=info.key==="battery" && batterySoc!==null?
+        "SOC "+pretty(batterySoc,"%"):"";
       append(branch,connector,node(info.key,info.key,info.icon,info.label,
-        metricValue,flow.caption+stateNote,subtitle,rows));
+        metricValue,compactDetail,subtitle,rows));
       outputZone.appendChild(branch);
     }
     append(map,sources,sourceWires,hub,outputZone);board.appendChild(map);
-    const legend=make(doc,"div","energy-board-legend");
-    append(legend,
-      make(doc,"span","energy-board-legend-key","☀ Генерація"),
-      make(doc,"span","energy-board-legend-key","⌂ Споживання"),
-      make(doc,"span","energy-board-legend-key","▣ Акумулятор"),
-      make(doc,"span","energy-board-legend-key","⌁ Мережа"));
-    board.appendChild(legend);
-    const foot=make(doc,"div","energy-board-foot");
     const inspector=make(doc,"div","energy-board-inspector");
+    inspector.hidden=true;
     inspector.setAttribute("aria-live","polite");
-    append(inspector,make(doc,"strong","energy-board-inspector-title","Натисніть на елемент"),
-      make(doc,"p","energy-board-inspector-description",
-        "Сонце, будинок, акумулятор, мережа та лінії енергії відкривають пояснення і записи Deye."));
-    const notice=make(doc,"p","energy-board-disclaimer",
-      "Анімація ілюструє останній збережений зріз, а не рух енергії зараз. " +
-      "Показники взято з обраного Deye, їх не додаємо без звірки регістрів.");
-    append(foot,inspector,notice);board.appendChild(foot);
+    inspector.setAttribute("aria-label","Деталі вибраного показника");
+    board.appendChild(inspector);
     function choose(item){
       for(const candidate of interactive){
         candidate.el.className=candidate.el.className.replace(/\s+is-focused/g,"");
@@ -331,11 +311,26 @@
           wires[key].setAttribute("aria-pressed",String(key===item.key));
         }
         inspector.replaceChildren();
-        append(inspector,
+        const close=make(doc,"button","energy-board-inspector-close","✕");
+        close.type="button";
+        close.setAttribute("aria-label","Закрити деталі");
+        close.addEventListener("click",()=>{
+          inspector.hidden=true;
+          for(const candidate of interactive){
+            candidate.el.className=candidate.el.className.replace(/\s+is-focused/g,"");
+            candidate.el.setAttribute("aria-pressed","false");
+          }
+          for(const key of Object.keys(wires)){
+            wires[key].className=wires[key].className.replace(/\s+is-highlight/g,"");
+            wires[key].setAttribute("aria-pressed","false");
+          }
+        });
+        append(inspector,close,
           make(doc,"strong","energy-board-inspector-title",item.title||item.label+" · "+pretty(item.num,"кВт")),
           make(doc,"p","energy-board-inspector-description",item.detail),
           make(doc,"small","energy-board-inspector-timestamp",
             (item.subtitle?item.subtitle+" · ":"")+"Стан: "+(s.confirmed?"підтверджене опитування":"архівний запис")));
+        inspector.hidden=false;
       }
     }
     for(const item of interactive){

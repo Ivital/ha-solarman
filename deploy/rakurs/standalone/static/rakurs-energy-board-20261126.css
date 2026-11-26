@@ -607,3 +607,76 @@ body[data-theme] .energy-board-ssr .energy-board-map{
  body[data-theme] .energy-board.is-animated .source-wires
   .energy-board-flow-particle{display:none!important;animation:none!important}
 }
+
+/* CLEAN V6: no explanatory paragraphs, legends, flow captions or repeated data notes. */
+body[data-theme] .energy-board-topbar{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:9px 14px;margin:0 0 11px}
+body[data-theme] .energy-board-topbar .energy-board-modes{
+ margin:0;order:0}
+body[data-theme] .energy-board-topbar .energy-board-flags{
+ display:flex;align-items:center;justify-content:flex-end;
+ flex-direction:row;gap:8px;order:1;margin:0}
+body[data-theme] .energy-board-topbar .energy-board-date{
+ color:var(--ux-muted);font-size:10px}
+body[data-theme] .energy-board-topbar .energy-board-toolbar{
+ order:2;display:flex;align-items:center;justify-content:flex-end;
+ flex-wrap:nowrap;gap:7px;margin:0;padding:0}
+body[data-theme] .energy-board-topbar .energy-board-motion,
+body[data-theme] .energy-board-topbar .energy-board-speed{
+ width:38px;min-width:38px;height:37px;min-height:37px;
+ display:grid;place-items:center;padding:5px 7px;
+ font-size:13px;border-radius:10px;flex:none}
+body[data-theme] .energy-board-topbar .energy-board-speed{width:48px;min-width:48px}
+body[data-theme] .energy-board .energy-board-wire-title,
+body[data-theme] .energy-board .energy-board-hub-note,
+body[data-theme] .energy-board .energy-board-legend,
+body[data-theme] .energy-board .energy-board-context,
+body[data-theme] .energy-board .energy-board-disclaimer{display:none!important}
+body[data-theme] .energy-board .energy-board-source-text{gap:5px}
+body[data-theme] .energy-board .energy-board-source-text span{display:none!important}
+body[data-theme] .energy-board .energy-board-node-detail:empty{display:none!important}
+body[data-theme] .energy-board .energy-board-node-note{display:none!important}
+body[data-theme] .energy-board .energy-board-inspector[hidden]{display:none!important}
+body[data-theme] .energy-board .energy-board-inspector{
+ position:relative;margin-top:11px;padding:14px 44px 14px 15px;
+ border-radius:14px;border:1px solid var(--ux-line);background:var(--ux-subtle);
+ box-shadow:none;max-width:100%;min-height:0}
+body[data-theme] .energy-board .energy-board-inspector-close{
+ appearance:none;position:absolute;right:11px;top:11px;
+ display:grid;place-items:center;width:29px;height:29px;
+ border:1px solid var(--ux-line);border-radius:8px;
+ background:var(--ux-surface);color:var(--ux-title);
+ font-size:14px;cursor:pointer}
+body[data-theme] .energy-board .energy-board-inspector-close:focus-visible{
+ outline:2px solid var(--ux-accent);outline-offset:2px}
+body[data-theme] .energy-board .energy-board-inspector-description{
+ font-size:11px;line-height:1.5}
+body[data-theme] .energy-board .energy-board-map{margin:0}
+body[data-theme] .energy-board .energy-board-hub{gap:8px}
+@media(max-width:850px){
+ body[data-theme] .energy-board-topbar{justify-content:space-between;gap:9px}
+ body[data-theme] .energy-board-topbar .energy-board-modes{width:100%;order:0}
+ body[data-theme] .energy-board-topbar .energy-board-flags{order:1}
+ body[data-theme] .energy-board-topbar .energy-board-toolbar{order:2}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board-topbar{gap:7px 9px;margin-bottom:9px}
+ body[data-theme] .energy-board-topbar .energy-board-modes{
+  display:flex;justify-content:stretch;margin:0;width:100%}
+ body[data-theme] .energy-board-topbar .energy-board-flags{
+  gap:6px;flex-wrap:wrap;justify-content:flex-start}
+ body[data-theme] .energy-board-topbar .energy-board-date{font-size:9px}
+ body[data-theme] .energy-board-topbar .energy-board-toolbar{margin-left:auto;gap:5px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+  min-height:69px;gap:6px}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+  min-height:62px!important;height:62px!important;max-height:62px!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+  min-height:69px;padding:9px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  gap:6px!important;margin-bottom:11px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-inspector-close{transition:none!important}
+}

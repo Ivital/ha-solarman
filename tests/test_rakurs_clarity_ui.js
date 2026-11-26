@@ -231,15 +231,22 @@ async function run() {
   assert(loginHtml.includes('id="page-theme-toggle"'));
   assert(deyeHtml.includes('id="page-theme-toggle"'));
   assert(html.includes("energy-board-ssr") && html.includes("insight-strip"));
+  assert(!html.includes("Як рухається енергія"));
+  assert(!html.includes("ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ"));
+  assert(!html.includes("energy-board-disclaimer"));
+  assert(html.includes('>◷ Архів</span>'));
   assert(html.indexOf("energy-board-ssr")<html.indexOf("cards cards-main"),
     "System diagram must be first, before KPI cards");
   assert(html.includes("/static/rakurs-energy-board-20261126.js"));
   assert(html.includes("/static/rakurs-energy-board-20261126.css"));
-  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-mobile-v5-20261126"));
-  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-v5-20261126"));
+  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-clean-v6-20261126"));
+  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-clean-v6-20261126"));
   assert(html.indexOf("rakurs-energy-board-20261126.js")<
     html.indexOf("app-parallel-twin-20261125.js"),
     "Energy diagram must load before dashboard app");
+  assert(energyBoardCss.includes(".energy-board-inspector[hidden]"));
+  assert(energyBoardCss.includes(".energy-board .energy-board-wire-title,"));
+  console.log("CLARITY_MINIMAL_BOARD_NO_EXPLANATORY_TEXT=PASS");
   assert(energyBoardCss.includes(".energy-board-map") && 
     energyBoardCss.includes("prefers-reduced-motion"));
   console.log("CLARITY_SYSTEM_DIAGRAM_FIRST_ASSETS=PASS");
@@ -391,11 +398,15 @@ async function run() {
     "Common load must have ONE displayed reference figure");
   assert(byClass(house,"energy-board-node-value")[0].textContent.includes("6,816"),
     "System mode uses clearly labeled selected Deye report; NOT an invented system total");
-  assert(descendants(house).some(node=>
-    String(node.textContent||"").includes("Архів Deye №2")));
-  assert(descendants(house).some(node=>
+  assert(!descendants(house).some(node=>
+    String(node.textContent||"").includes("Архів Deye №2")),
+    "Archive source details must not clutter the card");
+  assert(!descendants(house).some(node=>
     String(node.textContent||"").includes("покази Deye різні")));
+  const hiddenDetails=byClass(compareHost,"energy-board-inspector")[0];
+  assert.equal(hiddenDetails.hidden,true,"No explanatory panel until a node is selected");
   house.listeners.click();
+  assert.equal(hiddenDetails.hidden,false);
   const details=byClass(compareHost,"energy-board-inspector-description")[0].textContent;
   assert(details.includes("Deye №1: 6,4")&&details.includes("Deye №2: 6,816"),
     "Both inverter reports remain available on click, as diagnostics of ONE shared load");
@@ -424,7 +435,8 @@ async function run() {
   const selectedHouse=byClass(selectedOneHost,"energy-board-house")[0];
   assert(byClass(selectedHouse,"energy-board-node-value")[0].textContent.includes("6,4"));
   assert.equal(byClass(selectedOneHost,"energy-board-node").length,3);
-  assert.equal(byClass(compareHost,"energy-board-legend").length,1);
+  assert.equal(byClass(compareHost,"energy-board-legend").length,0,
+    "Remove redundant explanatory legend");
   assert.equal(byClass(compareHost,"energy-board-flow-track").length,5);
   const gridTrack=byClass(sharedGridWire[0],"energy-board-flow-track")[0];
   assert(gridTrack);
@@ -443,6 +455,11 @@ async function run() {
     "Flow track is clickable and selects the battery");
   assert(byClass(compareHost,"energy-board-inspector-title")[0].textContent.includes("Акумулятор"));
   console.log("CLARITY_ACCESSIBLE_STREAM_INTERACTION_AND_NO_FAKE_FLOW=PASS");
+  const detailClose=byClass(compareHost,"energy-board-inspector-close")[0];
+  assert(detailClose && detailClose.listeners.click);
+  detailClose.listeners.click();
+  assert.equal(hiddenDetails.hidden,true,"Close button hides explanatory details");
+  assert.equal(byClass(compareHost,"wire-battery")[0].attributes["aria-pressed"],"false");
   const wholeText=descendants(compareHost).map(node=>String(node.textContent||"")).join(" ");
   assert(!wholeText.includes("13,216")&&!wholeText.includes("2,685"),
     "Do not fabricate shared-node totals from separate inverter reports");
@@ -498,8 +515,12 @@ async function run() {
   assert.equal(byClass(app.main,"energy-board-source").length,2);
   assert.equal(byClass(app.main,"energy-board-node").length,3);
   assert.equal(byClass(app.main,"energy-board-mode").length,3);
-  assert.equal(byClass(app.main,"energy-board-flag")[0].textContent,
-    "◷ Архівний зріз — не онлайн");
+  assert.equal(byClass(app.main,"energy-board-flag")[0].textContent,"◷ Архів");
+  assert.equal(byClass(app.main,"energy-board-inspector")[0].hidden,true);
+  assert.equal(byClass(app.main,"energy-board-legend").length,0);
+  assert.equal(byClass(app.main,"energy-board-context").length,0);
+  assert.equal(byClass(app.main,"energy-board-heading").length,0);
+  assert.equal(byClass(app.main,"energy-board-disclaimer").length,0);
   assert.equal(byClass(app.main,"energy-board")[0].className.includes("is-live"),false);
   console.log("CLARITY_ENERGY_FLOW_ON_TOP_ARCHIVE_NOT_LIVE=PASS");
   const energyMotion=byClass(app.main,"energy-board-motion")[0];
@@ -510,8 +531,8 @@ async function run() {
   assert.equal(byClass(app.main,"energy-board-flow-particle").length,12,
     "Two active PV, house and battery have illustrative particles; grid zero has none");
   assert(byClass(app.main,"energy-board")[0].className.includes("is-animated"));
-  assert(byClass(app.main,"energy-board-visual-label")[0].textContent.includes("архівним"),
-    "Animated archive must be clearly labeled as historical visualization");
+  assert(byClass(app.main,"energy-board-flags")[0].attributes["aria-label"].includes("Архівні"),
+    "Animated archive must retain clear data provenance in its status label");
   energyMotion.listeners.click();
   assert.equal(energyMotion.attributes["aria-pressed"],"false");
   assert(byClass(app.main,"energy-board")[0].className.includes("is-paused"));
@@ -530,7 +551,9 @@ async function run() {
   for(const label of ["Будинок","Акумулятор","Мережа"]){
     assert(byClass(app.main,"energy-board-node-name").some(item=>item.textContent===label));
   }
-  assert(!byClass(app.main,"energy-board-context")[0].textContent.includes("спільн"));
+  assert.equal(byClass(app.main,"energy-board-context").length,0);
+  assert.equal(byClass(app.main,"energy-board-node-note").length,0);
+  assert.equal(byClass(app.main,"energy-board-wire-title").length,0);
   console.log("CLARITY_CLEAN_ENERGY_LABELS=PASS");
   assert.equal(byClass(app.main,"insight-item").length,3);
   assert.equal(byClass(app.main,"quick-link").length,3);
@@ -636,7 +659,8 @@ async function run() {
   flowTabs.find(x=>x.textContent==="Deye №2").listeners.click();
   await settle();
   assert.equal(app.elements["device-select"].value,"sim_deye20k_parallel_2");
-  assert(byClass(app.main,"energy-board-context").some(x=>String(x.textContent||"").includes("Deye №2")));
+  assert.equal(byClass(app.main,"energy-board-mode").find(x=>x.textContent==="Deye №2")
+    .attributes["aria-pressed"],"true");
   byClass(app.main,"energy-board-mode").find(x=>x.textContent==="Уся система").listeners.click();
   await settle();
   assert.equal(byClass(app.main,"energy-board-mode").find(x=>

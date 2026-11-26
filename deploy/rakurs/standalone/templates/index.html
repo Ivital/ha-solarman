@@ -10,8 +10,8 @@
   <link rel="stylesheet" href="/static/events-ui-20261124.css">
   <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1">
   <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-flow-v4-20261126">
-  <link rel="stylesheet" href="/static/rakurs-energy-board-20261126.css?v=rakurs-mobile-v5-20261126">
-  <script defer src="/static/rakurs-energy-board-20261126.js?v=rakurs-mobile-v5-20261126"></script>
+  <link rel="stylesheet" href="/static/rakurs-energy-board-20261126.css?v=rakurs-clean-v6-20261126">
+  <script defer src="/static/rakurs-energy-board-20261126.js?v=rakurs-clean-v6-20261126"></script>
   <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126"></script>
 </head>
 <body data-theme="light">
@@ -48,36 +48,28 @@
       </header>
       <main id="content" class="content" data-initial-mode="real">
         <section class="energy-board energy-board-ssr" aria-label="Енергетична схема останніх збережених показників">
-          <div class="energy-board-header">
-            <div class="energy-board-heading">
-              <span class="energy-board-kicker">ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ · АРХІВ</span>
-              <h2>Як рухається енергія</h2>
-              <p>Останній збережений стан. Без підтвердженого опитування це не дані реального часу.</p>
-            </div>
-            <span class="energy-board-flag is-stale">◷ Архівний зріз — не онлайн</span>
+          <div class="energy-board-topbar">
+            <span class="energy-board-flag is-stale" title="Збережені показники, не онлайн">◷ Архів</span>
           </div>
           <div class="energy-board-map">
             <div class="energy-board-sources">
               <div class="energy-board-source">
                 <span class="energy-board-source-icon">☀</span>
                 <span class="energy-board-source-text">
-                  <small>Сонячні панелі · обраний Deye</small>
+                  <small>Сонце · Deye</small>
                   <strong>{{ initial_cards[0].value }} {{ initial_cards[0].unit }}</strong>
-                  <span>Збережені вимірювання MySQL</span>
                 </span>
               </div>
               <div class="energy-board-source is-dimmed">
                 <span class="energy-board-source-icon">⧉</span>
                 <span class="energy-board-source-text">
-                  <small>Другий інвертор Deye</small><strong>—</strong>
-                  <span>Дані завантажаться разом із інтерактивною схемою</span>
+                  <small>Сонце · Deye №2</small><strong>—</strong>
                 </span>
               </div>
             </div>
             <div class="energy-board-hub">
               <span class="energy-board-hub-icon">⚡</span>
-              <strong>ЕНЕРГЕТИЧНА ШИНА</strong><small>Два інвертори Deye</small>
-              <span class="energy-board-hub-note">Схема — лише архівний зріз</span>
+              <strong>ЕНЕРГЕТИЧНА ШИНА</strong>
             </div>
             <div class="energy-board-sinks">
               <div class="energy-board-node energy-board-house"><small>⌂ Будинок</small><strong>{{ initial_cards[1].value }} {{ initial_cards[1].unit }}</strong></div>
@@ -85,7 +77,6 @@
               <div class="energy-board-node energy-board-grid"><small>⌁ Мережа</small><strong>{{ initial_cards[2].value }} {{ initial_cards[2].unit }}</strong></div>
             </div>
           </div>
-          <p class="energy-board-disclaimer">Схема показує архів, а не поточний стан. Інтерактивний рух доступний після завантаження сторінки. Дані нижче збережено у MySQL.</p>
         </section>
         <section class="insight-strip" aria-label="Джерело та актуальність показників">
           <div class="insight-item"><span class="insight-icon">▣</span><span class="insight-copy"><small>Джерело даних</small><strong>Збережений архів MySQL</strong></span></div>
