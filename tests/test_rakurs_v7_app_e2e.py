@@ -31,7 +31,7 @@ D2 = "integration_deye_2"
 
 def reading(value, unit="кВт", stamp=MEASURED):
     return {"value_decimal": value, "unit": unit, "observed_at_utc": stamp,
-            "register_verified": False, "sign_verified": False}
+            "register_verified": False, "sign_verified": False, "quality": "generated"}
 
 
 def device_values(slot):
@@ -229,6 +229,7 @@ def run():
                         })""")
                         assert max(first_screen["gridBottom"], first_screen["batteryBottom"]) <                             first_screen["navTop"] - 6,                             "V7 critical energy nodes must be fully above the mobile bottom nav: " + str(first_screen)
                     assert not page.locator(".rv7 .rv7-pill.is-live").count()
+                    assert "тестові дані" in page.locator(".rv7-pill").first.inner_text()
                     assert page.locator(".rv7 .rv7-warnings").count() == 1
                     assert page.evaluate(
                         "document.documentElement.scrollWidth <= window.innerWidth + 2"

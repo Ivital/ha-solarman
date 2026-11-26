@@ -14,7 +14,7 @@
   activeScopes.delete(scope);
  }
  const classes={pv1:"pv",pv2:"pv",inv1:"bus",inv2:"bus",bus:"bus",load:"load",battery:"battery",grid:"grid"};
- const labels={pv1:"PV · Deye №1",pv2:"PV · Deye №2",bus:"Спільна шина AC",inv1:"Deye №1",inv2:"Deye №2",
+ const labels={pv1:"PV · Deye №1",pv2:"PV · Deye №2",bus:"Спільні енергетичні вузли",inv1:"Deye №1",inv2:"Deye №2",
   load:"Будинок",battery:"Акумулятор",grid:"Мережа"};
  const metrics=["pv_power","load_power","battery_power","grid_power","battery_soc"];
  function h(name,cls,value){
@@ -76,12 +76,13 @@
   close.type="button";close.setAttribute("aria-label","Закрити деталі");
   put(title,h("h2","",labels[id]),close);sheet.appendChild(title);
   const reading=source(snap,id);
-  sheet.appendChild(h("div","rv7-panel-big",id==="bus"?"Спільна AC-шина":id.startsWith("inv")?labels[id]:M.fmt(reading)));
+  sheet.appendChild(h("div","rv7-panel-big",id==="bus"?"Логічна енергетична шина":id.startsWith("inv")?labels[id]:M.fmt(reading)));
   if(id!=="bus"&&!id.startsWith("inv")){
    const data=[
     ["Джерело",reading?.slot_no?"Deye №"+reading.slot_no:"Не підтверджено"],
     ["Дата запису",M.ukTime(reading?.observed_at_utc)],
     ["Достовірність",reading?.quality||"missing"],
+    ["Походження",reading?.reported_quality==="generated"?"Згенеровано для тестування":reading?.reported_quality||"Невідоме"],
     ["Адреса регістра",reading?.register_address??"Не визначено"],
     ["Підтвердження регістра",reading?.register_verified?"Так":"Немає"]
    ];
@@ -130,7 +131,7 @@
    role:"group","aria-label":"Енергосистема: два PV, два Deye, одна АКБ, будинок і мережа"});
   for(const [id,path] of g.paths){
    const reading=id==="battery"?snap.reports.battery_power.reading:source(snap,id);
-   const supported=reading?.valid && reading.number!==0;
+   const supported=reading?.valid && reading.number!==0 && (reading.quality!=="conflicting"||id.startsWith("pv"));
    const wire=s("path",{d:path,"data-flow":id,
     class:"rv7-wire "+(supported?"rv7-wire-"+id:"is-unknown")});
    svg.appendChild(wire);
@@ -149,7 +150,7 @@
     "aria-label":labels[id]+(reading?": "+M.fmt(reading):"")});
    group.appendChild(s("rect",{x,y,width:w,height,rx:10,ry:10,class:"rv7-node-bg rv7-node-"+classes[id]}));
    if(isBus){
-    group.appendChild(s("text",{x:x+w/2,y:y+height/2+4,"text-anchor":"middle",class:"rv7-bus-title"},"AC · шина"));
+    group.appendChild(s("text",{x:x+w/2,y:y+height/2+4,"text-anchor":"middle",class:"rv7-bus-title"},"Енерг. шина"));
    }else if(isInv){
     icon(group,id,x+12,y+12);
     const dev=snap.sources[Number(id.slice(-1))-1].device;
@@ -216,8 +217,8 @@
   const time=h("div","rv7-history-time"),control=h("div","rv7-time-control");
   card.appendChild(chartbox);card.appendChild(legend);
   card.appendChild(time);card.appendChild(control);
-  card.appendChild(h("p","rv7-note",
-   "Дані MySQL. Натисніть на графік або перемістіть повзунок часу."));
+  const historyNote=h("p","rv7-note","Дані MySQL. Натисніть на графік або перемістіть повзунок часу.");
+  card.appendChild(historyNote);
   container.appendChild(card);
   let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
   let failedHistoryRequests=0;
@@ -349,7 +350,9 @@
     "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value:[]}));
-   for(const line of series.filter(row=>row.id!=="soc")){
+   const synthetic=series.some(line=>line.points.some(p=>["generated","simulated","demo","synthetic"].includes(p.quality)));
+   historyNote.textContent=synthetic?"Містить тестові згенеровані записи. Не є фактичними вимірюваннями.":"Дані MySQL. Натисніть на графік або перемістіть повзунок часу.";
+   for(const line of series){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
     const circle=h("span","rv7-series-dot");
@@ -394,7 +397,7 @@
   put(heading,copy);
   const statuses=h("div","rv7-status");
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
-   snap.data_state==="archive"?"◷ Архів":
+   snap.generated?"◷ Архів · тестові дані":snap.data_state==="archive"?"◷ Архів":
     snap.data_state==="live"?"● Онлайн":"○ Немає даних"));
   if(snap.updated_at_utc)statuses.appendChild(
    h("span","rv7-pill",M.ukTime(snap.updated_at_utc)));
@@ -415,7 +418,7 @@
    const diagramCard=h("section","rv7-card rv7-diagram-card");
    const dh=h("div","rv7-card-head");
    put(dh,h("strong","rv7-card-title","Потоки енергії"),
-    h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"));
+    h("span","rv7-card-meta",snap.generated?"Демонстраційний стан":snap.data_state==="live"?"Поточний стан":"Збережений стан"));
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
    let displayed=snap;
@@ -444,7 +447,7 @@
         const p=M.historicalValue(row.points,timestamp,600000);
         if(p)archive[row.key]={value_decimal:p.number,
           unit:p.unit||M.read(d.values,row.key,d).unit,
-          observed_at_utc:p.timestamp,sign_verified:false,register_verified:false};
+          observed_at_utc:p.timestamp,quality:p.quality,sign_verified:false,register_verified:false};
       }
       return {...d,values:archive};
     });
@@ -452,11 +455,11 @@
       fallbackValues:{},status:{},now:Date.parse(timestamp)});
     paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
-      "Архів · "+M.ukTime(timestamp);
+      (displayed.generated?"Тестовий архів · ":"Архів · ")+M.ukTime(timestamp);
    },()=>{
     displayed=snap;paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
-      snap.data_state==="live"?"Поточний стан":"Збережений стан";
+      snap.generated?"Демонстраційний стан":snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
    layout.appendChild(shell);
    if(snap.warnings.length){

@@ -291,3 +291,5 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-diagram .rv7-node-bg{stroke-width:1}
 .rv7-diagram .rv7-node-pv,.rv7-diagram .rv7-node-load,.rv7-diagram .rv7-node-battery,.rv7-diagram .rv7-node-grid{fill:var(--v7-card)}
 @media(max-width:600px){.rv7-top{align-items:center;gap:4px}.rv7-subtitle{display:none}.rv7-tab{min-height:40px}.rv7-diagram-card .rv7-link{min-height:44px}.rv7-warning-details summary{padding:7px 10px}.rv7-message{padding:7px 9px}.rv7-card-meta{max-width:50%;text-align:right}}
+
+.rv7-pill.is-archive{white-space:normal;line-height:1.2}

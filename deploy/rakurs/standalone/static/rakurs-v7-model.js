@@ -24,8 +24,9 @@
     let unit=String(item?.unit||((key==="battery_soc")?"%":"кВт"));
     // Never convert watts implicitly; retain the reported unit and its scale.
     const registerAddress=item?.register_address??item?.modbus_address??null;
+    const reported_quality=String(item?.quality||"unknown");
     return Object.freeze({
-      key,number,unit,
+      key,number,unit,reported_quality,
       valid:number!==null,
       observed_at_utc:measured_at_utc,
       device_key:device?.device_key||null,
@@ -61,6 +62,7 @@
   }
   function quality(item,ctx){
     if(!item?.valid)return "missing";
+    if(["generated","simulated","demo","synthetic"].includes(item.reported_quality))return "generated";
     if(!item.observed_at_utc)return "unverified";
     if(ctx.isLive&&item.register_verified&&fresh(item.observed_at_utc,ctx.now))return "live";
     return "archive";
@@ -104,10 +106,11 @@
       ...sources.map(x=>x.reading),...SHARED_KEYS.map(key=>reports[key].reading)
     ].filter(item=>item.valid);
     const last=lastOf(validReadings);
+    const generated=validReadings.some(item=>["generated","simulated","demo","synthetic"].includes(item.reported_quality));
     const reportedFresh=devices.length===2&&devices.every(d=>{
       return d.telemetry_error!==true&&["pv_power",...SHARED_KEYS].every(key=>{
         const item=read(d.values,key,d);
-        return item.valid&&item.register_verified&&fresh(item.observed_at_utc,now);
+        return item.valid&&item.register_verified&&!["generated","simulated","demo","synthetic"].includes(item.reported_quality)&&fresh(item.observed_at_utc,now);
       });
     });
     // All three physical gates + firmware/register semantics must be verified.
@@ -124,6 +127,7 @@
     // Batteries and grid are shared but reports may refer to inverter-local shares.
     // Keep sources visible; do not sum two reports and never assert system totals.
     const warnings=[];
+    if(generated)warnings.push("Демонстраційний архів: містить алгоритмічно згенеровані записи, а не вимірювання обладнання");
     if(fallbackUnscoped)warnings.push("Немає підтвердженої прив'язки архіву до конкретного Deye");
     if(devices.length<2)warnings.push("Не всі інвертори зареєстровані в архіві");
     for(const device of devices)if(device.telemetry_error===true)
@@ -136,7 +140,7 @@
     // Even with aligned PV timestamps, a verified aggregate is still required.
     return Object.freeze({
       devices,selected,source:"MySQL",data_state:isLive?"live":validReadings.length?"archive":"missing",
-      updated_at_utc:last,show_aggregate_pv:false,pv_time_aligned:alignedPv,
+      updated_at_utc:last,generated,show_aggregate_pv:false,pv_time_aligned:alignedPv,
       sources,reports,warnings,read_only:true,
       physical:{pv_arrays:2,inverters:2,load_nodes:1,battery_nodes:1,grid_nodes:1}
     });
@@ -147,7 +151,7 @@
       const timestamp=date(point?.timestamp||point?.observed_at_utc||
         point?.recorded_at_utc||point?.timestamp_utc);
       const number=NUM(point?.number??point?.value_decimal);
-      return {timestamp,number,unit:String(point?.unit||"")};
+      return {timestamp,number,unit:String(point?.unit||""),quality:String(point?.quality||"unknown")};
     }).filter(p=>p.timestamp&&p.number!==null)
       .sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
   }
