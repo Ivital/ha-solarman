@@ -239,8 +239,8 @@ async function run() {
     "System diagram must be first, before KPI cards");
   assert(html.includes("/static/rakurs-energy-board-20261126.js"));
   assert(html.includes("/static/rakurs-energy-board-20261126.css"));
-  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-clean-v6-20261126"));
-  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-clean-v6-20261126"));
+  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-mobile-compact-v2"));
+  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-compact-v2"));
   assert(html.indexOf("rakurs-energy-board-20261126.js")<
     html.indexOf("app-parallel-twin-20261125.js"),
     "Energy diagram must load before dashboard app");
