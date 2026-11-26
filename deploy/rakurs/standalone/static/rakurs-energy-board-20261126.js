@@ -132,6 +132,7 @@
       });
       switches.appendChild(button);
     }
+    board.appendChild(switches);
     const toolbar=make(doc,"div","energy-board-toolbar");
     const motion=make(doc,"button","energy-board-motion","");
     motion.type="button";
