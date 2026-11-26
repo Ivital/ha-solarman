@@ -411,7 +411,11 @@ async function run() {
   const batteryWire=byClass(compareHost,"wire-battery")[0];
   assert(batteryWire.className.includes("is-reverse")===false,
     "Selected Deye №2 reports charge, not discharge");
-  assert.equal(byClass(batteryWire,"energy-board-flow-particle").length,3);
+  assert.equal(byClass(batteryWire,"energy-board-flow-particle").length,0,
+    "Opposite battery directions cannot be animated as one confirmed common flow");
+  const oneBatteryWire=byClass(selectedOneHost,"wire-battery")[0];
+  assert.equal(byClass(oneBatteryWire,"energy-board-flow-particle").length,3,
+    "A single Deye archive snapshot may illustrate its reported flow direction");
   batteryWire.listeners.click();
   assert.equal(batteryWire.attributes["aria-pressed"],"true",
     "Flow track is clickable and selects the battery");
