@@ -100,9 +100,12 @@
  }
  function modal(parent,snap,id,trigger,scope){
   if(scope?.dialogClose)scope.dialogClose();
-  const previous=parent.querySelector(".rv7-panel-backdrop");
-  const prevPanel=parent.querySelector(".rv7-panel");
-  if(previous)previous.remove();if(prevPanel)prevPanel.remove();
+  // Mount outside the animated content tree: transformed ancestors change the containing block of fixed descendants.
+  const portal=h("div","rv7 rv7-dialog-root");
+  const background=document.querySelector(".layout");
+  const wasInert=background?.inert||false;
+  if(background)background.inert=true;
+  document.documentElement.classList.add("rv7-dialog-open");
   const backdrop=h("div","rv7-panel-backdrop"),sheet=h("section","rv7-panel");
   sheet.setAttribute("role","dialog");sheet.setAttribute("aria-modal","true");
   sheet.setAttribute("aria-label","Деталі вузла");
@@ -141,9 +144,11 @@
   const link=h("a","rv7-link","Інвертори");link.href="#/parallel";
   const actions=h("div","rv7-panel-actions");actions.appendChild(link);sheet.appendChild(actions);
   const dismiss=()=>{
-   backdrop.remove();sheet.remove();document.removeEventListener("keydown",keyHandler);
+   portal.remove();document.documentElement.classList.remove("rv7-dialog-open");
+   if(background)background.inert=wasInert;
+   document.removeEventListener("keydown",keyHandler);
    if(scope?.dialogClose===dismiss)scope.dialogClose=null;
-   if(trigger?.isConnected&&trigger.focus)trigger.focus();
+   if(trigger?.isConnected&&trigger.focus)trigger.focus({preventScroll:true});
   };
   if(scope)scope.dialogClose=dismiss;
   function keyHandler(e){
@@ -155,7 +160,7 @@
   }
   backdrop.addEventListener("click",dismiss);close.addEventListener("click",dismiss);
   document.addEventListener("keydown",keyHandler);
-  put(parent,backdrop,sheet);close.focus();
+  put(portal,backdrop,sheet);document.body.appendChild(portal);close.focus({preventScroll:true});
  }
  function diagram(snap,onDetails,mobile){
   const g=geometry(mobile);
@@ -389,7 +394,7 @@
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
-   if((explicitSelection||Date.parse(chosenTime)!==latest)&&typeof onFrame==="function")onFrame(chosenTime,series);
+   if((explicitSelection||(hasRange&&Date.parse(chosenTime)!==latest))&&typeof onFrame==="function")onFrame(chosenTime,series);
    else if(!explicitSelection)onRestore?.();
    function select(index){
     explicitSelection=true;

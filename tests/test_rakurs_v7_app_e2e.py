@@ -307,6 +307,33 @@ def run():
                     context.close()
                     print("V7_INTEGRATED_TEMPLATE_%s=PASS" % width)
 
+                # Regression: animated page ancestors used to capture fixed modal coordinates.
+                server.scenario = "normal"
+                motion_context=browser.new_context(viewport={"width":360,"height":680},locale="uk-UA",reduced_motion="no-preference",is_mobile=True,has_touch=True)
+                motion_page=motion_context.new_page()
+                motion_page.goto(base+"/",wait_until="load")
+                wait_rendered(motion_page)
+                motion_page.wait_for_timeout(400)
+                grid=motion_page.locator(".rv7-mobile [data-node=grid]")
+                grid.scroll_into_view_if_needed()
+                scroll_before=motion_page.evaluate("window.scrollY")
+                grid.tap()
+                sheet=motion_page.locator(".rv7-panel")
+                sheet.wait_for(state="visible")
+                motion_page.wait_for_timeout(250)
+                bounds=sheet.bounding_box()
+                assert bounds and bounds["y"]>=-1 and bounds["y"]+bounds["height"]<=681,bounds
+                assert motion_page.locator("body > .rv7-dialog-root").count()==1
+                assert motion_page.evaluate("window.scrollY")==scroll_before
+                close=sheet.get_by_role("button",name="Закрити деталі")
+                assert close.is_visible()
+                assert close.bounding_box()["y"]>=0
+                close.tap()
+                assert motion_page.locator(".rv7-dialog-root").count()==0
+                assert motion_page.evaluate("window.scrollY")==scroll_before
+                motion_context.close()
+                print("RAKURS_MOBILE_INSPECTOR_VIEWPORT_NO_PAGE_SCROLL=PASS")
+
                 # Every existing internal route, both representative viewports and themes.
                 route_targets = {
                     "pv": ".product-metric-catalog .metric",
