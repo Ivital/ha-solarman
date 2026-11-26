@@ -149,7 +149,8 @@ if __name__ == '__main__':
             assert first_label != after_label, (first_label, after_label)
             assert "Архів" in page.locator(".rv7-card-meta").first.inner_text()
             page.screenshot(path=str(OUT / "mobile_archive_cursor.png"), full_page=True)
-            play = page.get_by_role("button", name="Відтворити архів")
+            play = page.locator(".rv7-play")
+            assert "Відтворити архів" in play.inner_text()
             play.click()
             assert play.get_attribute("aria-pressed") == "true"
             old = page.locator(".rv7-time-control input[type='range']").input_value()
