@@ -24,7 +24,7 @@ TEMPLATES = ROOT / "deploy/rakurs/standalone/templates"
 OUT = Path(os.environ.get("RAKURS_V7_SCREENSHOTS", "artifacts/rakurs-v7")).resolve()
 OUT.mkdir(parents=True, exist_ok=True)
 TEMPLATE = None  # assigned by run(); importable by other unittest suites
-MEASURED = "2026-11-25T00:16:18Z"
+MEASURED = "2026-11-25T00:16:18.000786Z"
 D1 = "integration_deye_1"
 D2 = "integration_deye_2"
 PAGE_GROUPS = {"pv": [("pv_power","Сонячна генерація")], "battery": [("battery_soc","Заряд"),("battery_power","Потужність АКБ")], "grid": [("grid_power","Мережа")], "load": [("load_power","Споживання")], "inverter": [("inverter_temperature","Температура")]}
@@ -177,6 +177,11 @@ class Handler(BaseHTTPRequestHandler):
                     point=reading(value,"%" if key=="battery_soc" else "кВт",stamp.isoformat().replace("+00:00","Z"))
                     point.pop("unit")
                     points.append(point)
+            # Include a real latest-row fixture with sub-millisecond MySQL precision.
+            latest_stamp=datetime.fromisoformat(MEASURED.replace("Z","+00:00"))
+            latest_row=device_values(1 if device==D1 else 2).get(key)
+            if latest_row and start<=latest_stamp<=end:
+                points.append({k:v for k,v in latest_row.items() if k!="unit"})
             # Internal archive also uses this route; keep its fixture deterministic.
             if not points and scenario=="normal" and key=="pv_power" and end>datetime(2026,11,25,12,tzinfo=timezone.utc):
                 points=[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(2,"кВт","2026-11-24T11:00:00Z")]
@@ -255,8 +260,10 @@ def run():
                     assert page.get_by_role("button", name="Останній запис").count() == 1
                     assert page.get_by_label("Кінцева дата архіву").input_value()=="2026-11-25"
                     ranges=[parse_qs(urlsplit(path).query) for verb,path in server.calls if urlsplit(path).path=="/api/v1/history/range"]
-                    assert len(ranges)>=6 and all(q.get("end")==["2026-11-25T00:16:18.000Z"] for q in ranges)
+                    assert len(ranges)>=6 and all(q.get("end")==["2026-11-25T00:16:18.000999Z"] for q in ranges)
                     assert {q["device"][0] for q in ranges}=={D1,D2}
+                    assert page.locator(".rv7-chart-date").text_content()==page.locator(".rv7-status-date").text_content()
+                    assert "5,1 кВт" in page.locator(".rv7-chart-stat").first.text_content()
                     assert not any(word in page.locator(".rv7").inner_text().lower() for word in ["тестові дані", "демонстраційний стан"])
                     if width < 600:
                         assert page.locator("body.rakurs-v7-overview").count() == 1

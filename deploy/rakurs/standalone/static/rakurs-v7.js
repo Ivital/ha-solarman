@@ -332,7 +332,7 @@
   ];
   function chart(){
    const present=series.filter(line=>views.has(line.id)&&line.points.length);
-   const timestamps=Array.from(new Set(present.flatMap(line=>
+   const timestamps=Array.from(new Set(series.flatMap(line=>
     line.points.map(p=>p.timestamp)))).sort();
    const layer=s("svg",{viewBox:"0 0 480 180",class:"rv7-chart",
     role:"img","aria-label":"Архівний графік"});
@@ -389,7 +389,8 @@
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
-   if(explicitSelection&&typeof onFrame==="function")onFrame(chosenTime,series);
+   if((explicitSelection||Date.parse(chosenTime)!==latest)&&typeof onFrame==="function")onFrame(chosenTime,series);
+   else if(!explicitSelection)onRestore?.();
    function select(index){
     explicitSelection=true;
     chosenTime=timestamps[Math.max(0,Math.min(timestamps.length-1,index))];
@@ -437,7 +438,7 @@
    if(hasRange)periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
    const got=await Promise.allSettled(planned.map(async item=>{
     if(!item.device?.device_key)return {points:[],truncated:false};
-    const r=hasRange?await config.historyRangeLoader(item.device.device_key,item.key,new Date(endTime-hours*3600000).toISOString(),new Date(endTime).toISOString()):await config.historyLoader(item.device.device_key,item.key,hours);
+    const r=hasRange?await config.historyRangeLoader(item.device.device_key,item.key,new Date(endTime-hours*3600000).toISOString(),new Date(endTime).toISOString().replace(/Z$/,"999Z")):await config.historyLoader(item.device.device_key,item.key,hours);
     const unit=M.read(item.device.values,item.key,item.device).unit||(item.id==="soc"?"%":"кВт");
     return {points:M.normalizeHistory((r?.points||[]).map(p=>({...p,unit:p.unit||unit}))),truncated:!!r?.truncated};
    }));
@@ -495,8 +496,8 @@
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
    snap.data_state==="archive"?"◷ Архів":
     snap.data_state==="live"?"● Онлайн":"○ Немає даних"));
-  if(snap.updated_at_utc)statuses.appendChild(
-   h("span","rv7-pill",M.ukTime(snap.updated_at_utc)));
+  const statusDate=h("span","rv7-pill rv7-status-date",snap.updated_at_utc?M.ukTime(snap.updated_at_utc):"");
+  if(snap.updated_at_utc)statuses.appendChild(statusDate);
   put(top,heading,statuses);app.appendChild(top);
   const tabs=h("div","rv7-tabs");tabs.setAttribute("role","tablist");
   for(const [value,label] of [["overview","Огляд"],["engineer","Інженерний режим"]]){
@@ -552,13 +553,17 @@
       }
       return {...d,values:archive};
     });
+    statusDate.textContent=M.ukTime(timestamp);
+    statuses.firstChild.className="rv7-pill is-archive";statuses.firstChild.textContent="◷ Архів";
     displayed=M.snapshot({...config,devices:deviceRows,
       fallbackValues:{},status:{},now:Date.parse(timestamp)});
     paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
       "Архів · "+M.ukTime(timestamp);
    },()=>{
-    displayed=snap;paint();
+    displayed=snap;statusDate.textContent=snap.updated_at_utc?M.ukTime(snap.updated_at_utc):"";
+    statuses.firstChild.className="rv7-pill is-"+snap.data_state;
+    statuses.firstChild.textContent=snap.data_state==="live"?"● Онлайн":snap.data_state==="archive"?"◷ Архів":"○ Немає даних";paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
       snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
