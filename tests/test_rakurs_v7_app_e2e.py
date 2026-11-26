@@ -161,6 +161,26 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": device_values(1)})
+        elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
+            key=args.get("key",[""])[0]
+            device=args["device"][0]
+            start=datetime.fromisoformat(args["start"][0].replace("Z","+00:00"))
+            end=datetime.fromisoformat(args["end"][0].replace("Z","+00:00"))
+            if device not in {D1,D2} or len(args["device"]) != 1:
+                self.reply({"error":"bad device"},400)
+                return
+            points=[]
+            for i in range(12):
+                stamp=datetime(2026,11,24,tzinfo=timezone.utc)+timedelta(hours=i*2)
+                if start<=stamp<=end:
+                    value=70+i if key=="battery_soc" else i*(.44 if device==D1 else .37)
+                    point=reading(value,"%" if key=="battery_soc" else "кВт",stamp.isoformat().replace("+00:00","Z"))
+                    point.pop("unit")
+                    points.append(point)
+            # Internal archive also uses this route; keep its fixture deterministic.
+            if not points and scenario=="normal" and key=="pv_power" and end>datetime(2026,11,25,12,tzinfo=timezone.utc):
+                points=[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(2,"кВт","2026-11-24T11:00:00Z")]
+            self.reply({"points":[] if scenario=="empty" else points,"truncated":False})
         elif path in {"/api/v1/history", "/api/v1/history/range"}:
             self.reply({"signal":{"unit":"кВт"},"points":[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(4,"кВт","2026-11-24T11:00:00Z"),reading(2,"кВт","2026-11-24T12:00:00Z")],"truncated":False})
         elif path in {"/api/v1/modbus-fields","/api/v1/parallel/modbus-fields"}:
@@ -233,6 +253,10 @@ def run():
                     assert not has_real_ssr(page), "Trusted SSR should be replaced only by verified twin response"
                     assert page.locator(".rv7-chart-stat").count() >= 3
                     assert page.get_by_role("button", name="Останній запис").count() == 1
+                    assert page.get_by_label("Кінцева дата архіву").input_value()=="2026-11-25"
+                    ranges=[parse_qs(urlsplit(path).query) for verb,path in server.calls if urlsplit(path).path=="/api/v1/history/range"]
+                    assert len(ranges)>=6 and all(q.get("end")==["2026-11-25T00:16:18.000Z"] for q in ranges)
+                    assert {q["device"][0] for q in ranges}=={D1,D2}
                     assert not any(word in page.locator(".rv7").inner_text().lower() for word in ["тестові дані", "демонстраційний стан"])
                     if width < 600:
                         assert page.locator("body.rakurs-v7-overview").count() == 1

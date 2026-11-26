@@ -365,3 +365,19 @@ body[data-theme] .topbar .top-actions{align-items:center}
  body[data-theme] .product-section-copy .subtle{font-size:11px}
  body[data-theme] .product-metric-summary{grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr))}
 }
+
+/* Archive calendar and readable two-unit charts. */
+.rv7{--v7-soc:#087fae}
+body[data-theme=dark] .rv7,.rv7[data-theme=dark]{--v7-soc:#78d4fc}
+.rv7-chart-soc{stroke-dasharray:6 4}
+.rv7-calendar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:3px 18px 6px;font-size:11px;color:var(--v7-muted)}
+.rv7-calendar label{font-weight:650}
+.rv7-calendar .rv7-date{padding:5px 7px;border:1px solid var(--v7-line);border-radius:7px;background:var(--v7-card-alt);color:var(--v7-ink);min-width:0;max-width:145px;min-height:34px;color-scheme:light}
+body[data-theme=dark] .rv7-date{color-scheme:dark}
+.rv7-period-label{font-size:10px}
+.rv7-chart-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.rv7-chart-stat{min-width:0}
+.rv7-series-button:has(.rv7-series-dot[style*="v7-soc"]) .rv7-series-dot{border:1px dashed currentColor;background:transparent}
+.rv7-note{display:none}
+@media(min-width:1200px){.rv7-shell{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}.rv7-diagram-card .rv7-schema-wrap{padding:6px 10px 0}.rv7-chart-card .rv7-chart{max-height:220px}}
+@media(max-width:600px){.rv7-calendar{padding:3px 10px}.rv7-chart-stats{gap:6px}.rv7-chart-stat strong{font-size:14px}.rv7-calendar .rv7-date{font-size:11px}}

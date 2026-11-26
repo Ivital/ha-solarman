@@ -254,11 +254,29 @@
    "◷ До фізичної перевірки Modbus адреси та масштаби регістрів залишаються непідтвердженими."));
   container.appendChild(zone);
  }
+ // Convert a calendar date to the end of that day in Europe/Kyiv,
+ // including summer/winter time independently of the browser's timezone.
+ const kyivParts=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+ function kyivDay(t){const p=Object.fromEntries(kyivParts.formatToParts(new Date(t)).map(x=>[x.type,x.value]));return p.year+"-"+p.month+"-"+p.day;}
+ function kyivDayEnd(day){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))return NaN;
+  const target=Date.parse(day+"T00:00:00Z")+86400000;
+  if(!Number.isFinite(target))return NaN;
+  let guess=target;
+  for(let i=0;i<3;i++){const p=Object.fromEntries(kyivParts.formatToParts(new Date(guess)).map(x=>[x.type,x.value]));const local=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute,+p.second);guess+=target-local;}
+  return guess-1;
+ }
  function paintHistory(container,snap,config,scope,onFrame,onRestore){
   const card=h("section","rv7-card rv7-chart-card"),heading=h("div","rv7-card-head");
   heading.appendChild(h("strong","rv7-card-title","Потужність, кВт"));
   const ranges=h("div","rv7-ranges");
   heading.appendChild(ranges);card.appendChild(heading);
+  const latest=Date.parse(snap.updated_at_utc),hasRange=Number.isFinite(latest)&&typeof config.historyRangeLoader==="function";
+  let endTime=hasRange?latest:null;
+  const calendar=h("div","rv7-calendar"),day=h("input","rv7-date");day.type="date";day.setAttribute("aria-label","Кінцева дата архіву");
+  const periodLabel=h("span","rv7-period-label");
+  if(hasRange){day.max=kyivDay(latest);day.value=day.max;put(calendar,h("label","","До дати"),day,periodLabel);card.appendChild(calendar);}
+  day.addEventListener("change",()=>{const selected=kyivDayEnd(day.value);if(!Number.isFinite(selected)){day.value=kyivDay(endTime);return;}endTime=Math.min(latest,selected);day.value=kyivDay(endTime);chosenTime=null;explicitSelection=endTime!==latest;if(!explicitSelection)onRestore?.();fetchSeries();});
   const chartbox=h("div","rv7-chart-box"),legend=h("div","rv7-series");
   const time=h("div","rv7-history-time"),control=h("div","rv7-time-control");
   card.appendChild(chartbox);card.appendChild(legend);
@@ -301,7 +319,7 @@
    ["load","Будинок","load_power",0,"var(--v7-load)"],
    ["battery","АКБ","battery_power",0,"var(--v7-battery)"],
    ["grid","Мережа","grid_power",0,"var(--v7-grid)"],
-   ["soc","SOC","battery_soc",0,"var(--v7-battery)"]
+   ["soc","SOC","battery_soc",0,"var(--v7-soc)"]
   ];
   function chart(){
    const present=series.filter(line=>views.has(line.id)&&line.points.length);
@@ -317,12 +335,14 @@
     chartbox.replaceChildren(h("div","rv7-chart-status",
      failedHistoryRequests?"Архів тимчасово недоступний — помилка API":
        "За цей період немає архівних вимірювань"));
-    control.replaceChildren();time.textContent="";return;
+    const emptyRestore=h("button","rv7-latest","Останній запис");emptyRestore.type="button";
+    emptyRestore.addEventListener("click",()=>{explicitSelection=false;chosenTime=null;onRestore?.();if(hasRange){endTime=latest;day.value=kyivDay(latest);}fetchSeries();});
+    control.replaceChildren(emptyRestore);time.textContent="";return;
    }
    const nums=present.filter(line=>line.id!=="soc").flatMap(line=>line.points.map(p=>p.number));
    const lo=Math.min(0,...nums),hi=Math.max(0,...nums),delta=Math.max(1,hi-lo);
    const first=Date.parse(timestamps[0]),last=Date.parse(timestamps.at(-1));
-   const x=t=>42+(Date.parse(t)-first)/Math.max(1,last-first)*398;
+   const x=t=>first===last?241:42+(Date.parse(t)-first)/(last-first)*398;
    const y=n=>151-(n-lo)/delta*139;
    const socY=n=>151-n/100*139;
    for(const frac of [0,.5,1]){
@@ -330,9 +350,9 @@
     layer.appendChild(s("text",{x:35,y:y(val)+3,"text-anchor":"end",class:"rv7-axis"},M.pretty(val,1)));
     if(present.some(line=>line.id==="soc"))layer.appendChild(s("text",{x:446,y:socY(frac*100)+3,class:"rv7-axis"},Math.round(frac*100)+"%"));
    }
-   for(const frac of [0,.33,.67,1]){
+   for(const frac of first===last?[.5]:[0,.33,.67,1]){
     const stamp=new Date(first+(last-first)*frac);
-    const label=hours>24?stamp.toLocaleDateString("uk-UA",{timeZone:"Europe/Kyiv",day:"2-digit",month:"2-digit"}):stamp.toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"});
+    const label=last-first>86400000?stamp.toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit"}):stamp.toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"});
     layer.appendChild(s("text",{x:42+398*frac,y:174,"text-anchor":frac===0?"start":frac===1?"end":"middle",class:"rv7-axis"},label));
    }
    for(const line of present){
@@ -344,7 +364,7 @@
      const gap=i&&Date.parse(p.timestamp)-Date.parse(line.points[i-1].timestamp)>gapLimit;
      d+=(i&&!gap?" L":" M")+x(p.timestamp).toFixed(1)+" "+(line.id==="soc"?socY(p.number):y(p.number)).toFixed(1);
     }
-    layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"}));
+    layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"+(line.id==="soc"?" rv7-chart-soc":""),"data-series":line.id}));
     if(line.points.length===1){const p=line.points[0];layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3,fill:line.color}));}
    }
    if(!chosenTime||!timestamps.includes(chosenTime))chosenTime=timestamps.at(-1);
@@ -385,7 +405,7 @@
    put(row,h("span","","Час вимірювання"),
     h("span","",timestamps.length+" записів"));
    const restore=h("button","rv7-latest","Останній запис");restore.type="button";
-   restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;chosenTime=timestamps.at(-1);onRestore?.();chart();});
+   restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;onRestore?.();if(hasRange&&endTime!==latest){endTime=latest;day.value=kyivDay(latest);chosenTime=null;fetchSeries();}else{chosenTime=timestamps.at(-1);chart();}});
    control.replaceChildren(row,slider,put(h("div","rv7-playback-actions"),play,restore));
   }
   async function fetchSeries(){
@@ -401,17 +421,20 @@
    const planned=metadata.map(([id,label,key,slot,color])=>({
     id,label,key,color,device:slot?snap.devices.find(x=>Number(x.slot_no)===slot):snap.selected
    }));
+   if(hasRange)periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
    const got=await Promise.allSettled(planned.map(async item=>{
-    if(!item.device?.device_key)return [];
-    const r=await config.historyLoader(item.device.device_key,item.key,hours);
-    return M.normalizeHistory(r?.points||[]);
+    if(!item.device?.device_key)return {points:[],truncated:false};
+    const r=hasRange?await config.historyRangeLoader(item.device.device_key,item.key,new Date(endTime-hours*3600000).toISOString(),new Date(endTime).toISOString()):await config.historyLoader(item.device.device_key,item.key,hours);
+    const unit=M.read(item.device.values,item.key,item.device).unit||(item.id==="soc"?"%":"кВт");
+    return {points:M.normalizeHistory((r?.points||[]).map(p=>({...p,unit:p.unit||unit}))),truncated:!!r?.truncated};
    }));
    if(scope.cancelled||current!==revision)return;
    failedHistoryRequests=got.filter(item=>item.status==="rejected").length;
    historyError.textContent=failedHistoryRequests ?
     "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
+   if(got.some(item=>item.status==="fulfilled"&&item.value.truncated))historyError.textContent+=(historyError.textContent?" · ":"")+"Ліміт записів. Для повної деталізації виберіть коротший період.";
    series=planned.map((item,i)=>({...item,
-    points:got[i].status==="fulfilled"?got[i].value:[]}));
+    points:got[i].status==="fulfilled"?got[i].value.points:[]}));
    for(const line of series){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
@@ -433,8 +456,8 @@
     const button=h("button","rv7-range",label);
     button.type="button";button.setAttribute("aria-pressed",String(hours===value));
     button.addEventListener("click",()=>{
-     hours=value;chosenTime=null;explicitSelection=false;
-     if(typeof onRestore==="function")onRestore();
+     hours=value;chosenTime=null;explicitSelection=hasRange&&endTime!==latest;
+     if(!explicitSelection&&typeof onRestore==="function")onRestore();
      drawRanges();fetchSeries();
     });
     ranges.appendChild(button);

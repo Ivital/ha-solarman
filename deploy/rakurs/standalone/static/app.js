@@ -95,7 +95,7 @@ function message(title, detail, warning) {
 }
 async function api(path, options = {}) {
   const scoped = /^\/(latest|history(?:\/range)?|modbus-fields)(\?|$)/.test(path);
-  const suffix = scoped && state.selectedDeviceKey ?
+  const suffix = scoped && state.selectedDeviceKey && !/[?&]device=/.test(path) ?
     (path.includes("?") ? "&" : "?") +
     "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
   const url = base + path + suffix;
@@ -549,7 +549,9 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
         status:state.status,loading,
         historyLoader:(device,key,frame)=>api("/parallel/history?device="+
           encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
-          "&hours="+encodeURIComponent(frame))
+          "&hours="+encodeURIComponent(frame)),
+        historyRangeLoader:(device,key,start,end)=>api("/history/range?device="+encodeURIComponent(device)+
+          "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end))
       });
       return;
     }
