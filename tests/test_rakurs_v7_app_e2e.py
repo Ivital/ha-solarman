@@ -244,7 +244,8 @@ def run():
                         page.locator(".rv7-mobile [data-node='bus']").click()
                         page.locator(".rv7-panel a[href='#/parallel']").click()
                         page.wait_for_function("location.hash === '#/parallel'")
-                        assert page.locator("body.rakurs-v7-overview").count() == 0
+                        page.wait_for_function(
+                            "!document.body.classList.contains('rakurs-v7-overview')")
                         page.wait_for_function("document.querySelector('#content')?.textContent.includes('Паралельна система Deye')")
                         page.go_back()
                         wait_rendered(page)
