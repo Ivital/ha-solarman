@@ -157,7 +157,7 @@ function prepare(mode = "seeded") {
         {model:"SUN-20K-SG05LP3-EU-SM2",expected_inverters:2,
          registered_inverters:stored.length,devices:stored,aggregate_verified:false}
       : url.includes("/latest?") ? {values:latest}
-      : url.includes("/history?") ? {signal:{unit:"кВт"},points:mode==="single"?history.slice(0,1):history}
+      : url.includes("/history?") ? {signal:{unit:"кВт"},points:mode==="no-recent-history"?[]:mode==="single"?history.slice(0,1):history}
       : url.includes("/config") ? {available:true,enabled:false,interval_seconds:60,worker_online:false,
           devices:stored.map((d,i)=>({...d,id:i+2,display_name:"Deye №"+(i+1),enabled:false,
             transport:"unconfigured",function_code:3,register_count:1,timeout_ms:1500}))}
@@ -229,6 +229,10 @@ async function run() {
   assert(html.includes("hero-layout") && html.includes("insight-strip"));
   console.log("CLARITY_LIGHT_ALL_COMPONENTS_AND_EXTRA_PAGES=PASS");
   assert(colorCss.includes("prefers-reduced-motion"));
+  assert(colorCss.includes(".trend-grid[hidden]") &&
+         colorCss.includes(".mode-indicator.mode-archive"));
+  assert(html.includes('mode-indicator mode-archive'));
+  console.log("CLARITY_ARCHIVE_STATUS_CSS=PASS");
   assert.equal(reference.counts.document_addresses,755);
   assert.equal(reference.counts.profile_addresses,815);
   assert.equal(reference.counts.shared_addresses,290);
@@ -239,8 +243,8 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux2-20261126"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux2-20261126"'));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux3-20261126-1"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux3-20261126-1"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -278,10 +282,15 @@ async function run() {
   assert.equal(byClass(app.main,"quick-link").length,3);
   console.log("CLARITY_NEW_HOME_HIERARCHY=PASS");
   assert.equal(byClass(app.main,"energy-diagram").length,1);
+  assert(descendants(app.main).some(x=>String(x.textContent||"").includes("На дату останнього запису")));
+  assert(descendants(app.main).some(x=>String(x.textContent||"").includes("Без обміну")));
+  assert(!descendants(app.main).some(x=>String(x.textContent||"").includes("За сьогодні")));
+  console.log("CLARITY_ARCHIVED_DAY_AND_ZERO_FLOW=PASS");
   assert.equal(byClass(app.main,"parallel-home-device").length,2);
   assert.equal(byClass(app.main,"trend-card").length,4);
   assert.equal(byClass(app.nav,"nav-group-label").length,3);
-  assert.equal(app.elements["mode-indicator"].textContent,"Дані MySQL");
+  assert.equal(app.elements["mode-indicator"].textContent,"Архів MySQL");
+  assert.equal(app.elements["mode-indicator"].className,"mode-indicator mode-archive");
   assert(app.fetchCalls.some(x=>x.includes("/api/v1/history?key=pv_power")));
   const selectors = byClass(app.main, "parallel-open-link")
     .filter(item => item.tagName === "button");
@@ -410,6 +419,18 @@ async function run() {
   assert(partial.main.childNodes.some(x=>x.ssr&&x.textContent===partial.ssr.textContent));
   assert.equal(byClass(partial.main,"parallel-home-device").length,2);
   console.log("PARALLEL_SURVIVES_INCOMPLETE_LEGACY_API=PASS");
+
+  const emptyTrends=prepare("no-recent-history");
+  await settle();
+  const summary=byClass(emptyTrends.main,"trend-empty-summary")[0];
+  assert(summary && !summary.hidden);
+  assert.equal(byClass(emptyTrends.main,"trend-grid")[0].hidden,true);
+  const next=byClass(summary,"trend-empty-button")[0];
+  assert(next && next.textContent==="Показати 3 доби");
+  next.listeners.click();
+  await settle();
+  assert(emptyTrends.fetchCalls.some(url=>url.includes("/history?key=pv_power")&&url.includes("hours=72")));
+  console.log("CLARITY_EMPTY_TRENDS_COMPACT_AND_72H=PASS");
 
   const onePoint=prepare("single");
   await settle();

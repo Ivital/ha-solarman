@@ -297,3 +297,34 @@ body[data-theme] progress.soc-meter::-moz-progress-bar{background:linear-gradien
 }
 @media(prefers-reduced-motion:reduce){body[data-theme] .quick-link,
  body[data-theme] .nav a,body[data-theme] .theme-toggle{transition:none!important;transform:none!important}}
+
+/* UX v3: concise empty graphs, correct archival database status and tighter spacing. */
+body[data-theme] .trend-grid[hidden],
+body[data-theme] .trend-empty-summary[hidden]{display:none!important}
+body[data-theme] .trend-empty-summary{display:flex;flex-direction:column;align-items:center;
+ text-align:center;gap:9px;padding:22px 17px;margin:12px 0 0;border-radius:17px;
+ background:var(--ux-surface);border:1px solid var(--ux-line);
+ box-shadow:var(--ux-shadow);color:var(--ux-title)}
+body[data-theme] .trend-empty-symbol{width:45px;height:45px;display:grid;place-items:center;
+ background:var(--ux-warn-bg);color:var(--ux-warn);border-radius:14px;font-size:23px}
+body[data-theme] .trend-empty-summary strong{color:var(--ux-title);font-size:16px}
+body[data-theme] .trend-empty-summary p{color:var(--ux-muted);font-size:12px;
+ max-width:630px;margin:0;line-height:1.55}
+body[data-theme] .trend-empty-actions{display:flex;flex-wrap:wrap;
+ align-items:center;justify-content:center;gap:10px;margin-top:6px}
+body[data-theme] .trend-empty-button,
+body[data-theme] .trend-history-link{display:inline-flex;align-items:center;justify-content:center;
+ min-height:40px;padding:10px 15px;border-radius:11px;font:inherit;
+ font-size:12px;font-weight:750;cursor:pointer;text-decoration:none}
+body[data-theme] .trend-empty-button{background:var(--ux-accent);
+ color:var(--ux-surface);border:1px solid var(--ux-accent)}
+body[data-theme] .trend-history-link{background:var(--ux-subtle);
+ color:var(--ux-link);border:1px solid var(--ux-line)}
+body[data-theme] .mode-indicator.mode-archive{background:var(--ux-raised);
+ color:var(--ux-link);border:1px solid var(--ux-line)}
+body[data-theme] .insight-strip{margin-top:11px;margin-bottom:14px}
+body[data-theme] .section-header{margin:20px 0 11px}
+body[data-theme] .quick-actions{margin:13px 0}
+body[data-theme] .card.kpi{min-height:164px}
+body[data-theme] .parallel-device{padding:16px}
+@media(max-width:760px){body[data-theme] .trend-empty-summary{padding:19px 13px}}
