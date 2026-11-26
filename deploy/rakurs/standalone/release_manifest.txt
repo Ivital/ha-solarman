@@ -28,3 +28,5 @@ static/rakurs-pages-20261126.css
 static/rakurs-page-theme-20261126.js
 static/rakurs-energy-board-20261126.js
 static/rakurs-energy-board-20261126.css
+static/rakurs-mobile-nav-20261126.js
+static/rakurs-mobile-nav-20261126.css

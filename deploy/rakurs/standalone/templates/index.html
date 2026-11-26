@@ -11,8 +11,10 @@
   <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1">
   <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-flow-v4-20261126">
   <link rel="stylesheet" href="/static/rakurs-energy-board-20261126.css?v=rakurs-clean-v6-20261126">
+  <link rel="stylesheet" href="/static/rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v1">
   <script defer src="/static/rakurs-energy-board-20261126.js?v=rakurs-clean-v6-20261126"></script>
   <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126"></script>
+  <script defer src="/static/rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v1"></script>
 </head>
 <body data-theme="light">
   <div class="layout">
@@ -125,5 +127,27 @@
       <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
     </div>
   </div>
+
+  <!-- Mobile only. Links use the same hash routes as the desktop sidebar. -->
+  <nav id="mobile-tabs" class="mobile-tabs" aria-label="Мобільна навігація">
+    <a data-route="overview" href="#/overview"><span class="mobile-tab-symbol" aria-hidden="true">⌂</span><span class="mobile-tab-caption">Огляд</span></a>
+    <a data-route="parallel" href="#/parallel"><span class="mobile-tab-symbol" aria-hidden="true">⧉</span><span class="mobile-tab-caption">Інвертори</span></a>
+    <a data-route="pv" href="#/pv"><span class="mobile-tab-symbol" aria-hidden="true">☀</span><span class="mobile-tab-caption">Сонце</span></a>
+    <a data-route="history" href="#/history"><span class="mobile-tab-symbol" aria-hidden="true">◷</span><span class="mobile-tab-caption">Історія</span></a>
+    <button id="mobile-more" type="button" aria-expanded="false" aria-controls="mobile-pages"
+      aria-label="Усі розділи"><span class="mobile-tab-symbol" aria-hidden="true">☷</span><span class="mobile-tab-caption">Розділи</span></button>
+  </nav>
+  <div id="mobile-pages-backdrop" class="mobile-pages-backdrop" hidden></div>
+  <section id="mobile-pages" class="mobile-pages" role="dialog" aria-modal="true"
+    aria-labelledby="mobile-pages-title" hidden>
+    <div class="mobile-pages-head">
+      <h2 id="mobile-pages-title">Усі розділи</h2>
+      <button id="mobile-pages-close" class="mobile-pages-close" type="button"
+        aria-label="Закрити список розділів">✕</button>
+    </div>
+    <input id="mobile-pages-search" class="mobile-pages-search" type="search"
+      placeholder="Знайти розділ…" aria-label="Пошук розділу">
+    <nav id="mobile-page-list" class="mobile-pages-list" aria-label="Повний список розділів"></nav>
+  </section>
 </body>
 </html>
