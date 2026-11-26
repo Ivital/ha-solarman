@@ -191,7 +191,7 @@
   card.appendChild(h("p","rv7-note",
    "Дані MySQL. Натисніть на графік або перемістіть повзунок часу."));
   container.appendChild(card);
-  let series=[],revision=0;
+  let series=[],revision=0,explicitSelection=false;
   const metadata=[
    ["pv1","PV 1","pv_power",1,"var(--v7-pv)"],
    ["pv2","PV 2","pv_power",2,"var(--v7-primary)"],
@@ -233,8 +233,9 @@
     return line.label+": "+(v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—");
    });
    time.textContent=M.ukTime(chosenTime)+"  ·  "+active.join("  |  ");
-   if(typeof onFrame==="function")onFrame(chosenTime,series);
+   if(explicitSelection&&typeof onFrame==="function")onFrame(chosenTime,series);
    function select(index){
+    explicitSelection=true;
     chosenTime=timestamps[Math.max(0,Math.min(timestamps.length-1,index))];
     chart();
    }
@@ -295,7 +296,7 @@
     const button=h("button","rv7-range",label);
     button.type="button";button.setAttribute("aria-pressed",String(hours===value));
     button.addEventListener("click",()=>{
-     hours=value;chosenTime=null;drawRanges();fetchSeries();
+     hours=value;chosenTime=null;explicitSelection=false;drawRanges();fetchSeries();
     });
     ranges.appendChild(button);
    }

@@ -141,6 +141,7 @@ if __name__ == '__main__':
 
             # Inspect historical playback at a chosen timestamp: do not carry newest PV value.
             first_label = page.locator(".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
+        assert "5,1 кВт" in first_label, "Dashboard must retain the latest MySQL reading until the user selects an archive time"
             slider = page.locator(".rv7-time-control input[type='range']")
             slider.fill("0")
             page.wait_for_timeout(100)

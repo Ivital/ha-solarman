@@ -39,6 +39,7 @@ body[data-theme="dark"]{background:#0b1625}
  if(scenario==="partial"){delete d1.values.battery_soc;delete d2.values.grid_power;}
  const start=Date.parse("2026-11-24T00:00:00Z");
  const loader=async(device,key,hours)=>{
+  if(scenario==="empty")return {points:[]};
   const n=hours>=168?44:hours>=72?32:24;
   const points=Array.from({length:n},(_,i)=>{
    const hour=i/(n-1)*hours;
