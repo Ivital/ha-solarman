@@ -35,12 +35,13 @@
     const doc = root.document;
     const tabs = doc.getElementById("mobile-tabs");
     const more = doc.getElementById("mobile-more");
+    const back = doc.getElementById("mobile-route-back");
     const panel = doc.getElementById("mobile-pages");
     const overlay = doc.getElementById("mobile-pages-backdrop");
     const close = doc.getElementById("mobile-pages-close");
     const input = doc.getElementById("mobile-pages-search");
     const list = doc.getElementById("mobile-page-list");
-    if (!tabs || !more || !panel || !overlay || !close || !input || !list) return;
+    if (!tabs || !more || !back || !panel || !overlay || !close || !input || !list) return;
     // Guard against a second init on a restored page.
     if (tabs.getAttribute("data-ready") === "true") return;
     tabs.setAttribute("data-ready","true");
@@ -81,8 +82,30 @@
     noResults.hidden = true;
     list.appendChild(noResults);
     let previousFocus = null;
+    let activePage = routeOf(root.location.hash);
+    const routeTrail = [];
+    let returningTo = null;
     function setActive() {
       const selected = routeOf(root.location.hash);
+      if (selected !== activePage) {
+        if (returningTo === selected) {
+          returningTo = null;
+        } else if (routeTrail.length && routeTrail[routeTrail.length - 1] === selected) {
+          // Browser Back should unwind the same history, not create a loop.
+          routeTrail.pop();
+        } else {
+          routeTrail.push(activePage);
+          if (routeTrail.length > 24) routeTrail.shift();
+          returningTo = null;
+        }
+        activePage = selected;
+      }
+      back.hidden = selected === "overview" && routeTrail.length === 0;
+      back.disabled = back.hidden;
+      const destination = routeTrail.length ?
+        routeTrail[routeTrail.length - 1] : "overview";
+      back.setAttribute("aria-label","Назад: "+routeMap.get(destination)[1]);
+      back.title="Назад: "+routeMap.get(destination)[1];
       for (const a of quick) {
         const active = a.dataset.route === selected;
         a.classList.toggle("is-active",active);
@@ -130,6 +153,15 @@
         previousFocus.focus();
       }
     }
+    back.addEventListener("click",()=>{
+      const selected = routeOf(root.location.hash);
+      const target = routeTrail.length ? routeTrail.pop() :
+        (selected !== "overview" ? "overview" : null);
+      if (!target || target === selected) return;
+      returningTo = target;
+      toggle(false,false);
+      root.location.hash = "#/" + target;
+    });
     more.addEventListener("click",()=>toggle(panel.hidden));
     close.addEventListener("click",()=>toggle(false));
     overlay.addEventListener("click",()=>toggle(false));

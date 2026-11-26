@@ -680,3 +680,29 @@ body[data-theme] .energy-board .energy-board-hub{gap:8px}
 @media(prefers-reduced-motion:reduce){
  body[data-theme] .energy-board .energy-board-inspector-close{transition:none!important}
 }
+
+/* Mobile V2: reduce empty space in the two PV cards without shrinking values. */
+@media(max-width:600px){
+  body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-sources{
+    grid-template-rows:min-content!important;grid-auto-rows:min-content!important;
+    align-items:start!important}
+  body[data-theme] .energy-board .energy-board-source{
+    height:auto!important;min-height:74px!important;max-height:none!important;
+    padding:8px 7px!important;gap:5px!important;
+    align-items:center!important}
+  body[data-theme] .energy-board .energy-board-source-icon{
+    width:22px!important;font-size:19px!important}
+  body[data-theme] .energy-board .energy-board-source-text{
+    gap:4px!important;min-width:0}
+  body[data-theme] .energy-board .energy-board-source-text small{
+    font-size:10px!important;line-height:1.28!important}
+  body[data-theme] .energy-board .energy-board-source-text strong{
+    font-size:clamp(15px,4.2vw,18px)!important;line-height:1.25!important}
+  body[data-theme] .energy-board:not(.energy-board-ssr) .source-wires{
+    grid-template-rows:37px!important;height:37px!important;
+    max-height:37px!important;min-height:0!important}
+  body[data-theme] .energy-board .source-wires .energy-board-wire{
+    height:37px!important;max-height:37px!important;min-height:0!important}
+  body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+    height:26px!important}
+}
