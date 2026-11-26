@@ -136,7 +136,7 @@
     input.addEventListener("input",filter);
     for (const {a,key} of menuLinks) {
       a.addEventListener("click",()=>{
-        toggle(false,false);
+        toggle(false,true);
         if (routeOf(root.location.hash)===key && typeof root.scrollTo==="function")
           root.scrollTo(0,0);
       });

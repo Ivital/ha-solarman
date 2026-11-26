@@ -112,6 +112,7 @@ const battery=menuLinks.find(a=>a.dataset.route==="battery");
 assert(!battery.hidden);
 battery.trigger("click");
 assert(panel.hidden,"Navigating from sheet must close it");
+assert.equal(document.activeElement,more,"Choosing a route restores focus to visible navigation");
 win.location.hash="#/battery";events.hashchange();
 assert(more.classList.contains("is-active"),"Unpinned page activates More tab");
 assert(more.getAttribute("aria-label").includes("Акумулятор"));
@@ -162,6 +163,7 @@ assert(html.indexOf("rakurs-mobile-nav-20261126.js")>html.indexOf("app-parallel-
   "Navigation must initialize after the main dashboard script");
 assert(css.includes("@media(max-width:760px)")&&css.includes(".sidebar{display:none!important}"));
 assert(css.includes("env(safe-area-inset-bottom"));
+assert(css.includes("max-height:min(72dvh,650px)"));
 assert(css.includes(".workarea")&&css.includes("padding-bottom:calc(76px"));
 assert(css.includes(".mobile-tabs a.is-active"));
 assert(css.includes("@media(min-width:761px)"));
