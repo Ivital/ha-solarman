@@ -193,7 +193,9 @@ def run():
             browser = p.chromium.launch(
                 headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
             try:
-                for width, height, theme in [(390, 844, "light"), (1366, 768, "dark")]:
+                for width, height, theme in [(360, 780, "light"), (390, 844, "light"),
+                                             (412, 915, "dark"), (768, 1024, "light"),
+                                             (1366, 768, "dark"), (1920, 1080, "light")]:
                     server.scenario = "normal"
                     server.calls = []
                     context = browser.new_context(
@@ -229,7 +231,7 @@ def run():
                     assert all(method == "GET" for method, _target in server.calls)
                     assert not any(path.startswith("/api/v1/latest") for _verb, path in server.calls), \
                         "V7 must not depend on legacy single-device /latest"
-                    png = OUT / ("integrated_%s.png" % ("mobile" if width < 600 else "desktop"))
+                    png = OUT / f"integrated_{width}_{theme}.png"
                     page.screenshot(path=str(png), full_page=True, animations="disabled")
                     if width < 600:
                         page.locator(".rv7-mobile [data-node='pv2']").click()
