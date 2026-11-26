@@ -1895,7 +1895,8 @@ async function render() {
   }
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
   let primedValues = null;
-  if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey) {
+  if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey &&
+      !(window.RakursV7 && window.RakursV7.enabled())) {
     // This is the key guard: a failed/stale client API must not replace the
     // successful server-rendered database values with placeholders.
     const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
