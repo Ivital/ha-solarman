@@ -372,7 +372,7 @@ async function run() {
   assert(descendants(house).some(node=>
     String(node.textContent||"").includes("Архів Deye №2")));
   assert(descendants(house).some(node=>
-    String(node.textContent||"").includes("покази двох Deye відрізняються")));
+    String(node.textContent||"").includes("покази Deye різні")));
   house.listeners.click();
   const details=byClass(compareHost,"energy-board-inspector-description")[0].textContent;
   assert(details.includes("Deye №1: 6,4")&&details.includes("Deye №2: 6,816"),
@@ -426,7 +426,7 @@ async function run() {
   assert(!energyBoardCss.includes(".energy-board-wire-lane"));
   assert(energyBoardCss.includes("@media(max-width:600px)"));
   assert(energyBoardCss.includes("prefers-reduced-motion"));
-  assert(energyBoardCss.includes("flow-forward")===false || energyBoardCss.includes("flow-forward"));
+  assert(energyBoardCss.includes("energy-board-flow-head"),"Visible direction tips");
   console.log("CLARITY_STREAM_RESPONSIVE_AND_REDUCED_MOTION=PASS");
   console.log("CLARITY_ONE_COMMON_LOAD_GRID_BATTERY_TWO_SEPARATE_PV=PASS");
   console.log("CLARITY_SHARED_TELEMETRY_DIAGNOSTICS_NO_AGGREGATION=PASS");
