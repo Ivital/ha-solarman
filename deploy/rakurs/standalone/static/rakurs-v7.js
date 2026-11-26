@@ -3,7 +3,7 @@
    No telemetry is fabricated; V7 is the canonical overview. */
 (function(root){
  const M=root.RakursV7Model,NS="http://www.w3.org/2000/svg";
- let mode="overview",hours=24,chosenTime=null;
+ let mode="overview",hours=24,chosenTime=null,motionEnabled=true;
  const views=new Set(["pv1","pv2","load"]);
  const handlers=new WeakMap(),activeScopes=new Set();
  function disposeScope(scope){
@@ -162,19 +162,27 @@
   const svg=s("svg",{viewBox:"0 0 "+g.w+" "+g.h,
    class:"rv7-diagram "+(mobile?"rv7-mobile":"rv7-desktop"),
    role:"group","aria-label":"Енергосистема: два PV, два Deye, одна АКБ, будинок і мережа"});
+  // Moving strokes depict the selected record, not a new measurement.
+  // Positive PV and positive load have an unambiguous displayed direction.
+  // Shared battery/grid signs remain nondirectional unless verified.
   for(const [id,path] of g.paths){
-   const reading=id==="battery"?snap.reports.battery_power.reading:source(snap,id);
-   const supported=reading?.valid && reading.number!==0 && (reading.quality!=="conflicting"||id.startsWith("pv"));
-   const wire=s("path",{d:path,"data-flow":id,
-    class:"rv7-wire "+(supported?"rv7-wire-"+id:"is-unknown")});
+   const pv=id.startsWith("pv"),inv=id.startsWith("inv");
+   const reading=inv?snap.sources[Number(id.slice(-1))-1].reading:id==="battery"?snap.reports.battery_power.reading:source(snap,id);
+   const supported=Boolean(!inv&&reading?.valid&&reading.number!==0);
+   const knownDirection=supported&&(pv||id==="load")&&reading.number>0;
+   const tone=pv||inv?"pv":id;
+   const wire=s("path",{d:path,"data-flow":id,class:"rv7-wire "+(supported?"rv7-wire-"+id:"is-unknown")});
    svg.appendChild(wire);
-   // Only verified PV production has an unambiguous directional meaning here.
-   // Shared power reports are not confirmed system totals and must not imply direction.
-   if((id==="pv1"||id==="pv2")&&supported&&reading.number>0&&reading.register_verified&&reading.quality==="live"){
-    const p=wire.getPointAtLength(wire.getTotalLength()*.6);
-    const q=wire.getPointAtLength(wire.getTotalLength()*.6+1);
-    const angle=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
-    svg.appendChild(s("path",{d:"M-4 -4 L2 0 -4 4",transform:"translate("+p.x+" "+p.y+") rotate("+angle+")",class:"rv7-direction"}));
+   if(supported){
+    // Inverter output has no independently verified net-flow value: neutral pulse only.
+    const direction=knownDirection&&!inv?"forward":"unknown";
+    svg.appendChild(s("path",{d:path,"data-motion":id,"data-direction":direction,
+     "aria-hidden":"true",class:"rv7-flow-animation flow-"+tone+" "+(direction==="forward"?"flow-forward":"flow-pulse")}));
+    if(direction==="forward"){
+     const length=wire.getTotalLength(),p=wire.getPointAtLength(length*.65),q=wire.getPointAtLength(Math.min(length,length*.65+1));
+     const angle=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
+     svg.appendChild(s("path",{d:"M-4 -3 L1 0 -4 3",transform:"translate("+p.x+" "+p.y+") rotate("+angle+")",class:"rv7-direction flow-"+tone,"aria-hidden":"true"}));
+    }
    }
   }
   for(const id of ["pv1","pv2","inv1","inv2","bus","load","battery","grid"]){
@@ -286,6 +294,7 @@
   container.appendChild(card);
   let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
   let failedHistoryRequests=0;
+  let slider=null;
   const historyError=h("p","rv7-history-error");
   historyError.setAttribute("role","status");
   card.insertBefore(historyError,time);
@@ -371,6 +380,7 @@
    const cursor=x(chosenTime);
    layer.appendChild(s("line",{x1:cursor,y1:9,x2:cursor,y2:154,
     class:"rv7-chart-cursor"}));
+   for(const line of present){const p=M.historicalValue(line.points,chosenTime);if(p)layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3.5,fill:line.color,class:"rv7-chart-selection"}));}
    const active=present.map(line=>{
     const v=M.historicalValue(line.points,chosenTime);
     const stat=h("div","rv7-chart-stat");
@@ -387,6 +397,7 @@
    }
    const hit=s("rect",{x:0,y:0,width:480,height:180,class:"rv7-chart-hit"});
    hit.addEventListener("click",e=>{
+    stopPlayback();
     const matrix=layer.getScreenCTM();
     if(!matrix)return;
     const point=layer.createSVGPoint();point.x=e.clientX;point.y=e.clientY;
@@ -396,17 +407,19 @@
     select(best);
    });
    layer.appendChild(hit);chartbox.replaceChildren(layer);
-   const slider=h("input");slider.type="range";
-   slider.min="0";slider.max=String(timestamps.length-1);
-   slider.value=String(timestamps.indexOf(chosenTime));
-   slider.setAttribute("aria-label","Час архівного запису");
-   slider.addEventListener("input",()=>select(Number(slider.value)));
+   if(!slider){
+    slider=h("input");slider.type="range";slider.min="0";
+    slider.setAttribute("aria-label","Час архівного запису");
+    slider.addEventListener("input",()=>{explicitSelection=true;stopPlayback();chosenTime=availableTimes[Number(slider.value)];chart();});
+   }
+   slider.max=String(timestamps.length-1);slider.value=String(timestamps.indexOf(chosenTime));
    const row=h("label");
    put(row,h("span","","Час вимірювання"),
     h("span","",timestamps.length+" записів"));
    const restore=h("button","rv7-latest","Останній запис");restore.type="button";
    restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;onRestore?.();if(hasRange&&endTime!==latest){endTime=latest;day.value=kyivDay(latest);chosenTime=null;fetchSeries();}else{chosenTime=timestamps.at(-1);chart();}});
-   control.replaceChildren(row,slider,put(h("div","rv7-playback-actions"),play,restore));
+   if(!control.contains(slider))control.replaceChildren(row,slider,put(h("div","rv7-playback-actions"),play,restore));
+   else control.querySelector("label").replaceChildren(...Array.from(row.childNodes));
   }
   async function fetchSeries(){
    const current=++revision;
@@ -471,7 +484,7 @@
   if(last)disposeScope(last);
   const scope={cancelled:false,dialogClose:null};handlers.set(host,scope);
   activeScopes.add(scope);
-  const snap=M.snapshot(config),app=h("div","rv7");
+  const snap=M.snapshot(config),app=h("div","rv7"+(motionEnabled?"":" rv7-motion-paused"));
   app.setAttribute("aria-label","Енергосистема Rakurs V7");
   const top=h("header","rv7-top"),heading=h("div","rv7-heading");
   const copy=h("div");
@@ -500,8 +513,13 @@
    const shell=h("div","rv7-shell"),leftColumn=h("div","rv7-overview-left");
    const diagramCard=h("section","rv7-card rv7-diagram-card");
    const dh=h("div","rv7-card-head");
-   put(dh,h("strong","rv7-card-title","Енергопотоки"),
-    h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"));
+   const headActions=h("div","rv7-flow-head-actions");
+   const motion=h("button","rv7-motion-toggle",motionEnabled?"Пауза руху":"Увімкнути рух");
+   motion.type="button";motion.setAttribute("aria-pressed",String(motionEnabled));
+   motion.setAttribute("aria-label","Анімація енергопотоків");
+   motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;app.classList.toggle("rv7-motion-paused",!motionEnabled);motion.setAttribute("aria-pressed",String(motionEnabled));motion.textContent=motionEnabled?"Пауза руху":"Увімкнути рух";});
+   put(headActions,h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"),motion);
+   put(dh,h("strong","rv7-card-title","Енергопотоки"),headActions);
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
    let displayed=snap;
@@ -573,5 +591,5 @@
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
-  reset:()=>{mode="overview";hours=24;chosenTime=null;}});
+  reset:()=>{mode="overview";hours=24;chosenTime=null;motionEnabled=true;}});
 })(window);

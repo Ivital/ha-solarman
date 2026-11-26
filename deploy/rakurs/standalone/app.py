@@ -15,7 +15,7 @@ from decimal import Decimal
 from pathlib import Path
 
 import pymysql
-from flask import Flask, abort, g, jsonify, render_template, request
+from flask import Flask, abort, g, jsonify, render_template, request, redirect, url_for
 from .parallel_support import MODEL as PARALLEL_MODEL, SIGNAL_KEYS as PARALLEL_SIGNAL_KEYS, describe_topology
 from .mysql_transport import mysql_tls_options, mysql_transport_state
 
@@ -212,6 +212,10 @@ def selected_overview_device_id():
 
 @app.get("/")
 def index():
+    if "ux" in request.args:
+        from urllib.parse import urlencode
+        args = [(key, value) for key, value in request.args.items(multi=True) if key != "ux" and not key.startswith("utm_")]
+        return redirect(url_for("index") + ("?" + urlencode(args) if args else ""), code=302)
     selected = selected_overview_device_id()
     readings = []
     if selected is not None:

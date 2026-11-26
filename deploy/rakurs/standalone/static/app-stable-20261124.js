@@ -1912,6 +1912,11 @@ async function render() {
   let v7PreflightFailed = false;
   const v7Overview = state.route === "overview" &&
     Boolean(window.RakursV7 && window.RakursV7.enabled());
+  if(state.route==="overview"&&!v7Overview&&document.body?.getAttribute?.("data-interface")==="rakurs"){
+    restoreServerReadings();
+    message("Огляд тимчасово недоступний","Збережені серверні показники залишено. Оновіть сторінку.",true);
+    return;
+  }
   // Full application toolbar becomes compact only for the V7 overview.
   // Other routes and V6 retain their original presentation.
   if (typeof document.body?.classList?.toggle === "function")
@@ -1931,7 +1936,7 @@ async function render() {
       if (typeof document.body?.classList?.remove === "function")
         document.body.classList.remove("rakurs-v7-overview");
       restoreServerReadings();
-      message("V7 тимчасово недоступний",
+      message("Огляд тимчасово недоступний",
         "Не вдалося підтвердити читання двох Deye. Збережено серверні показники MySQL.", true);
       return;
     }

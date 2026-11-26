@@ -381,3 +381,34 @@ body[data-theme=dark] .rv7-date{color-scheme:dark}
 .rv7-note{display:none}
 @media(min-width:1200px){.rv7-shell{grid-template-columns:minmax(0,1.25fr) minmax(0,1fr)}.rv7-diagram-card .rv7-schema-wrap{padding:6px 10px 0}.rv7-chart-card .rv7-chart{max-height:220px}}
 @media(max-width:600px){.rv7-calendar{padding:3px 10px}.rv7-chart-stats{gap:6px}.rv7-chart-stat strong{font-size:14px}.rv7-calendar .rv7-date{font-size:11px}}
+
+/* One motion system: selected archive record or verified current state, never invented flow. */
+.rv7-flow-head-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap;justify-content:flex-end}
+.rv7-motion-toggle{font-size:11px!important;min-height:32px;padding:4px 9px;border-radius:7px;border:1px solid var(--v7-line);background:var(--v7-card-alt);color:var(--v7-primary)}
+.rv7-flow-animation{fill:none;stroke-width:3;stroke-linecap:round;pointer-events:none}
+.rv7-flow-animation.flow-forward{stroke-dasharray:3 16;animation:rv7-energy-travel 1.25s linear infinite}
+.rv7-flow-animation.flow-pulse{stroke-dasharray:2 5;animation:rv7-energy-pulse 2s ease-in-out infinite}
+.rv7-flow-animation.flow-pv,.rv7-direction.flow-pv{stroke:var(--v7-pv)}
+.rv7-flow-animation.flow-load,.rv7-direction.flow-load{stroke:var(--v7-load)}
+.rv7-flow-animation.flow-battery{stroke:var(--v7-battery)}
+.rv7-flow-animation.flow-grid{stroke:var(--v7-grid)}
+.rv7-diagram .rv7-wire-load,.rv7-diagram .rv7-wire-battery,.rv7-diagram .rv7-wire-grid{opacity:.4}
+.rv7-motion-paused .rv7-flow-animation{animation-play-state:paused}
+.rv7-diagram [data-node] .rv7-equipment{transition:filter .2s ease}
+.rv7-diagram [data-node]:hover .rv7-equipment,.rv7-diagram [data-node]:focus-visible .rv7-equipment{filter:drop-shadow(0 2px 4px #1768df60)}
+.rv7-chart-selection{stroke:var(--v7-card);stroke-width:1.5;pointer-events:none}
+.rv7-panel{animation:rv7-inspector-enter .2s ease-out}
+.rv7-panel-backdrop{animation:rv7-backdrop-enter .2s ease-out}
+@keyframes rv7-energy-travel{to{stroke-dashoffset:-19}}
+@keyframes rv7-energy-pulse{0%,100%{opacity:.35}50%{opacity:1}}
+@keyframes rv7-inspector-enter{from{opacity:0;transform:translateX(12px)}to{opacity:1;transform:translateX(0)}}
+@keyframes rv7-backdrop-enter{from{opacity:0}to{opacity:1}}
+@media(max-width:600px){.rv7-flow-head-actions{gap:3px}.rv7-motion-toggle{padding:3px 6px;font-size:10px!important}.rv7-panel{animation-name:rv7-sheet-enter}}
+@keyframes rv7-sheet-enter{from{opacity:0;transform:translateY(15px)}to{opacity:1;transform:translateY(0)}}
+@media(prefers-reduced-motion:reduce){.rv7 *{animation:none!important;transition:none!important}}
+body[data-theme] .rakurs-server-fallback{max-width:100%;margin:0 auto}
+body[data-theme] .rakurs-server-fallback .cards-main{margin:12px 0}
+body[data-theme] .rakurs-server-fallback>p{font-size:12px;color:var(--ux-muted)}
+body[data-theme].rakurs-v7-overview .topbar .mode-indicator{display:none}
+body[data-theme].rakurs-v7-overview .topbar .updated{display:none}
+body[data-theme].rakurs-v7-overview .side-bottom{display:none}

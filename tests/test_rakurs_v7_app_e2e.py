@@ -367,7 +367,7 @@ def run():
                         "() => !!document.querySelector('.banner.warning')", timeout=20000)
                     assert has_real_ssr(page), scenario + ": trusted SSR was erased"
                     assert not page.locator(".v7-host").count()
-                    assert "V7 тимчасово недоступний" in page.locator("#content").text_content()
+                    assert "Огляд тимчасово недоступний" in page.locator("#content").text_content()
                     page.screenshot(path=str(OUT / ("integrated_" + scenario + ".png")),
                                     full_page=True)
                     context.close()

@@ -252,6 +252,28 @@ if __name__ == '__main__':
             assert "0 кВт" in page.locator(".rv7-mobile [data-node='pv1']").text_content()
             print("V7_BROWSER_ZERO_VS_MISSING=PASS")
 
+            # A real animated SVG moves only recorded nonzero energy branches.
+            animated = browser.new_context(viewport={"width":390,"height":844}, reduced_motion="no-preference")
+            ap=animated.new_page()
+            ap.goto(FIXTURE,wait_until="load")
+            ready(ap)
+            flow=ap.locator(".rv7-mobile [data-motion=pv1]")
+            assert flow.count()==1
+            assert flow.get_attribute("data-direction")=="forward"
+            assert flow.evaluate("(e)=>getComputedStyle(e).animationName")=="rv7-energy-travel"
+            initial=flow.evaluate("(e)=>getComputedStyle(e).strokeDashoffset")
+            ap.wait_for_timeout(450)
+            assert initial!=flow.evaluate("(e)=>getComputedStyle(e).strokeDashoffset")
+            assert ap.locator(".rv7-mobile [data-motion=grid]").count()==0
+            ap.get_by_role("button",name="Анімація енергопотоків").click()
+            assert flow.evaluate("(e)=>getComputedStyle(e).animationPlayState")=="paused"
+            ap.get_by_role("button",name="Анімація енергопотоків").click()
+            assert flow.evaluate("(e)=>getComputedStyle(e).animationPlayState")=="running"
+            ap.emulate_media(reduced_motion="reduce")
+            assert flow.evaluate("(e)=>getComputedStyle(e).animationName")=="none"
+            animated.close()
+            print("RAKURS_REAL_ANIMATION_DIRECTION_PAUSE_REDUCED_MOTION=PASS")
+
             # Responsive rules respect OS motion preferences; no animated fake telemetry.
             state = page.evaluate("""() => ({
               animation: getComputedStyle(document.querySelector('.rv7-flow-foot')).animationName,

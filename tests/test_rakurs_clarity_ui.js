@@ -230,20 +230,14 @@ async function run() {
   assert(deyeHtml.includes("/static/rakurs-pages-20261126.css"));
   assert(loginHtml.includes('id="page-theme-toggle"'));
   assert(deyeHtml.includes('id="page-theme-toggle"'));
-  assert(html.includes("energy-board-ssr") && html.includes("insight-strip"));
+  assert(html.includes("rakurs-server-fallback") && !html.includes("insight-strip"));
   assert(!html.includes("Як рухається енергія"));
   assert(!html.includes("ЕНЕРГІЯ НА ОДНОМУ ЕКРАНІ"));
   assert(!html.includes("energy-board-disclaimer"));
-  assert(html.includes('>◷ Архів</span>'));
-  assert(html.indexOf("energy-board-ssr")<html.indexOf("cards cards-main"),
-    "System diagram must be first, before KPI cards");
-  assert(html.includes("/static/rakurs-energy-board-20261126.js"));
-  assert(html.includes("/static/rakurs-energy-board-20261126.css"));
-  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-premium-flow-v3"));
-  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-compact-v2"));
-  assert(html.indexOf("rakurs-energy-board-20261126.js")<
-    html.indexOf("app-parallel-twin-20261125.js"),
-    "Energy diagram must load before dashboard app");
+  assert(html.includes("rakurs-server-fallback"));
+  assert(!html.includes("/static/rakurs-energy-board-20261126.js"));
+  assert(!html.includes("/static/rakurs-energy-board-20261126.css"));
+  assert(html.indexOf("rakurs-v7.js")<html.indexOf("app-parallel-twin-20261125.js"));
   assert(energyBoardCss.includes(".energy-board-inspector[hidden]"));
   assert(energyBoardCss.includes(".energy-board .energy-board-wire-title,"));
   console.log("CLARITY_MINIMAL_BOARD_NO_EXPLANATORY_TEXT=PASS");
@@ -251,7 +245,7 @@ async function run() {
     energyBoardCss.includes("prefers-reduced-motion"));
   console.log("CLARITY_SYSTEM_DIAGRAM_FIRST_ASSETS=PASS");
   assert(html.includes('id="refresh-data"'));
-  assert(html.includes("dashboard-toolbar-ssr"));
+  assert(!html.includes("dashboard-toolbar-ssr"));
   assert(colorCss.includes(".dashboard-options") && colorCss.includes(".nav-search") &&
     colorCss.includes(".refresh-data"));
   assert(colorCss.includes("@keyframes rakurs-ui-reveal"));
@@ -276,7 +270,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126-product2"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261126-product3"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
