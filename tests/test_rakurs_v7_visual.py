@@ -272,7 +272,20 @@ if __name__ == '__main__':
             assert flow.evaluate("(e)=>getComputedStyle(e).animationPlayState")=="running"
             ap.emulate_media(reduced_motion="reduce")
             assert flow.evaluate("(e)=>getComputedStyle(e).animationName")=="none"
+            for scenario,direction,label in [("archive","forward","Заряд"),("discharge","reverse","Розряд"),("battery-idle","none","Очікування"),("battery-conflict","unknown","Різні звіти")]:
+                ap.goto(FIXTURE+"?scenario="+scenario,wait_until="load")
+                ready(ap)
+                battery=ap.locator(".rv7-mobile .rv7-battery-power")
+                assert label in battery.text_content()
+                assert battery.get_attribute("data-battery-state")==direction
+                arrow=ap.locator(".rv7-mobile [data-arrow=battery]")
+                if direction in {"forward","reverse"}:
+                    assert arrow.count()==1 and arrow.get_attribute("data-direction")==direction
+                else:
+                    assert arrow.count()==0
+                assert ap.locator(".rv7-mobile [data-motion=battery]").count()==(0 if direction=="none" else 1)
             animated.close()
+            print("RAKURS_BATTERY_CHARGE_DISCHARGE_IDLE_CONFLICT=PASS")
             print("RAKURS_REAL_ANIMATION_DIRECTION_PAUSE_REDUCED_MOTION=PASS")
 
             # Responsive rules respect OS motion preferences; no animated fake telemetry.

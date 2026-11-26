@@ -433,3 +433,13 @@ html.rv7-dialog-open,html.rv7-dialog-open body{overflow:hidden;overscroll-behavi
  .rv7-dialog-root .rv7-panel-header{top:-12px}
  .rv7-dialog-root .rv7-panel{animation-name:rv7-sheet-enter}
 }
+
+/* Signed battery/grid flows follow the selected Deye report. */
+.rv7-flow-animation.flow-reverse{stroke-width:3.5;stroke-dasharray:6 17;animation:rv7-energy-travel 1.25s linear infinite reverse}
+.rv7-flow-animation.flow-battery,.rv7-direction.flow-battery{stroke:var(--v7-battery);color:var(--v7-battery)}
+.rv7-flow-animation.flow-grid,.rv7-direction.flow-grid{stroke:var(--v7-grid);color:var(--v7-grid)}
+.rv7-battery-power{font-size:12px;font-weight:720;fill:var(--v7-battery)}
+.rv7-battery-power[data-battery-state=unknown],.rv7-battery-power[data-battery-state=none]{fill:var(--v7-muted)}
+@media(max-width:600px){.rv7-battery-power{font-size:10px}}
+.rv7-motion-paused .rv7-flow-animation{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.rv7-flow-animation{animation:none!important}}

@@ -163,6 +163,21 @@
     }
     return found;
   }
-  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,
+  // Deye convention used by the existing archived profile: positive battery
+  // power = discharge, negative = charge. Positive grid = import.
+  // These are directions of the selected report, not an aggregate measurement.
+  function sharedFlow(report,key){
+    const reading=report?.reading;
+    if(!reading?.valid)return {direction:"none",label:"Немає даних"};
+    if(reading.number===0)return {direction:"none",label:"Очікування"};
+    const opposing=(report.reports||[]).some(item=>item.valid&&item.number!==0&&
+      item.unit===reading.unit&&Math.sign(item.number)!==Math.sign(reading.number));
+    const incompatible=(report.reports||[]).some(item=>item.valid&&item.unit!==reading.unit);
+    if(opposing||incompatible)return {direction:"unknown",label:"Різні звіти"};
+    const incoming=reading.number>0;
+    return {direction:incoming?"reverse":"forward",
+      label:key==="battery_power"?(incoming?"Розряд":"Заряд"):(incoming?"Імпорт":"Експорт")};
+  }
+  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,
     historicalValue,differing,POWER_KEYS,SHARED_KEYS});
 });

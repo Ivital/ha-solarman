@@ -116,6 +116,7 @@
   sheet.appendChild(h("div","rv7-panel-big",id==="bus"?"Логічна енергетична шина":id.startsWith("inv")?labels[id]:M.fmt(reading)));
   if(id!=="bus"&&!id.startsWith("inv")){
    const data=[
+    ...(id==="battery"?[["Потужність АКБ",M.fmt(snap.reports.battery_power.reading)],["Напрямок",M.sharedFlow(snap.reports.battery_power,"battery_power").label]]:id==="grid"?[["Напрямок",M.sharedFlow(snap.reports.grid_power,"grid_power").label]]:[]),
     ["Джерело",reading?.slot_no?"Deye №"+reading.slot_no:"Не підтверджено"],
     ["Дата запису",M.ukTime(reading?.observed_at_utc)],
     ["Достовірність",reading?.quality||"missing"],
@@ -169,7 +170,7 @@
    role:"group","aria-label":"Енергосистема: два PV, два Deye, одна АКБ, будинок і мережа"});
   // Moving strokes depict the selected record, not a new measurement.
   // Positive PV and positive load have an unambiguous displayed direction.
-  // Shared battery/grid signs remain nondirectional unless verified.
+  // Battery/grid use the existing Deye sign convention, with disagreement guarded.
   for(const [id,path] of g.paths){
    const pv=id.startsWith("pv"),inv=id.startsWith("inv");
    const reading=inv?snap.sources[Number(id.slice(-1))-1].reading:id==="battery"?snap.reports.battery_power.reading:source(snap,id);
@@ -180,13 +181,13 @@
    svg.appendChild(wire);
    if(supported){
     // Inverter output has no independently verified net-flow value: neutral pulse only.
-    const direction=knownDirection&&!inv?"forward":"unknown";
+    const direction=id==="battery"?M.sharedFlow(snap.reports.battery_power,"battery_power").direction:id==="grid"?M.sharedFlow(snap.reports.grid_power,"grid_power").direction:knownDirection?"forward":"unknown";
     svg.appendChild(s("path",{d:path,"data-motion":id,"data-direction":direction,
-     "aria-hidden":"true",class:"rv7-flow-animation flow-"+tone+" "+(direction==="forward"?"flow-forward":"flow-pulse")}));
-    if(direction==="forward"){
+     "aria-hidden":"true",class:"rv7-flow-animation flow-"+tone+" "+(direction==="forward"?"flow-forward":direction==="reverse"?"flow-reverse":"flow-pulse")}));
+    if(direction==="forward"||direction==="reverse"){
      const length=wire.getTotalLength(),p=wire.getPointAtLength(length*.65),q=wire.getPointAtLength(Math.min(length,length*.65+1));
-     const angle=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
-     svg.appendChild(s("path",{d:"M-4 -3 L1 0 -4 3",transform:"translate("+p.x+" "+p.y+") rotate("+angle+")",class:"rv7-direction flow-"+tone,"aria-hidden":"true"}));
+     const angle=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI+(direction==="reverse"?180:0);
+     svg.appendChild(s("path",{d:"M-4 -3 L1 0 -4 3",transform:"translate("+p.x+" "+p.y+") rotate("+angle+")",class:"rv7-direction flow-"+tone,"data-arrow":id,"data-direction":direction,"aria-hidden":"true"}));
     }
    }
   }
@@ -221,7 +222,11 @@
     const labelY=y+(sidePV?20:right?27:mobile?49:66),valueY=labelY+(mobile?19:25);
     group.appendChild(s("text",{x:tx,y:labelY,"text-anchor":anchor,class:"rv7-node-label"},title));
     group.appendChild(s("text",{x:tx,y:valueY,"text-anchor":anchor,class:"rv7-node-value",style:"font-size:"+(mobile?17:25)+"px"},M.fmt(reading)));
-    if(id==="battery")group.appendChild(s("text",{x:tx,y:valueY+13,"text-anchor":anchor,class:"rv7-bus-meta"},M.fmt(snap.reports.battery_power.reading)));
+    if(id==="battery"){
+     const power=snap.reports.battery_power.reading,flow=M.sharedFlow(snap.reports.battery_power,"battery_power");
+     const magnitude=power.valid?M.fmt({...power,number:Math.abs(power.number)}):"—";
+     group.appendChild(s("text",{x:tx,y:valueY+15,"text-anchor":anchor,class:"rv7-battery-power","data-battery-state":flow.direction},magnitude+" · "+flow.label));
+    }
    }
    const activate=()=>onDetails(id,group);
    group.addEventListener("click",activate);

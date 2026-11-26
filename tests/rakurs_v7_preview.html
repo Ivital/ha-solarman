@@ -36,6 +36,9 @@ body[data-theme="dark"]{background:#0b1625}
  const scenario=p.get("scenario")||"archive";
  if(scenario==="empty"){d1.values={};d2.values={};}
  if(scenario==="zero"){d1.values.pv_power=r(0);d2.values.pv_power=r(0);}
+ if(scenario==="discharge"){d1.values.battery_power=r(1.38);d2.values.battery_power=r(1.4);}
+ if(scenario==="battery-idle"){d1.values.battery_power=r(0);d2.values.battery_power=r(0);}
+ if(scenario==="battery-conflict"){d2.values.battery_power=r(1.4);}
  if(scenario==="partial"){delete d1.values.battery_soc;delete d2.values.grid_power;}
  const start=Date.parse("2026-11-24T00:00:00Z");
  const loader=async(device,key,hours)=>{

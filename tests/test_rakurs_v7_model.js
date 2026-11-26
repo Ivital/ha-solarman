@@ -116,3 +116,11 @@ assert.equal(generated.data_state,"archive");
 assert.notEqual(generated.sources[0].reading.quality,"generated");
 assert.equal(M.normalizeHistory([{timestamp:when,number:1,quality:"generated"}])[0].quality,"generated");
 console.log("V7_ARCHIVE_PROVENANCE_RETAINED=PASS");
+
+assert.deepEqual(M.sharedFlow(M.snapshot(cfg).reports.battery_power,"battery_power"),{direction:"forward",label:"Заряд"});
+const discharge=[{...d1,values:{...d1.values,battery_power:row(1.38)}},{...d2,values:{...d2.values,battery_power:row(1.4)}}];
+assert.deepEqual(M.sharedFlow(M.snapshot({...cfg,devices:discharge}).reports.battery_power,"battery_power"),{direction:"reverse",label:"Розряд"});
+assert.equal(M.sharedFlow(M.snapshot({...cfg,devices:[d1,discharge[1]]}).reports.battery_power,"battery_power").direction,"unknown");
+assert.equal(M.sharedFlow(M.snapshot(cfg).reports.grid_power,"grid_power").direction,"none");
+assert.equal(M.sharedFlow(M.snapshot({}).reports.battery_power,"battery_power").label,"Немає даних");
+console.log("RAKURS_SIGNED_BATTERY_DIRECTION=PASS");
