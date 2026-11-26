@@ -242,3 +242,9 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
  border-color:var(--v7-primary)}
 .rv7-play:focus-visible{outline:3px solid var(--v7-primary);outline-offset:2px}
 @media(prefers-reduced-motion:reduce){.rv7-play{transition:none}}
+
+/* Two PV feeds are separate, but belong to the same solar color family. */
+.rv7-diagram .rv7-wire-pv1,
+.rv7-diagram .rv7-wire-pv2{stroke:var(--v7-pv)}
+/* Zero grid exchange is neutral, never a directional purple import/export. */
+.rv7-diagram .rv7-wire.is-unknown{stroke:var(--v7-line)}

@@ -107,8 +107,9 @@
    role:"group","aria-label":"Енергосистема: два PV, два Deye, одна АКБ, будинок і мережа"});
   for(const [id,path] of g.paths){
    const reading=source(snap,id);
+   const supported=reading?.valid && (id!=="grid"||reading.number!==0);
    svg.appendChild(s("path",{d:path,"data-flow":id,
-    class:"rv7-wire "+(id==="bus"||reading?.valid?"rv7-wire-"+id:"is-unknown")}));
+    class:"rv7-wire "+(id==="bus"||supported?"rv7-wire-"+id:"is-unknown")}));
   }
   for(const id of ["pv1","pv2","bus","load","battery","grid"]){
    const [x,y,w,height]=g.boxes[id],small=w<130,reading=source(snap,id);

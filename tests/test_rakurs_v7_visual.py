@@ -77,6 +77,10 @@ if __name__ == '__main__':
         assert result["boxW"] > 300 and result["boxH"] <= 330
         assert set(result["nodeIds"]) == {"pv1", "pv2", "bus", "load", "battery", "grid"}
         assert all("M" in path["d"] for path in result["paths"])
+    assert page.locator(selector + " [data-flow='pv1'].rv7-wire-pv1").count() == 1
+    assert page.locator(selector + " [data-flow='pv2'].rv7-wire-pv2").count() == 1
+    assert page.locator(selector + " [data-flow='grid'].is-unknown").count() == 1
+
 
 
     with sync_playwright() as p:
