@@ -308,6 +308,8 @@ def run():
                         assert page.locator("body").get_attribute("data-route") == route
                         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), f"Overflow: {route}/{width}"
                         assert not errors,(route,errors)
+                        if width < 761:
+                            assert page.locator(".topbar").bounding_box()["height"] <= 110, f"Oversized header: {route}"
                         nav_icon = page.locator(".mobile-tabs a[data-route=overview] .mobile-tab-symbol" if width < 761 else '.nav a[href="#/overview"] .symbol').first
                         assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
                         if route in {"history","archive","trends","parallel"}:

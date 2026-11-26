@@ -201,28 +201,28 @@ body[data-theme] .mobile-tabs{box-shadow:0 -2px 12px #12203312}
 /* Keep the toolbar functional and visually quiet: accessible text stays in DOM. */
 body[data-theme].rakurs-v7-overview .topbar .mobile-heading-row{display:none}
 body[data-theme].rakurs-v7-overview .topbar .top-actions{width:100%;justify-content:flex-end;gap:8px}
-body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button){
+body[data-theme] .topbar :is(.theme-toggle,.refresh-data,.logout-button){
  font-size:0!important;width:38px;min-width:38px;height:38px;min-height:38px!important;padding:0!important;display:inline-grid;place-items:center
 }
-body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button)::before{
+body[data-theme] .topbar :is(.theme-toggle,.refresh-data,.logout-button)::before{
  content:"";display:block;width:19px;height:19px;background:currentColor;mask-repeat:no-repeat;mask-position:center;mask-size:contain
 }
-body[data-theme].rakurs-v7-overview .topbar .theme-toggle::before{
+body[data-theme] .topbar .theme-toggle::before{
  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.9 13.4A9 9 0 0 1 10.6 3.1 9 9 0 1 0 20.9 13.4Z'/%3E%3C/svg%3E")
 }
-body[data-theme=dark].rakurs-v7-overview .topbar .theme-toggle::before{
+body[data-theme=dark] .topbar .theme-toggle::before{
  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19m0-14-1.5 1.5m-11 11L5 19'/%3E%3C/svg%3E")
 }
-body[data-theme].rakurs-v7-overview .topbar .refresh-data::before{
+body[data-theme] .topbar .refresh-data::before{
  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-2l2 2M4 16l2 2a7 7 0 0 0 12-2'/%3E%3C/svg%3E")
 }
-body[data-theme].rakurs-v7-overview .topbar .logout-button::before{
+body[data-theme] .topbar .logout-button::before{
  mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4H5v16h6m3-8h7m-4-4 4 4-4 4'/%3E%3C/svg%3E")
 }
 @media(max-width:760px){
  body[data-theme].rakurs-v7-overview .topbar .top-actions{justify-content:space-between;flex-wrap:nowrap;gap:5px}
  body[data-theme].rakurs-v7-overview .topbar .device-select-wrap{margin-left:auto;min-width:0}
- body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button){width:36px;min-width:36px;height:36px}
+ body[data-theme] .topbar :is(.theme-toggle,.refresh-data,.logout-button){width:36px;min-width:36px;height:36px}
 }
 
 /* PRODUCT WORKSPACES — all application routes use one density and type scale. */
@@ -345,3 +345,23 @@ body[data-theme] .nav a[href="#/registers"],body[data-theme] .mobile-tabs a[data
 body[data-theme] .nav a[href="#/settings"],body[data-theme] .mobile-tabs a[data-route="settings"],body[data-theme] .mobile-menu-link[data-route="settings"]{--product-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.65%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M12%208a4%204%200%201%200%200%208%204%204%200%201%200%200-8M12%202v3m0%2014v3M2%2012h3m14%200h3M5%205l2%202m10%2010%202%202M19%205l-2%202M7%2017l-2%202%22%2F%3E%3C%2Fsvg%3E")}
 body[data-theme] .nav a[href="#/system"],body[data-theme] .mobile-tabs a[data-route="system"],body[data-theme] .mobile-menu-link[data-route="system"]{--product-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.65%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M3%204h18v12H3zM8%2020h8m-4-4v4M7%208h4m-4%204h8%22%2F%3E%3C%2Fsvg%3E")}
 body[data-theme] #mobile-more{--product-nav-icon:url("data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke%3D%22black%22%20stroke-width%3D%221.65%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%3E%3Cpath%20d%3D%22M4%204h6v6H4zM14%204h6v6h-6zM4%2014h6v6H4zM14%2014h6v6h-6z%22%2F%3E%3C%2Fsvg%3E")}
+
+/* Compact actual app header, including every secondary screen. */
+body[data-theme] .topbar .logout-form{margin:0;display:inline-flex;flex:none}
+body[data-theme] .topbar .device-select-wrap{display:flex;align-items:center;gap:6px;font-size:11px;white-space:nowrap}
+body[data-theme] .topbar .device-select-wrap select{min-width:94px;max-width:140px;padding:6px 8px;min-height:34px}
+body[data-theme] .topbar .top-actions{align-items:center}
+@media(max-width:760px){
+ body[data-theme] .topbar{padding:6px 10px;gap:5px;min-height:0}
+ body[data-theme] .topbar .mobile-heading-row{display:flex;align-items:center;gap:8px;min-height:36px;width:100%}
+ body[data-theme] .topbar .mobile-heading-row h1{font-size:17px;line-height:1.2}
+ body[data-theme] .topbar .mobile-heading-row .mobile-route-back:not([hidden]){min-height:34px;height:34px;width:34px}
+ body[data-theme].rakurs-v7-overview .topbar .mobile-heading-row{display:none}
+ body[data-theme] .topbar .top-actions{display:flex;align-items:center;justify-content:flex-start;gap:6px;flex-wrap:nowrap;width:100%}
+ body[data-theme] .topbar .mode-indicator{display:none}
+ body[data-theme] .topbar .device-select-wrap{margin-left:auto;min-width:0}
+ body[data-theme] .topbar :is(.theme-toggle,.refresh-data,.logout-button){width:36px;min-width:36px;height:36px}
+ body[data-theme] .section-header.product-section-heading{margin:4px 0 10px}
+ body[data-theme] .product-section-copy .subtle{font-size:11px}
+ body[data-theme] .product-metric-summary{grid-template-columns:repeat(auto-fit,minmax(min(140px,100%),1fr))}
+}
