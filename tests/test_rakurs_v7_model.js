@@ -87,3 +87,18 @@ assert(!M.snapshot(cfg).sources[0].reading.register_verified);
 assert.equal(M.read({pv_power:{...row(5),register_address:512}},"pv_power",d1)
   .register_verified,false);
 console.log("V7_UNVERIFIED_REGISTERS_REMAIN_UNVERIFIED=PASS");
+
+const failedD2={...d2,values:{},telemetry_error:true};
+const partial=M.snapshot({...cfg,devices:[d1,failedD2],
+  fallbackValues:{load_power:row(999),battery_soc:row(99,"%")}});
+assert.equal(partial.sources[1].reading.valid,false);
+assert.equal(partial.reports.load_power.reading.number,6.4);
+assert(partial.warnings.some(x=>x.includes("Не вдалося прочитати покази Deye №2")));
+const failedSelected=M.snapshot({...cfg,devices:[{...d1,values:{},telemetry_error:true},d2],
+  selectedDeviceKey:"deye_1",fallbackValues:{load_power:row(888)}});
+assert.equal(failedSelected.reports.load_power.reading.valid,false,
+  "Legacy unscoped fallback must never impersonate missing selected-device readings");
+const unidentified=M.snapshot({devices:[],fallbackValues:{load_power:row(8)}});
+assert.equal(unidentified.reports.load_power.reading.scope,"unscoped");
+assert(unidentified.warnings.some(x=>x.includes("Немає підтвердженої прив'язки")));
+console.log("V7_PARTIAL_API_FAILURE_NEVER_RELABELS_FALLBACK_AS_DEVICE=PASS");
