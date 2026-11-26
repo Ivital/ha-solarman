@@ -79,8 +79,10 @@ function createEmpty(title, detail) {
   return box;
 }
 function section(title, caption) {
-  const row = element("div", "section-header");
-  add(row, element("h2", "", title), element("span", "subtle", caption || ""));
+  const row = element("div", "section-header product-section-heading");
+  const copy=element("div","product-section-copy");
+  add(copy,element("h2","",title),element("span","subtle",caption||""));
+  row.appendChild(copy);
   main.appendChild(row);
   return row;
 }
@@ -213,7 +215,7 @@ function addStatusMessage() {
       "Перевірте окремий read-only обліковий запис і локальний сервіс Rakurs. Значення не підставляються.", true);
   } else if (!state.status.has_real_samples) {
     message("Очікування показників Deye",
-      "Структура бази rakurs готова, але даних із підтвердженого пристрою ще немає. «—» означає відсутність даних, не нуль.");
+      "Поки немає збережених показників. «—» означає відсутність значення, не нуль.");
   }
 }
 function reading(values, key) {
@@ -715,7 +717,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
         return;
       }
       const points = result.value.points || [];
-      const numeric = points.filter(p => p.value_decimal !== null);
+      const numeric = points.filter(p => p.value_decimal != null && p.value_decimal !== "" && Number.isFinite(Number(p.value_decimal)));
       if (!numeric.length) {
         body.appendChild(createEmpty("Немає вимірювань", "За вибраний період записів немає."));
         return;
@@ -767,12 +769,27 @@ async function renderGroup(groups, title, cycle) {
   const count = element("span", "catalog-count");
   controls.appendChild(search);
   controls.appendChild(count);
+  const preferred={pv:["pv_power","pv_energy_today"],battery:["battery_soc","battery_power","battery_voltage","battery_current"],grid:["grid_power","grid_voltage","grid_frequency"],load:["load_power","load_energy_today"],inverter:["inverter_temperature","inverter_power","output_power"]};
+  const priority=(preferred[groups[0]]||[]).map(key=>items.find(item=>item.key===key)).filter(Boolean);
+  const highlight=priority.length?priority:items.filter(item=>values[item.key]?.value_decimal!=null).slice(0,3);
+  if(highlight.length){
+    const overview=element("section","product-metric-summary");
+    for(const metric of highlight){
+      const record=values[metric.key],value=record?.value_decimal;
+      const tile=element("div","product-metric-highlight");
+      add(tile,element("small","",metric.label),
+        element("strong","",value==null?"—":pretty(Number(value),3)+" "+(record.unit||"")),
+        element("span","",record?.observed_at_utc?time(record.observed_at_utc):"Немає запису"));
+      overview.appendChild(tile);
+    }
+    main.appendChild(overview);
+  }
   main.appendChild(controls);
-  const list = element("div", "metric-list");
+  const list = element("div", "metric-list product-metric-catalog");
   const entries = [];
   for (const metric of items) {
     const record = values[metric.key];
-    const hasValue = record && record.value_decimal !== null;
+    const hasValue = record && record.value_decimal != null && record.value_decimal !== "" && Number.isFinite(Number(record.value_decimal));
     const row = element("article", "metric");
     const info = element("div", "metric-info");
     add(info, element("strong", "", metric.label),
@@ -805,70 +822,61 @@ async function renderGroup(groups, title, cycle) {
   filter();
 }
 function svgChart(points, unit) {
-  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
-  svg.setAttribute("class", "chart");
-  svg.setAttribute("viewBox", "0 0 900 280");
-  svg.setAttribute("role", "img");
-  svg.setAttribute("aria-label", "Графік вимірювань з MySQL");
-  const real = points.map((p, index) => ({index, v: Number(p.value_decimal)}))
-    .filter(p => points[p.index].value_decimal !== null && Number.isFinite(p.v));
-  if (!real.length) return createEmpty("Графік без точок", "За вибраний період числових значень у MySQL немає.");
-  const min = Math.min(...real.map(p => p.v));
-  const max = Math.max(...real.map(p => p.v));
-  const span = Math.max(max - min, Math.abs(max) * .08, .1);
-  const low = min - span * .15, high = max + span * .15;
-  for (let i = 0; i < 4; i++) {
-    const line = document.createElementNS(svg.namespaceURI, "line");
-    const y = 40 + i * 66;
-    line.setAttribute("x1", "52"); line.setAttribute("x2", "868");
-    line.setAttribute("y1", String(y)); line.setAttribute("y2", String(y));
-    svg.appendChild(line);
-    const label = document.createElementNS(svg.namespaceURI, "text");
-    label.setAttribute("x", "7"); label.setAttribute("y", String(y + 3));
-    label.textContent = ((high - (high - low) * i / 3).toFixed(2)) + (unit ? " " + unit : "");
-    svg.appendChild(label);
+  const ns="http://www.w3.org/2000/svg";
+  const node=(tag,attrs={},text)=>{const e=document.createElementNS(ns,tag);
+    for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));
+    if(text!==undefined)e.textContent=text;return e;};
+  const real=(points||[]).map(p=>({t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)}))
+    .filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t);
+  if(!real.length)return createEmpty("Графік без точок","За вибраний період числових значень немає.");
+  const svg=node("svg",{class:"chart product-timeseries",viewBox:"0 0 640 226",role:"group",tabindex:0,"aria-label":"Інтерактивний графік. Стрілки ліворуч і праворуч вибирають запис."});
+  const left=55,right=620,top=27,bottom=181;
+  const first=real[0].t,last=real.at(-1).t;
+  const values=real.map(p=>p.v),min=Math.min(...values),max=Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
+  const low=min-span*.12,high=max+span*.12;
+  const x=t=>first===last?(left+right)/2:left+(t-first)/(last-first)*(right-left);
+  const y=v=>bottom-(v-low)/(high-low)*(bottom-top);
+  for(let i=0;i<4;i++){
+    const yy=top+(bottom-top)*i/3;
+    svg.appendChild(node("line",{x1:left,x2:right,y1:yy,y2:yy,class:"product-gridline"}));
+    svg.appendChild(node("text",{x:left-7,y:yy+4,"text-anchor":"end",class:"product-axis"},pretty(high-(high-low)*i/3,2)));
   }
-  if (real.length === 1) {
-    const y = 238 - (real[0].v - low)*198/(high-low);
-    const dot = document.createElementNS(svg.namespaceURI,"circle");
-    dot.setAttribute("cx","460");dot.setAttribute("cy",String(y));
-    dot.setAttribute("r","6");dot.setAttribute("fill","#71e6d8");
-    svg.appendChild(dot);
-    const label=document.createElementNS(svg.namespaceURI,"text");
-    label.setAttribute("x","460");label.setAttribute("y",String(y-16));
-    label.setAttribute("text-anchor","middle");
-    label.textContent=pretty(real[0].v,3)+" "+(unit||"");
-    svg.appendChild(label);
+  if(unit)svg.appendChild(node("text",{x:9,y:13,class:"product-axis"},unit));
+  const intervals=real.slice(1).map((p,i)=>p.t-real[i].t).filter(v=>v>0).sort((a,b)=>a-b);
+  const cadence=intervals.length?intervals[Math.floor((intervals.length-1)/2)]:0;
+  const gap=Math.max(1200000,cadence*3);
+  const segments=[];let segment=[];
+  for(const p of real){if(segment.length&&p.t-segment.at(-1).t>gap){segments.push(segment);segment=[];}segment.push(p);}
+  if(segment.length)segments.push(segment);
+  for(const s of segments){
+    if(s.length===1)svg.appendChild(node("circle",{cx:x(s[0].t),cy:y(s[0].v),r:3.5,class:"product-sample-dot"}));
+    else svg.appendChild(node("polyline",{points:s.map(p=>x(p.t).toFixed(2)+","+y(p.v).toFixed(2)).join(" "),class:"product-series-line"}));
   }
-  const polyline = document.createElementNS(svg.namespaceURI, "polyline");
-  const pointsString = real.map(p => {
-    const x = real.length === 1 ? 460 : 52 + p.index * 816 / Math.max(1, points.length - 1);
-    const y = 238 - (p.v - low) * 198 / (high - low);
-    return x.toFixed(2) + "," + y.toFixed(2);
-  }).join(" ");
-  polyline.setAttribute("points", pointsString);
-  if (real.length > 1) svg.appendChild(polyline);
-  const first = points[real[0].index];
-  const last = points[real[real.length - 1].index];
-  if (first && last) {
-    const labels = real.length === 1 ? [[460,first.observed_at_utc,"middle"]] : [
-      [52, first.observed_at_utc, "start"],
-      [868, last.observed_at_utc, "end"]
-    ];
-    for (const [x, observed, anchor] of labels) {
-      const node = document.createElementNS(svg.namespaceURI, "text");
-      node.setAttribute("x", String(x));
-      node.setAttribute("y", "264");
-      node.setAttribute("text-anchor", anchor);
-      const date = new Date(observed);
-      node.textContent = Number.isNaN(date.getTime()) ? "" :
-        date.toLocaleString("uk-UA", {
-          timeZone: "Europe/Kyiv", day: "2-digit", month: "2-digit",
-          hour: "2-digit", minute: "2-digit"
-        });
-      svg.appendChild(node);
-    }
+  const timeFormat=new Intl.DateTimeFormat("uk-UA",{timeZone:"Europe/Kyiv",...(last-first>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})});
+  const fractions=first===last?[.5]:[0,1/3,2/3,1];
+  for(const f of fractions)svg.appendChild(node("text",{x:left+(right-left)*f,y:205,"text-anchor":f===0?"start":f===1?"end":"middle",class:"product-axis"},timeFormat.format(new Date(first+(last-first)*f))));
+  const cursor=node("line",{y1:top,y2:bottom,class:"product-cursor"});
+  const dot=node("circle",{r:4,class:"product-cursor-dot"});
+  const label=node("text",{x:right,y:14,"text-anchor":"end",class:"product-chart-label"});
+  const tip=node("title");
+  svg.appendChild(cursor);svg.appendChild(dot);svg.appendChild(label);svg.appendChild(tip);
+  let selected=real.length-1;
+  function choose(i){selected=Math.max(0,Math.min(real.length-1,i));const p=real[selected],xx=x(p.t),yy=y(p.v);
+    cursor.setAttribute("x1",xx);cursor.setAttribute("x2",xx);dot.setAttribute("cx",xx);dot.setAttribute("cy",yy);
+    label.textContent=pretty(p.v,3)+(unit?" "+unit:"")+" · "+timeFormat.format(new Date(p.t));
+    tip.textContent=time(new Date(p.t).toISOString())+" — "+pretty(p.v,3)+" "+(unit||"");
   }
+  choose(selected);
+  const interact=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;
+    const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;
+    const xx=p.matrixTransform(matrix.inverse()).x;
+    const target=first+Math.max(0,Math.min(1,(xx-left)/(right-left)))*(last-first);
+    let lowIndex=0,highIndex=real.length-1;
+    while(lowIndex<highIndex){const mid=(lowIndex+highIndex)>>1;if(real[mid].t<target)lowIndex=mid+1;else highIndex=mid;}
+    const i=lowIndex>0&&Math.abs(real[lowIndex-1].t-target)<Math.abs(real[lowIndex].t-target)?lowIndex-1:lowIndex;choose(i);
+  };
+  svg.addEventListener("click",interact);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")interact(e);});
+  svg.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight","Home","End"].includes(e.key)){e.preventDefault();choose(e.key==="Home"?0:e.key==="End"?real.length-1:selected+(e.key==="ArrowLeft"?-1:1));}});
   return svg;
 }
 async function renderHistory(cycle, archived) {
@@ -933,7 +941,7 @@ async function renderHistory(cycle, archived) {
       }
       const unit = result.signal && result.signal.unit || "";
       const stats = element("div", "history-summary");
-      const numericPoints = points.filter(point => point.value_decimal !== null);
+      const numericPoints = points.filter(point => point.value_decimal != null && point.value_decimal !== "" && Number.isFinite(Number(point.value_decimal)));
       const latestNumeric = numericPoints.length ? numericPoints[numericPoints.length - 1] : null;
       add(stats, element("strong", "",
         latestNumeric ? pretty(Number(latestNumeric.value_decimal), 3) + " " + unit : "—"),
@@ -1043,7 +1051,7 @@ async function renderTwinSummary(cycle,preloadedDevices=null) {
     const card = element("article", "parallel-device parallel-home-device");
     const head = element("div", "parallel-device-head");
     add(head, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", "MYSQL"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
     card.appendChild(head);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));
@@ -1139,9 +1147,9 @@ async function renderParallel(cycle) {
       (raw.value.raw_registers || []) : [];
     const info = element("div", "parallel-demo-counters");
     for (const [label, count] of [
-      ["Поля Modbus", fieldList.length],
-      ["Сирі регістри", raw.status === "fulfilled" ? raw.value.total : 0],
-      ["Події", events.status === "fulfilled" ? (events.value.events || []).length : 0]
+      ["Поля Modbus", fields.status === "fulfilled" ? fieldList.length : "—"],
+      ["Сирі регістри", raw.status === "fulfilled" ? raw.value.total : "—"],
+      ["Події", events.status === "fulfilled" ? (events.value.events || []).length : "—"]
     ]) {
       const item = element("div", "parallel-demo-counter");
       add(item, element("strong", "", String(count || 0)),
@@ -1160,8 +1168,8 @@ async function renderParallel(cycle) {
     }
     card.appendChild(chart);
 
-    const rawPanel = element("section", "parallel-raw-viewer");
-    rawPanel.appendChild(element("h3", "", "Регістри Modbus"));
+    const rawPanel = element("details", "parallel-raw-viewer");
+    rawPanel.appendChild(element("summary", "", "Регістри Modbus"));
     const rawArea = element("div", "parallel-raw-table");
     rawPanel.appendChild(rawArea);
     const rawMore = element("button", "more-button", "Показати регістри");
@@ -1206,8 +1214,8 @@ async function renderParallel(cycle) {
         "Поки немає збережених регістрів для цього інвертора."));
     }
 
-    const fieldPanel = element("section", "parallel-raw-viewer parallel-field-viewer");
-    fieldPanel.appendChild(element("h3", "",
+    const fieldPanel = element("details", "parallel-raw-viewer parallel-field-viewer");
+    fieldPanel.appendChild(element("summary", "",
       "Параметри Modbus — " + fieldList.length));
     const fieldArea = element("div", "parallel-raw-table");
     fieldPanel.appendChild(fieldArea);
@@ -1817,7 +1825,7 @@ async function renderArchive(cycle) {
           "Виберіть іншу дату або інший показник."));
         return;
       }
-      resultArea.appendChild(svgChart(points,""));
+      resultArea.appendChild(svgChart(points,response.signal?.unit||""));
       const exportButton=element("button","settings-save","Експорт CSV");
       exportButton.type="button";
       exportButton.disabled=Boolean(response.truncated);
@@ -1839,13 +1847,13 @@ async function renderArchive(cycle) {
       const wrap=element("div","table-wrap");
       const table=element("table","data-table");
       const th=element("tr","");
-      ["Дата й час","Значення","Якість запису"].forEach(x=>
+      ["Дата й час","Значення"].forEach(x=>
         th.appendChild(element("th","",x)));
       const head=element("thead","");head.appendChild(th);table.appendChild(head);
       const body=element("tbody","");
       for(const p of points.slice(-50).reverse()){
         const row=element("tr","");
-        [time(p.observed_at_utc),p.value_decimal??"—",p.quality||"—"]
+        [time(p.observed_at_utc),p.value_decimal==null?"—":number(p.value_decimal)]
           .forEach(x=>row.appendChild(element("td","",x)));
         body.appendChild(row);
       }
@@ -1890,6 +1898,7 @@ async function renderSystem(cycle) {
 async function render() {
   const cycle = ++state.cycle;
   state.route = activeRoute();
+  if(document.body?.setAttribute)document.body.setAttribute("data-route",state.route);
   buildNav();
   const picker=document.getElementById("device-select");
   if(picker && picker.childNodes && picker.childNodes.length){
