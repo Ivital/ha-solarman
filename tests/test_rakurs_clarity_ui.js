@@ -239,7 +239,7 @@ async function run() {
     "System diagram must be first, before KPI cards");
   assert(html.includes("/static/rakurs-energy-board-20261126.js"));
   assert(html.includes("/static/rakurs-energy-board-20261126.css"));
-  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-mobile-compact-v2"));
+  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-premium-flow-v3"));
   assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-compact-v2"));
   assert(html.indexOf("rakurs-energy-board-20261126.js")<
     html.indexOf("app-parallel-twin-20261125.js"),
@@ -491,6 +491,32 @@ async function run() {
     "Shared bus must visually connect its three independent branches");
   assert(mobileLayout.includes("@media(prefers-reduced-motion:reduce)"),
     "OS reduced-motion preference must suppress decorative particles");
+  const polished=energyBoardCss.slice(energyBoardCss.indexOf("/* PREMIUM FLOW V3"));
+  assert(polished.startsWith("/* PREMIUM FLOW V3"));
+  assert(polished.includes(".energy-board-output-row::before") &&
+    polished.includes("content:none!important;display:none!important"),
+    "Remove the orphan colored stubs shown left of mobile output arrows");
+  assert(polished.includes("--rail-left:12px;") &&
+    polished.includes("--row-left:25px;") &&
+    polished.includes("left:calc(var(--rail-left) - var(--row-left))!important;"),
+    "Full output track must start exactly at the physical bus rail");
+  assert(polished.includes("gap:0!important;") &&
+    polished.includes("right:0!important;top:50%!important;"),
+    "A continuous connector must end flush with its physical output card");
+  assert(polished.includes(".energy-board-wire.no-flow .energy-board-flow-track") &&
+    polished.includes("background:var(--ux-line)!important;") &&
+    polished.includes("height:2px!important;box-shadow:none!important;"),
+    "Zero grid power must be a calm SOLID connection, not broken gray dashes");
+  assert(polished.includes(".energy-board-output-row .energy-board-direction") &&
+    polished.includes("display:none!important"),
+    "Old text dash glyphs must not appear beside flow tracks");
+  assert(polished.includes(".energy-board-flow-particle:nth-child(3)") &&
+    polished.includes("display:none!important"),
+    "Reduce excessive bright circle particles to a single clean bead");
+  assert(polished.includes("prefers-reduced-motion:reduce") &&
+    polished.includes(".energy-board-source:focus-visible"),
+    "Keyboard focus and reduced motion must remain supported");
+  console.log("CLARITY_PREMIUM_FULL_LENGTH_MOBILE_TRACES_NO_STUBS=PASS");
   console.log("CLARITY_MOBILE_360PX_NO_GAPS_AND_CONNECTED_FLOWS=PASS");
   console.log("CLARITY_ONE_COMMON_LOAD_GRID_BATTERY_TWO_SEPARATE_PV=PASS");
   console.log("CLARITY_SHARED_TELEMETRY_DIAGNOSTICS_NO_AGGREGATION=PASS");
