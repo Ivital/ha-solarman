@@ -167,7 +167,7 @@ body[data-theme] .content{padding:14px 20px 28px}
 body[data-theme] .footer{padding:12px 20px}
 body[data-theme] :is(.panel,.card,.trend-card,.parallel-device,.history-workspace){border-radius:14px;box-shadow:none}
 body[data-theme] .mobile-tabs{box-shadow:0 -2px 12px #12203312}
-@media(min-width:1600px){.rv7-shell{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}}
+@media(min-width:1200px){.rv7-shell{grid-template-columns:minmax(0,1.45fr) minmax(0,1fr)}}
 @media(max-width:950px) and (min-width:761px){body[data-theme] .sidebar{width:76px;padding:15px 8px}}
 @media(max-width:760px){
  body[data-theme] .topbar{padding:8px 12px;min-height:0}
@@ -197,3 +197,30 @@ body[data-theme] .mobile-tabs{box-shadow:0 -2px 12px #12203312}
  .rv7-panel{left:0;right:0;top:auto;bottom:0;width:100%;max-height:85dvh;border-radius:20px 20px 0 0;padding:16px 16px calc(18px + env(safe-area-inset-bottom,0px))}
 }
 @media(prefers-reduced-motion:reduce){.rv7 *{transition:none!important;animation:none!important}}
+
+/* Keep the toolbar functional and visually quiet: accessible text stays in DOM. */
+body[data-theme].rakurs-v7-overview .topbar .mobile-heading-row{display:none}
+body[data-theme].rakurs-v7-overview .topbar .top-actions{width:100%;justify-content:flex-end;gap:8px}
+body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button){
+ font-size:0!important;width:38px;min-width:38px;height:38px;min-height:38px!important;padding:0!important;display:inline-grid;place-items:center
+}
+body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button)::before{
+ content:"";display:block;width:19px;height:19px;background:currentColor;mask-repeat:no-repeat;mask-position:center;mask-size:contain
+}
+body[data-theme].rakurs-v7-overview .topbar .theme-toggle::before{
+ mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20.9 13.4A9 9 0 0 1 10.6 3.1 9 9 0 1 0 20.9 13.4Z'/%3E%3C/svg%3E")
+}
+body[data-theme=dark].rakurs-v7-overview .topbar .theme-toggle::before{
+ mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round'%3E%3Ccircle cx='12' cy='12' r='4'/%3E%3Cpath d='M12 2v2m0 16v2M2 12h2m16 0h2M5 5l1.5 1.5m11 11L19 19m0-14-1.5 1.5m-11 11L5 19'/%3E%3C/svg%3E")
+}
+body[data-theme].rakurs-v7-overview .topbar .refresh-data::before{
+ mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 7v5h-5M4 17v-5h5M6 8a7 7 0 0 1 12-2l2 2M4 16l2 2a7 7 0 0 0 12-2'/%3E%3C/svg%3E")
+}
+body[data-theme].rakurs-v7-overview .topbar .logout-button::before{
+ mask-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M11 4H5v16h6m3-8h7m-4-4 4 4-4 4'/%3E%3C/svg%3E")
+}
+@media(max-width:760px){
+ body[data-theme].rakurs-v7-overview .topbar .top-actions{justify-content:space-between;flex-wrap:nowrap;gap:5px}
+ body[data-theme].rakurs-v7-overview .topbar .device-select-wrap{margin-left:auto;min-width:0}
+ body[data-theme].rakurs-v7-overview .topbar :is(.theme-toggle,.refresh-data,.logout-button){width:36px;min-width:36px;height:36px}
+}

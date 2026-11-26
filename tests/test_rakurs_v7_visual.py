@@ -96,7 +96,7 @@ if __name__ == '__main__':
             const length = line.getTotalLength();
             for (const node of nodes) {
               const id = node.getAttribute('data-node');
-              if (id === owner || id === 'bus') continue;
+              if (id === owner || id === 'bus' || (owner === 'pv1' && id === 'inv1') || (owner === 'pv2' && id === 'inv2')) continue;
               const b = node.querySelector('rect').getBBox();
               for (let n = 1; n < 100; n++) {
                 const p = line.getPointAtLength(length * n / 100);
@@ -111,6 +111,29 @@ if __name__ == '__main__':
           return collisions;
         }""", selector)
         assert not intersections, f"SVG wires hidden under unrelated cards: {intersections}"
+        # The wire must reach actual equipment art, not just the old invisible card edge.
+        gaps = page.evaluate("""sel => {
+          const svg=document.querySelector(sel);
+          const issues=[];
+          const close=(point,art)=>{
+            const r=art.getBoundingClientRect(),p=point.matrixTransform(svg.getScreenCTM());
+            const dx=Math.max(r.left-p.x,0,p.x-r.right),dy=Math.max(r.top-p.y,0,p.y-r.bottom);
+            return Math.hypot(dx,dy)<=5;
+          };
+          for(const [id,target] of [['pv1','inv1'],['pv2','inv2']]){
+            const wire=svg.querySelector('[data-flow="'+id+'"]');
+            const src=svg.querySelector('[data-node="'+id+'"] .rv7-equipment');
+            const dst=svg.querySelector('[data-node="'+target+'"] .rv7-equipment');
+            if(!close(wire.getPointAtLength(0),src)||!close(wire.getPointAtLength(wire.getTotalLength()),dst))issues.push(id);
+          }
+          for(const id of ['load','battery','grid']){
+            const wire=svg.querySelector('[data-flow="'+id+'"]');
+            const dst=svg.querySelector('[data-node="'+id+'"] .rv7-equipment');
+            if(!close(wire.getPointAtLength(wire.getTotalLength()),dst))issues.push(id);
+          }
+          return issues;
+        }""", selector)
+        assert not gaps, f"Disconnected artwork endpoints: {gaps}"
 
 
 

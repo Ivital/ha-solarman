@@ -37,22 +37,22 @@
   return null;
  }
  function geometry(mobile){
-  if(mobile)return {w:360,h:326,
-   boxes:{pv1:[19,1,152,86],pv2:[189,1,152,86],inv1:[27,105,136,61],inv2:[197,105,136,61],
-    bus:[137,184,86,26],load:[5,238,110,85],battery:[125,238,110,85],grid:[245,238,110,85]},
-   paths:[["pv1","M95 87 V105"],["pv2","M265 87 V105"],
-    ["inv1","M95 166 V174 Q95 180 103 180 H154 Q165 180 165 184"],
-    ["inv2","M265 166 V174 Q265 180 257 180 H206 Q195 180 195 184"],
-    ["bus","M180 210 V224 M60 224 H300"],["load","M60 224 V238"],
-    ["battery","M180 224 V238"],["grid","M300 224 V238"]]};
+  if(mobile)return {w:360,h:307,
+   boxes:{pv1:[4,2,172,64],pv2:[184,2,172,64],inv1:[4,82,172,58],inv2:[184,82,172,58],
+    bus:[138,164,84,26],load:[5,219,110,85],battery:[125,219,110,85],grid:[245,219,110,85]},
+   paths:[["pv1","M34 46 V86"],["pv2","M326 46 V86"],
+    ["inv1","M34 130 V148 Q34 156 44 156 H155 Q165 156 165 164"],
+    ["inv2","M326 130 V148 Q326 156 316 156 H205 Q195 156 195 164"],
+    ["bus","M180 190 V207 M60 207 H300"],["load","M60 207 V224"],
+    ["battery","M180 207 V222"],["grid","M300 207 V224"]]};
   return {w:760,h:316,
    boxes:{pv1:[8,19,174,108],pv2:[8,188,174,108],inv1:[225,28,145,88],inv2:[225,197,145,88],
     bus:[404,135,78,46],load:[547,5,205,96],battery:[547,110,205,96],grid:[547,215,205,96]},
-   paths:[["pv1","M182 73 H225"],["pv2","M182 242 H225"],
-    ["inv1","M370 72 H384 Q392 72 392 80 V146 Q392 151 404 151"],
-    ["inv2","M370 241 H384 Q392 241 392 233 V170 Q392 165 404 165"],
-    ["bus","M482 158 H518 M518 53 V263"],["load","M518 53 H547"],
-    ["battery","M518 158 H547"],["grid","M518 263 H547"]]};
+   paths:[["pv1","M118 49 H282"],["pv2","M118 218 H282"],
+    ["inv1","M310 51 H382 Q392 51 392 61 V146 Q392 151 408 151"],
+    ["inv2","M310 220 H382 Q392 220 392 210 V170 Q392 165 408 165"],
+    ["bus","M478 158 H518 M518 29 V239"],["load","M518 29 H567"],
+    ["battery","M518 134 H573"],["grid","M518 239 H587"]]};
  }
  // Native equipment artwork: vector paths, not emoji, screenshots or boxed glyphs.
  function equipment(group,id,x,y,scale=1,soc=null){
@@ -189,9 +189,10 @@
     const dev=snap.sources[Number(id.slice(-1))-1].device;
     const cx=x+w/2;
     if(mobile){
-     equipment(group,id,x+10,y+8,1.03);
-     group.appendChild(s("text",{x:x+56,y:y+25,class:"rv7-bus-title"},labels[id]));
-     group.appendChild(s("text",{x:x+56,y:y+39,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+     const left=id==="inv1",tx=left?66:294,anchor=left?"start":"end";
+     equipment(group,id,left?12:304,y+1,1.05);
+     group.appendChild(s("text",{x:tx,y:y+23,"text-anchor":anchor,class:"rv7-bus-title"},labels[id]));
+     group.appendChild(s("text",{x:tx,y:y+38,"text-anchor":anchor,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
     }else{
      equipment(group,id,cx-25,y+3,1.1);
      group.appendChild(s("text",{x:cx,y:y+66,"text-anchor":"middle",class:"rv7-bus-title"},labels[id]));
@@ -200,10 +201,11 @@
    }else{
     const cx=x+w/2,title=id==="battery"?"Акумулятор":id==="pv1"?"Сонце 1":id==="pv2"?"Сонце 2":labels[id];
     const right=!mobile&&(id==="load"||id==="battery"||id==="grid");
-    const size=mobile?.87:1.25;
-    equipment(group,id,right?x+12:cx-23*size,y+3,size,id==="battery"?reading?.number:null);
-    const tx=right?x+77:cx,anchor=right?"start":"middle";
-    const labelY=y+(right?27:mobile?49:66),valueY=labelY+(mobile?19:25);
+    const sidePV=mobile&&id.startsWith("pv"),left=id==="pv1";
+    const size=sidePV?1.05:mobile?.87:1.25;
+    equipment(group,id,sidePV?(left?12:304):right?x+12:cx-23*size,y+3,size,id==="battery"?reading?.number:null);
+    const tx=sidePV?(left?66:294):right?x+77:cx,anchor=sidePV?(left?"start":"end"):right?"start":"middle";
+    const labelY=y+(sidePV?20:right?27:mobile?49:66),valueY=labelY+(mobile?19:25);
     group.appendChild(s("text",{x:tx,y:labelY,"text-anchor":anchor,class:"rv7-node-label"},title));
     group.appendChild(s("text",{x:tx,y:valueY,"text-anchor":anchor,class:"rv7-node-value",style:"font-size:"+(mobile?17:25)+"px"},M.fmt(reading)));
     if(id==="battery")group.appendChild(s("text",{x:tx,y:valueY+13,"text-anchor":anchor,class:"rv7-bus-meta"},M.fmt(snap.reports.battery_power.reading)));
@@ -254,7 +256,7 @@
  }
  function paintHistory(container,snap,config,scope,onFrame,onRestore){
   const card=h("section","rv7-card rv7-chart-card"),heading=h("div","rv7-card-head");
-  heading.appendChild(h("strong","rv7-card-title","Динаміка потужності"));
+  heading.appendChild(h("strong","rv7-card-title","Потужність, кВт"));
   const ranges=h("div","rv7-ranges");
   heading.appendChild(ranges);card.appendChild(heading);
   const chartbox=h("div","rv7-chart-box"),legend=h("div","rv7-series");
@@ -307,8 +309,8 @@
     line.points.map(p=>p.timestamp)))).sort();
    const layer=s("svg",{viewBox:"0 0 480 180",class:"rv7-chart",
     role:"img","aria-label":"Архівний графік"});
-   for(const y of [20,60,100,140])layer.appendChild(s("line",{
-    x1:8,y1:y,x2:473,y2:y,class:"rv7-chart-gridline"}));
+   for(const y of [12,81.5,151])layer.appendChild(s("line",{
+    x1:42,y1:y,x2:440,y2:y,class:"rv7-chart-gridline"}));
    availableTimes=timestamps;
    if(!timestamps.length){
     stopPlayback();
@@ -328,7 +330,6 @@
     layer.appendChild(s("text",{x:35,y:y(val)+3,"text-anchor":"end",class:"rv7-axis"},M.pretty(val,1)));
     if(present.some(line=>line.id==="soc"))layer.appendChild(s("text",{x:446,y:socY(frac*100)+3,class:"rv7-axis"},Math.round(frac*100)+"%"));
    }
-   layer.appendChild(s("text",{x:5,y:10,class:"rv7-axis"},"кВт"));
    for(const frac of [0,.33,.67,1]){
     const stamp=new Date(first+(last-first)*frac);
     const label=hours>24?stamp.toLocaleDateString("uk-UA",{timeZone:"Europe/Kyiv",day:"2-digit",month:"2-digit"}):stamp.toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"});
@@ -540,29 +541,6 @@
      details.appendChild(reasons);notices.appendChild(details);
      leftColumn.appendChild(notices);
    }
-   const more=h("section","rv7-secondary");
-   const devices=h("div","rv7-card");
-   devices.appendChild(h("h3","rv7-secondary-title","Два інвертори"));
-   const two=h("div","rv7-devices");
-   for(const item of snap.sources){
-    const card=h("div","rv7-device");
-    put(card,h("strong","","Deye №"+item.slot),
-     h("small","",item.device?"Збережені показники":"Немає джерела"),
-     h("a","rv7-device-link","Показники →"));
-    card.querySelector("a").href="#/parallel";
-    two.appendChild(card);
-   }
-   devices.appendChild(two);more.appendChild(devices);
-   const shortcuts=h("div","rv7-card");
-   shortcuts.appendChild(h("h3","rv7-secondary-title","Розділи"));
-   const nav=h("nav","rv7-chip-grid");
-   for(const [route,label] of [
-    ["trends","⌁ Графіки"],["history","◷ Історія"],
-    ["events","◇ Події"],["registers","▥ Регістри"]]){
-    const a=h("a","rv7-chip",label);a.href="#/"+route;nav.appendChild(a);
-   }
-   shortcuts.appendChild(nav);more.appendChild(shortcuts);
-   layout.appendChild(more);
   }
   host.replaceChildren(app);
   return Object.freeze({snapshot:snap,root:app,dispose:()=>disposeScope(scope)});
