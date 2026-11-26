@@ -218,6 +218,9 @@ def run():
                     assert "5,43 кВт" in page.locator(
                         ".rv7 [data-node='pv2'] .rv7-node-value").first.text_content()
                     assert not has_real_ssr(page), "Trusted SSR should be replaced only by verified twin response"
+                    assert page.locator(".rv7-chart-stat").count() >= 3
+                    assert page.get_by_role("button", name="Останній запис").count() == 1
+                    assert not any(word in page.locator(".rv7").inner_text().lower() for word in ["тестові дані", "демонстраційний стан"])
                     if width < 600:
                         assert page.locator("body.rakurs-v7-overview").count() == 1
                         assert not page.locator(".topbar .mobile-heading-row").is_visible()

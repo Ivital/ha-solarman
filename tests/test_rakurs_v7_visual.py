@@ -64,6 +64,10 @@ if __name__ == '__main__':
         assert board.is_visible(), f"{selector} should be visible"
         assert board.locator("[data-node]").count() == 8
         assert board.locator("[data-flow]").count() == 8
+        assert board.locator(".rv7-equipment").count() == 7
+        assert board.locator(".art-solar").count() == 2
+        assert board.locator(".art-battery-track").count() == 1
+        assert board.locator(".rv7-node-bg").first.evaluate("(el) => getComputedStyle(el).fill") in ("rgba(0, 0, 0, 0)", "transparent"), "Equipment must not revert to the boxed-card composition"
         # All source/output connections are drawn within the same SVG viewport.
         result = page.evaluate("""(sel) => {
           const svg=document.querySelector(sel);

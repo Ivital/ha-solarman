@@ -37,32 +37,66 @@
   return null;
  }
  function geometry(mobile){
-  if(mobile)return {w:360,h:286,
-   boxes:{pv1:[20,4,152,62],pv2:[188,4,152,62],inv1:[30,88,132,46],inv2:[198,88,132,46],
-    bus:[132,156,96,26],load:[4,211,112,70],battery:[124,211,112,70],grid:[244,211,112,70]},
-   paths:[["pv1","M96 66 V88"],["pv2","M264 66 V88"],
-    ["inv1","M96 134 V145 H156 V156"],["inv2","M264 134 V145 H204 V156"],
-    ["bus","M180 182 V196 M60 196 H300"],["load","M60 196 V211"],
-    ["battery","M180 196 V211"],["grid","M300 196 V211"]]};
-  return {w:760,h:286,
-   boxes:{pv1:[12,24,142,78],pv2:[12,184,142,78],inv1:[204,32,140,62],inv2:[204,192,140,62],
-    bus:[393,116,100,54],load:[552,8,196,78],battery:[552,104,196,78],grid:[552,200,196,78]},
-   paths:[["pv1","M154 63 H204"],["pv2","M154 223 H204"],
-    ["inv1","M344 63 H368 V132 H393"],["inv2","M344 223 H368 V154 H393"],
-    ["bus","M493 143 H524 M524 47 V239"],["load","M524 47 H552"],
-    ["battery","M524 143 H552"],["grid","M524 239 H552"]]};
+  if(mobile)return {w:360,h:326,
+   boxes:{pv1:[19,1,152,86],pv2:[189,1,152,86],inv1:[27,105,136,61],inv2:[197,105,136,61],
+    bus:[137,184,86,26],load:[5,238,110,85],battery:[125,238,110,85],grid:[245,238,110,85]},
+   paths:[["pv1","M95 87 V105"],["pv2","M265 87 V105"],
+    ["inv1","M95 166 V174 Q95 180 103 180 H154 Q165 180 165 184"],
+    ["inv2","M265 166 V174 Q265 180 257 180 H206 Q195 180 195 184"],
+    ["bus","M180 210 V224 M60 224 H300"],["load","M60 224 V238"],
+    ["battery","M180 224 V238"],["grid","M300 224 V238"]]};
+  return {w:760,h:316,
+   boxes:{pv1:[8,19,174,108],pv2:[8,188,174,108],inv1:[225,28,145,88],inv2:[225,197,145,88],
+    bus:[404,135,78,46],load:[547,5,205,96],battery:[547,110,205,96],grid:[547,215,205,96]},
+   paths:[["pv1","M182 73 H225"],["pv2","M182 242 H225"],
+    ["inv1","M370 72 H384 Q392 72 392 80 V146 Q392 151 404 151"],
+    ["inv2","M370 241 H384 Q392 241 392 233 V170 Q392 165 404 165"],
+    ["bus","M482 158 H518 M518 53 V263"],["load","M518 53 H547"],
+    ["battery","M518 158 H547"],["grid","M518 263 H547"]]};
  }
- function icon(group,id,x,y){
-  const paths={
-   pv1:"M1 3h18l3 13H-2L1 3m5 0-1 13m8-13 1 13M0 9h20M7 16v4m-4 0h8",
-   pv2:"M1 3h18l3 13H-2L1 3m5 0-1 13m8-13 1 13M0 9h20M7 16v4m-4 0h8",
-   inv1:"M3 1h14v19H3zM7 5h6v4H7zM6 15q2-4 4 0t4 0",
-   inv2:"M3 1h14v19H3zM7 5h6v4H7zM6 15q2-4 4 0t4 0",
-   load:"M0 10 10 1l10 9M3 8v12h14V8m-10 12v-7h6v7",
-   battery:"M1 5h18v12H1zM19 9h3v4h-3M5 11h4m-2-2v4m6-2h3",
-   grid:"M10 1 2 21m8-20 8 20M4 15h12M6 9h8M1 5h18M1 5v4m18-4v4",
-   bus:"M1 10h18M5 5v10m10-10v10"};
-  group.appendChild(s("path",{d:paths[id],transform:"translate("+x+" "+y+")",class:"rv7-equipment-icon"}));
+ // Native equipment artwork: vector paths, not emoji, screenshots or boxed glyphs.
+ function equipment(group,id,x,y,scale=1,soc=null){
+  const art=s("g",{transform:"translate("+x+" "+y+") scale("+scale+")",class:"rv7-equipment art-"+classes[id],"aria-hidden":"true"});
+  const shape=(tag,attrs)=>art.appendChild(s(tag,attrs));
+  const path=(d,cls)=>shape("path",{d,class:cls});
+  const rect=(x,y,width,height,rx,cls)=>shape("rect",{x,y,width,height,rx,class:cls});
+  if(id.startsWith("pv")){
+   path("M3 30 34 30 45 41 14 41Z","art-ground");
+   path("M22 24v11m-8 0h17","art-frame");
+   path("M9 3 36 3 45 28 0 28Z","art-solar-frame");
+   path("M11 6 34 6 41 25 4 25Z","art-solar");
+   path("M17 6 14 25 M25 6 26 25 M6 15h32 M8 20h31","art-solar-cells");
+   shape("circle",{cx:43,cy:5,r:4,class:"art-sun"});
+  }else if(id.startsWith("inv")){
+   path("M10 5 34 5 40 9 40 33 34 39 10 39Z","art-ground");
+   rect(7,3,28,35,5,"art-device");
+   rect(11,8,20,11,3,"art-display");
+   path("M14 14q3-5 6 0t8 0","art-signal");
+   path("M15 26h12m-12 4h12m-12 4h12","art-detail");
+   shape("circle",{cx:21,cy:22,r:1.8,class:"art-led"});
+   path("M13 38v4m8-4v4m8-4v4","art-frame");
+  }else if(id==="load"){
+   path("M2 34 37 34 45 40 9 40Z","art-ground");
+   path("M6 17 23 5 39 17v19H6Z","art-house");
+   path("M2 18 23 2 43 18 39 21 23 9 6 21Z","art-roof");
+   rect(23,24,9,12,1,"art-door");
+   rect(11,21,9,9,1,"art-window");
+   path("M15.5 21v9m-4.5-4.5h9","art-frame");
+  }else if(id==="battery"){
+   path("M7 36h30l6 5H3Z","art-ground");
+   rect(9,4,25,35,5,"art-device");
+   rect(13,0,17,5,2,"art-terminal");
+   rect(13,9,17,25,3,"art-battery-track");
+   if(Number.isFinite(soc)){
+    const fill=Math.max(0,Math.min(100,soc))*.21;
+    rect(15,32-fill,13,fill,1,"art-battery-fill");
+   }
+   path("M23 11l-5 9h5l-3 8 8-11h-5Z","art-lightning");
+  }else if(id==="grid"){
+   path("M2 39h40l4 3H0Z","art-ground");
+   path("M22 2 9 39M22 2 35 39M15 20h14M11 31h22M16 18l15 13m-18 0 15-13M5 10h34M0 20h44M5 10v5m34-5v5M0 20v5m44-5v5","art-tower");
+  }
+  group.appendChild(art);
  }
  function modal(parent,snap,id,trigger,scope){
   if(scope?.dialogClose)scope.dialogClose();
@@ -149,19 +183,30 @@
     "aria-label":labels[id]+(reading?": "+M.fmt(reading):"")});
    group.appendChild(s("rect",{x,y,width:w,height,rx:10,ry:10,class:"rv7-node-bg rv7-node-"+classes[id]}));
    if(isBus){
-    group.appendChild(s("text",{x:x+w/2,y:y+height/2+4,"text-anchor":"middle",class:"rv7-bus-title"},"Енерг. шина"));
+    group.appendChild(s("rect",{x:x+4,y:y+2,width:w-8,height:height-4,rx:12,class:"rv7-hub"}));
+    group.appendChild(s("text",{x:x+w/2,y:y+height/2+4,"text-anchor":"middle",class:"rv7-bus-title"},"Шина"));
    }else if(isInv){
-    icon(group,id,x+12,y+12);
     const dev=snap.sources[Number(id.slice(-1))-1].device;
-    group.appendChild(s("text",{x:x+40,y:y+19,class:"rv7-bus-title"},labels[id]));
-    group.appendChild(s("text",{x:x+40,y:y+33,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+    const cx=x+w/2;
+    if(mobile){
+     equipment(group,id,x+10,y+8,1.03);
+     group.appendChild(s("text",{x:x+56,y:y+25,class:"rv7-bus-title"},labels[id]));
+     group.appendChild(s("text",{x:x+56,y:y+39,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+    }else{
+     equipment(group,id,cx-25,y+3,1.1);
+     group.appendChild(s("text",{x:cx,y:y+66,"text-anchor":"middle",class:"rv7-bus-title"},labels[id]));
+     group.appendChild(s("text",{x:cx,y:y+80,"text-anchor":"middle",class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+    }
    }else{
-    const title=id==="battery"?"АКБ":id==="pv1"?"PV 1":id==="pv2"?"PV 2":labels[id];
-    icon(group,id,x+10,y+9);
-    group.appendChild(s("text",{x:x+36,y:y+20,class:"rv7-node-label"},title));
-    group.appendChild(s("text",{x:x+10,y:y+43,class:"rv7-node-value",style:"font-size:"+(w<130?15:20)+"px"},M.fmt(reading)));
-    const detail=id==="battery"?M.fmt(snap.reports.battery_power.reading):id.startsWith("pv")?"Deye №"+id.slice(-1):"Звіт Deye "+(reading?.slot_no||"—");
-    group.appendChild(s("text",{x:x+10,y:y+height-7,class:"rv7-bus-meta"},detail));
+    const cx=x+w/2,title=id==="battery"?"Акумулятор":id==="pv1"?"Сонце 1":id==="pv2"?"Сонце 2":labels[id];
+    const right=!mobile&&(id==="load"||id==="battery"||id==="grid");
+    const size=mobile?.87:1.25;
+    equipment(group,id,right?x+12:cx-23*size,y+3,size,id==="battery"?reading?.number:null);
+    const tx=right?x+77:cx,anchor=right?"start":"middle";
+    const labelY=y+(right?27:mobile?49:66),valueY=labelY+(mobile?19:25);
+    group.appendChild(s("text",{x:tx,y:labelY,"text-anchor":anchor,class:"rv7-node-label"},title));
+    group.appendChild(s("text",{x:tx,y:valueY,"text-anchor":anchor,class:"rv7-node-value",style:"font-size:"+(mobile?17:25)+"px"},M.fmt(reading)));
+    if(id==="battery")group.appendChild(s("text",{x:tx,y:valueY+13,"text-anchor":anchor,class:"rv7-bus-meta"},M.fmt(snap.reports.battery_power.reading)));
    }
    const activate=()=>onDetails(id,group);
    group.addEventListener("click",activate);
@@ -209,7 +254,7 @@
  }
  function paintHistory(container,snap,config,scope,onFrame,onRestore){
   const card=h("section","rv7-card rv7-chart-card"),heading=h("div","rv7-card-head");
-  heading.appendChild(h("strong","rv7-card-title","Історія"));
+  heading.appendChild(h("strong","rv7-card-title","Динаміка потужності"));
   const ranges=h("div","rv7-ranges");
   heading.appendChild(ranges);card.appendChild(heading);
   const chartbox=h("div","rv7-chart-box"),legend=h("div","rv7-series");
@@ -284,7 +329,11 @@
     if(present.some(line=>line.id==="soc"))layer.appendChild(s("text",{x:446,y:socY(frac*100)+3,class:"rv7-axis"},Math.round(frac*100)+"%"));
    }
    layer.appendChild(s("text",{x:5,y:10,class:"rv7-axis"},"кВт"));
-   for(const t of [timestamps[0],timestamps.at(-1)])layer.appendChild(s("text",{x:x(t),y:174,"text-anchor":t===timestamps[0]?"start":"end",class:"rv7-axis"},new Date(t).toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"})));
+   for(const frac of [0,.33,.67,1]){
+    const stamp=new Date(first+(last-first)*frac);
+    const label=hours>24?stamp.toLocaleDateString("uk-UA",{timeZone:"Europe/Kyiv",day:"2-digit",month:"2-digit"}):stamp.toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"});
+    layer.appendChild(s("text",{x:42+398*frac,y:174,"text-anchor":frac===0?"start":frac===1?"end":"middle",class:"rv7-axis"},label));
+   }
    for(const line of present){
     let d="";
     const intervals=line.points.slice(1).map((p,i)=>Date.parse(p.timestamp)-Date.parse(line.points[i].timestamp)).filter(n=>n>0).sort((a,b)=>a-b);
@@ -295,6 +344,7 @@
      d+=(i&&!gap?" L":" M")+x(p.timestamp).toFixed(1)+" "+(line.id==="soc"?socY(p.number):y(p.number)).toFixed(1);
     }
     layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"}));
+    if(line.points.length===1){const p=line.points[0];layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3,fill:line.color}));}
    }
    if(!chosenTime||!timestamps.includes(chosenTime))chosenTime=timestamps.at(-1);
    const cursor=x(chosenTime);
@@ -302,9 +352,12 @@
     class:"rv7-chart-cursor"}));
    const active=present.map(line=>{
     const v=M.historicalValue(line.points,chosenTime);
-    return line.label+": "+(v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—");
+    const stat=h("div","rv7-chart-stat");
+    const label=h("small","",line.label);label.style.color=line.color;
+    put(stat,label,h("strong","",v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—"));
+    return stat;
    });
-   time.textContent=M.ukTime(chosenTime)+"  ·  "+active.join("  |  ");
+   time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
    if(explicitSelection&&typeof onFrame==="function")onFrame(chosenTime,series);
    function select(index){
     explicitSelection=true;
@@ -330,7 +383,9 @@
    const row=h("label");
    put(row,h("span","","Час вимірювання"),
     h("span","",timestamps.length+" записів"));
-   control.replaceChildren(row,slider,play);
+   const restore=h("button","rv7-latest","Останній запис");restore.type="button";
+   restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;chosenTime=timestamps.at(-1);onRestore?.();chart();});
+   control.replaceChildren(row,slider,put(h("div","rv7-playback-actions"),play,restore));
   }
   async function fetchSeries(){
    const current=++revision;
@@ -397,7 +452,7 @@
   const top=h("header","rv7-top"),heading=h("div","rv7-heading");
   const copy=h("div");
   put(copy,h("h2","rv7-title","Енергосистема"),
-   h("span","rv7-subtitle","2 × Deye · диспетчеризація"));
+   h("span","rv7-subtitle","Два паралельні інвертори"));
   put(heading,copy);
   const statuses=h("div","rv7-status");
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
@@ -421,7 +476,7 @@
    const shell=h("div","rv7-shell"),leftColumn=h("div","rv7-overview-left");
    const diagramCard=h("section","rv7-card rv7-diagram-card");
    const dh=h("div","rv7-card-head");
-   put(dh,h("strong","rv7-card-title","Потоки енергії"),
+   put(dh,h("strong","rv7-card-title","Енергопотоки"),
     h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"));
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
@@ -493,7 +548,8 @@
     const card=h("div","rv7-device");
     put(card,h("strong","","Deye №"+item.slot),
      h("small","",item.device?"Збережені показники":"Немає джерела"),
-     h("span","",M.fmt(item.reading)));
+     h("a","rv7-device-link","Показники →"));
+    card.querySelector("a").href="#/parallel";
     two.appendChild(card);
    }
    devices.appendChild(two);more.appendChild(devices);
