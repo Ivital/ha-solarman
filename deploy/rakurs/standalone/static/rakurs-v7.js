@@ -179,7 +179,7 @@
    "◷ До фізичної перевірки Modbus адреси та масштаби регістрів залишаються непідтвердженими."));
   container.appendChild(zone);
  }
- function paintHistory(container,snap,config,scope){
+ function paintHistory(container,snap,config,scope,onFrame){
   const card=h("section","rv7-card rv7-chart-card"),heading=h("div","rv7-card-head");
   heading.appendChild(h("strong","rv7-card-title","Історія"));
   const ranges=h("div","rv7-ranges");
@@ -197,7 +197,8 @@
    ["pv2","PV 2","pv_power",2,"var(--v7-primary)"],
    ["load","Будинок","load_power",0,"var(--v7-load)"],
    ["battery","АКБ","battery_power",0,"var(--v7-battery)"],
-   ["grid","Мережа","grid_power",0,"var(--v7-grid)"]
+   ["grid","Мережа","grid_power",0,"var(--v7-grid)"],
+   ["soc","SOC","battery_soc",0,"var(--v7-battery)"]
   ];
   function chart(){
    const present=series.filter(line=>views.has(line.id)&&line.points.length);
@@ -232,6 +233,7 @@
     return line.label+": "+(v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—");
    });
    time.textContent=M.ukTime(chosenTime)+"  ·  "+active.join("  |  ");
+   if(typeof onFrame==="function")onFrame(chosenTime,series);
    function select(index){
     chosenTime=timestamps[Math.max(0,Math.min(timestamps.length-1,index))];
     chart();
@@ -272,7 +274,7 @@
    if(scope.cancelled||current!==revision)return;
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value:[]}));
-   for(const line of series){
+   for(const line of series.filter(row=>row.id!=="soc")){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
     const circle=h("span","rv7-series-dot");
@@ -337,8 +339,12 @@
     h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"));
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
-   const show=(id,trigger)=>modal(app,snap,id,trigger);
-   put(wrapped,diagram(snap,show,false),diagram(snap,show,true));
+   let displayed=snap;
+   const show=(id,trigger)=>modal(app,displayed,id,trigger);
+   function paint(){
+    wrapped.replaceChildren(diagram(displayed,show,false),diagram(displayed,show,true));
+   }
+   paint();
    diagramCard.appendChild(wrapped);
    const foot=h("div","rv7-flow-foot");
    foot.appendChild(h("span","rv7-source-label",
@@ -349,7 +355,25 @@
    actions.appendChild(detailButton);foot.appendChild(actions);
    diagramCard.appendChild(foot);
    shell.appendChild(diagramCard);
-   paintHistory(shell,snap,config,scope);
+   paintHistory(shell,snap,config,scope,(timestamp,series)=>{
+    // Historical frames are built only from near-time measurements.
+    // Missing records stay missing; do not silently reuse current values.
+    const deviceRows=(snap.devices||[]).map(d=>{
+      const archive={};
+      for(const row of series.filter(s=>s.device?.device_key===d.device_key)){
+        const p=M.historicalValue(row.points,timestamp,600000);
+        if(p)archive[row.key]={value_decimal:p.number,
+          unit:p.unit||M.read(d.values,row.key,d).unit,
+          observed_at_utc:p.timestamp,sign_verified:false,register_verified:false};
+      }
+      return {...d,values:archive};
+    });
+    displayed=M.snapshot({...config,devices:deviceRows,
+      fallbackValues:{},status:{},now:Date.parse(timestamp)});
+    paint();
+    diagramCard.querySelector(".rv7-card-meta").textContent=
+      "Архів · "+M.ukTime(timestamp);
+   });
    layout.appendChild(shell);
    if(snap.warnings.length){
     const notices=h("section","rv7-warnings");
