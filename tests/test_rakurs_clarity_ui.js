@@ -423,8 +423,10 @@ async function run() {
   assert(sharedGridWire[0].className.includes("no-flow"),
     "Opposite report signs cannot be rendered as a known common-grid direction");
   assert.equal(byClass(sharedGridWire[0],"energy-board-direction")[0].textContent,"—");
-  assert(descendants(grid).some(node=>
-    String(node.textContent||"").includes("Напрямок невідомий")));
+  assert.equal(byClass(grid,"energy-board-node-detail").length,0,
+    "Keep unconfirmed direction out of the visible grid card");
+  assert(byClass(compareHost,"wire-grid")[0].attributes["aria-label"].includes("Напрямок невідомий"),
+    "Keep unconfirmed flow meaning accessible from the inactive connection");
   const selectedOneHost=new Node("div");
   boardWindow.RakursEnergyBoard.render(selectedOneHost,{document:doc,
     devices:[
