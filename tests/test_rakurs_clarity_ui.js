@@ -90,7 +90,14 @@ function prepare(mode = "seeded") {
     content: main, nav, connection: new Node("span"),
     updated: new Node("span"), "view-title": new Node("h1"),
     "mode-indicator": new Node("span"),
-    "device-select": new Node("select")
+    "device-select": new Node("select"),
+    "theme-toggle": new Node("button")
+  };
+  const body = new Node("body");
+  const storage = new Map();
+  const localStorage = {
+    getItem: key => storage.has(key) ? storage.get(key) : null,
+    setItem: (key, value) => storage.set(key, String(value))
   };
   const actions = new Node("div");
   const doc = {
@@ -101,7 +108,7 @@ function prepare(mode = "seeded") {
     createTextNode: value => {
       const n = new Node("text"); n.textContent = value; return n;
     },
-    body: {classList: {add() {}}},
+    body,
   };
   const loc = {pathname: "/", search: "", hash: "#/overview"};
   const events = {};
@@ -176,12 +183,12 @@ function prepare(mode = "seeded") {
   }
   const sandbox = {
     window:{location:loc,addEventListener:(name,fn)=>{events[name]=fn;}},
-    location:loc,document:doc,fetch,
+    location:loc,document:doc,fetch,localStorage,
     URLSearchParams,Number,Date,String,Array,Set,Math,
     encodeURIComponent,console:{warn(){}}
   };
   vm.runInNewContext(js,sandbox,{filename:"app-parallel-twin-20261125.js"});
-  return {main,nav,events,loc,fetchCalls,ssr,elements};
+  return {main,nav,events,loc,fetchCalls,ssr,elements,body,storage};
 }
 async function settle() {
   await new Promise(resolve => setTimeout(resolve,60));
@@ -203,6 +210,18 @@ async function run() {
   assert(colorCss.includes("body[data-theme=light]") && colorCss.includes("body[data-theme=dark]"));
   assert(pagesCss.includes(".auth-card") && pagesCss.includes(".bar"));
   assert(pageTheme.includes("rakurs_theme"));
+  const externalBody=new Node("body");
+  const externalButton=new Node("button");
+  const externalStore=new Map();
+  vm.runInNewContext(pageTheme,{
+    document:{body:externalBody,readyState:"complete",getElementById:key=>key==="page-theme-toggle"?externalButton:null},
+    localStorage:{getItem:key=>externalStore.get(key)||null,setItem:(key,value)=>externalStore.set(key,String(value))}
+  });
+  assert.equal(externalBody.attributes["data-theme"],"light");
+  externalButton.listeners.click();
+  assert.equal(externalBody.attributes["data-theme"],"dark");
+  assert.equal(externalStore.get("rakurs_theme"),"dark");
+  console.log("CLARITY_THEME_ALL_PAGES_TOGGLE=PASS");
   assert(loginHtml.includes("/static/rakurs-pages-20261126.css"));
   assert(deyeHtml.includes("/static/rakurs-pages-20261126.css"));
   assert(loginHtml.includes('id="page-theme-toggle"'));
@@ -244,6 +263,15 @@ async function run() {
   }
   const app=prepare("seeded");
   await settle();
+  assert.equal(app.body.attributes["data-theme"],"light");
+  const themeButton=app.elements["theme-toggle"];
+  themeButton.listeners.click();
+  assert.equal(app.body.attributes["data-theme"],"dark");
+  assert.equal(app.storage.get("rakurs_theme"),"dark");
+  themeButton.listeners.click();
+  assert.equal(app.body.attributes["data-theme"],"light");
+  assert.equal(app.storage.get("rakurs_theme"),"light");
+  console.log("CLARITY_THEME_SWITCH_BOTH_WAYS=PASS");
   assert.equal(byClass(app.main,"kpi").length,4);
   assert.equal(byClass(app.main,"dashboard-hero").length,1);
   assert.equal(byClass(app.main,"insight-item").length,3);
