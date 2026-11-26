@@ -170,8 +170,8 @@
     const hub=make(doc,"div","energy-board-hub");
     // Keep each physical bus branch as one wire+destination pair.
     // This is crucial on a phone: the flow must stay visually attached to its node.
-    const outputs=make(doc,"div","energy-board-outputs");
-    outputs.setAttribute("aria-label","Зв’язки енергетичної шини з будинком, акумулятором і мережею");
+    const outputZone=make(doc,"div","energy-board-outputs");
+    outputZone.setAttribute("aria-label","Зв’язки енергетичної шини з будинком, акумулятором і мережею");
     const interactive=[];
     const wires={};
     const value=key=>metric(s.values,key);
@@ -298,9 +298,9 @@
           metric(s.values,"battery_soc"):reference?.soc??null,"%"):"";
       append(branch,connector,node(info.key,info.key,info.icon,info.label,
         metricValue,flow.caption+stateNote,subtitle,rows));
-      outputs.appendChild(branch);
+      outputZone.appendChild(branch);
     }
-    append(map,sources,sourceWires,hub,outputs);board.appendChild(map);
+    append(map,sources,sourceWires,hub,outputZone);board.appendChild(map);
     const legend=make(doc,"div","energy-board-legend");
     append(legend,
       make(doc,"span","energy-board-legend-key","☀ Генерація"),
