@@ -532,7 +532,7 @@ async function run() {
   gridNode.listeners.click();
   assert.equal(gridNode.attributes["aria-pressed"],"true");
   assert(byClass(app.main,"energy-board-inspector")[0].childNodes.some(x=>
-    String(x.textContent||"").includes("Електромережа")));
+    String(x.textContent||"").includes("Спільна мережа")));
   assert.equal(byClass(app.main,"energy-board-wire").filter(x=>x.className.includes("is-live")).length,0);
   assert(byClass(app.main,"energy-board-wire").some(x=>
     x.className.includes("wire-grid")&&x.className.includes("no-flow")),
