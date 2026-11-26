@@ -1,0 +1,165 @@
+/* Rakurs main-first energy map. Read-only, keyboard accessible, archive != realtime. */
+body[data-theme] .energy-board-host{margin:0 0 13px}
+body[data-theme] .energy-board{--board-panel:var(--ux-surface);--board-muted:var(--ux-muted);
+  border:1px solid var(--ux-line);background:var(--ux-surface);box-shadow:var(--ux-shadow);
+  border-radius:23px;padding:clamp(17px,2vw,27px);color:var(--ux-ink)}
+body[data-theme] .energy-board-header{display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:16px;margin:0 0 12px}
+body[data-theme] .energy-board-kicker{color:var(--ux-accent);font-size:10px;letter-spacing:.12em;font-weight:850}
+body[data-theme] .energy-board-heading h2{font-size:clamp(23px,2.3vw,32px);
+  margin:4px 0 5px;letter-spacing:-.04em;color:var(--ux-title)}
+body[data-theme] .energy-board-heading p{font-size:12px;line-height:1.5;color:var(--ux-muted);margin:0}
+body[data-theme] .energy-board-flags{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+body[data-theme] .energy-board-flag{padding:8px 11px;border-radius:999px;font-size:11px;font-weight:750}
+body[data-theme] .energy-board-flag.is-stale{background:var(--ux-warn-bg);color:var(--ux-warn);
+  border:1px solid var(--ux-solar-line)}
+body[data-theme] .energy-board-flag.is-online{background:var(--ux-good-bg);color:var(--ux-good);
+  border:1px solid var(--ux-battery-line)}
+body[data-theme] .energy-board-date{font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-modes{display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  padding:5px;border:1px solid var(--ux-line);background:var(--ux-subtle);
+  border-radius:13px;width:fit-content;margin:13px 0 9px}
+body[data-theme] .energy-board-mode{min-height:36px;border:0;border-radius:9px;padding:8px 14px;
+  color:var(--ux-muted);background:transparent;font:inherit;font-size:12px;font-weight:740;cursor:pointer}
+body[data-theme] .energy-board-mode:hover{background:var(--ux-raised)}
+body[data-theme] .energy-board-mode.active{background:var(--ux-accent);color:#fff;
+  box-shadow:0 5px 13px rgba(60,85,175,.16)}
+body[data-theme] .energy-board-context{font-size:11px;color:var(--ux-muted);
+  padding:0 2px 15px;line-height:1.5}
+body[data-theme] .energy-board-map{display:grid;grid-template-columns:minmax(195px,1.15fr)
+  minmax(48px,.24fr) minmax(155px,.85fr) minmax(48px,.24fr) minmax(195px,1.13fr);
+  align-items:center;gap:10px;min-height:270px}
+body[data-theme] .energy-board-sources,body[data-theme] .source-wires{display:grid;
+  grid-template-rows:repeat(2,minmax(0,1fr));gap:13px;height:100%;align-content:center}
+body[data-theme] .energy-board-sinks,body[data-theme] .sink-wires{display:grid;
+  grid-template-rows:repeat(3,minmax(0,1fr));gap:10px;height:100%;align-content:center}
+body[data-theme] .energy-board-source,body[data-theme] .energy-board-node{min-width:0;
+  border:1px solid var(--ux-line);background:var(--ux-subtle);color:var(--ux-title);
+  border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:11px;
+  text-align:left;font:inherit;cursor:pointer;transition:transform .17s ease,box-shadow .17s ease}
+body[data-theme] .energy-board-source{background:linear-gradient(115deg,var(--ux-solar-bg),var(--ux-surface));
+  border-color:var(--ux-solar-line)}
+body[data-theme] .energy-board-source.is-dimmed{opacity:.54}
+body[data-theme] .energy-board-source-icon{font-size:28px;color:var(--ux-solar);
+  width:40px;text-align:center;flex:none}
+body[data-theme] .energy-board-source-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+body[data-theme] .energy-board-source-text small{font-size:11px;color:var(--ux-muted)}
+body[data-theme] .energy-board-source-text strong{font-size:20px;color:var(--ux-title)}
+body[data-theme] .energy-board-source-text span{font-size:10px;line-height:1.4;color:var(--ux-muted)}
+body[data-theme] .energy-board-node{display:grid;grid-template-columns:34px 1fr auto;
+  grid-template-rows:auto auto;gap:2px 9px;background:var(--ux-subtle)}
+body[data-theme] .energy-board-node-icon{grid-row:1/3;font-size:25px;color:var(--ux-accent)}
+body[data-theme] .energy-board-node-name{grid-column:2;font-weight:750;font-size:12px}
+body[data-theme] .energy-board-node-value{grid-column:3;grid-row:1/3;font-size:18px;white-space:nowrap}
+body[data-theme] .energy-board-node-detail{grid-column:2;font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-node-note{grid-column:2/4;color:var(--ux-muted);
+  font-size:10px;line-height:1.4}
+body[data-theme] .energy-board-house{border-color:var(--ux-load-line);background:var(--ux-load-bg)}
+body[data-theme] .energy-board-battery{border-color:var(--ux-battery-line);background:var(--ux-battery-bg)}
+body[data-theme] .energy-board-grid{border-color:var(--ux-grid-line);background:var(--ux-grid-bg)}
+body[data-theme] .energy-board-house .energy-board-node-icon{color:var(--ux-load)}
+body[data-theme] .energy-board-battery .energy-board-node-icon{color:var(--ux-battery)}
+body[data-theme] .energy-board-grid .energy-board-node-icon{color:var(--ux-grid)}
+body[data-theme] .energy-board-source:hover,body[data-theme] .energy-board-node:hover{
+  transform:translateY(-2px);box-shadow:0 8px 18px rgba(50,90,155,.12)}
+body[data-theme] .energy-board-source.is-focused,body[data-theme] .energy-board-node.is-focused{
+  outline:2px solid var(--ux-accent);outline-offset:2px;box-shadow:0 0 0 4px var(--ux-raised)}
+body[data-theme] .energy-board-hub{display:flex;flex-direction:column;align-items:center;
+  text-align:center;justify-content:center;gap:9px;border-radius:25px;padding:20px 11px;
+  min-height:175px;background:linear-gradient(152deg,var(--ux-battery-bg),var(--ux-raised));
+  border:2px solid var(--ux-battery-line);box-shadow:0 12px 32px rgba(24,150,117,.08)}
+body[data-theme] .energy-board-hub-icon{width:62px;height:62px;display:grid;place-items:center;
+  font-size:33px;border-radius:50%;color:var(--ux-battery);
+  background:var(--ux-surface);box-shadow:0 0 0 9px rgba(45,185,135,.1)}
+body[data-theme] .energy-board-hub strong{color:var(--ux-title);font-size:12px;letter-spacing:.04em}
+body[data-theme] .energy-board-hub small{color:var(--ux-battery);font-size:11px;font-weight:800}
+body[data-theme] .energy-board-hub-note{color:var(--ux-muted);font-size:10px;line-height:1.4}
+body[data-theme] .energy-board-wire{position:relative;min-height:55px;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--ux-muted)}
+body[data-theme] .energy-board-wire:before{content:"";position:absolute;left:0;right:0;top:53%;
+  border-top:3px solid var(--ux-line);border-radius:3px}
+body[data-theme] .energy-board-wire.has-flow:before{border-color:var(--ux-accent)}
+body[data-theme] .energy-board-wire.wire-solar1.has-flow:before,
+body[data-theme] .energy-board-wire.wire-solar2.has-flow:before{border-color:var(--ux-solar)}
+body[data-theme] .energy-board-wire.wire-battery.has-flow:before{border-color:var(--ux-battery)}
+body[data-theme] .energy-board-wire.wire-house.has-flow:before{border-color:var(--ux-load)}
+body[data-theme] .energy-board-wire.wire-grid.has-flow:before{border-color:var(--ux-grid)}
+body[data-theme] .energy-board-wire-title{font-size:10px;text-align:center;color:var(--ux-muted);
+  padding:3px 5px;background:var(--ux-surface);z-index:1;border-radius:6px;white-space:nowrap}
+body[data-theme] .energy-board-direction{font-size:24px;line-height:1;color:var(--ux-accent);
+  background:var(--ux-surface);z-index:1;padding:0 5px;font-weight:900}
+body[data-theme] .energy-board-wire.no-flow .energy-board-direction{color:var(--ux-muted)}
+body[data-theme] .energy-board-wire.is-highlight:before{border-width:5px;
+  box-shadow:0 0 12px rgba(75,140,225,.27)}
+body[data-theme] .energy-board-foot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:14px;margin-top:17px}
+body[data-theme] .energy-board-inspector{background:var(--ux-subtle);border:1px solid var(--ux-line);
+  border-radius:14px;padding:13px 16px;min-height:66px;display:flex;flex-direction:column;gap:6px}
+body[data-theme] .energy-board-inspector-title{color:var(--ux-title);font-size:13px}
+body[data-theme] .energy-board-inspector-description{color:var(--ux-muted);font-size:11px;
+  line-height:1.45;margin:0}
+body[data-theme] .energy-board-inspector-timestamp{color:var(--ux-muted);font-size:10px}
+body[data-theme] .energy-board-disclaimer{font-size:10px;line-height:1.55;color:var(--ux-muted);
+  margin:0;align-self:center}
+body[data-theme] .energy-board.is-live .energy-board-wire.has-flow:after{
+  content:"";position:absolute;top:calc(53% - 3px);left:0;width:7px;height:7px;
+  border-radius:50%;background:var(--ux-accent);animation:energy-dot 1.8s linear infinite}
+@keyframes energy-dot{from{left:0}to{left:calc(100% - 7px)}}
+/* The SSR board has no invented arrows or battery power: only real initial MySQL values. */
+body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:minmax(0,1fr) minmax(0,.75fr) minmax(0,1fr)}
+body[data-theme] .energy-board-ssr .energy-board-sources,body[data-theme] .energy-board-ssr .energy-board-sinks{
+  display:flex;flex-direction:column;gap:9px}
+body[data-theme] .energy-board-ssr .energy-board-source,
+body[data-theme] .energy-board-ssr .energy-board-node{cursor:default}
+body[data-theme] .energy-board-ssr .energy-board-node{display:flex;justify-content:space-between;min-height:50px}
+body[data-theme] .energy-board-ssr .energy-board-node small{font-size:11px;color:var(--ux-muted)}
+@media(max-width:1180px){
+ body[data-theme] .energy-board-map{grid-template-columns:minmax(165px,1fr) minmax(33px,.16fr)
+  minmax(125px,.7fr) minmax(33px,.16fr) minmax(165px,1fr);gap:6px}
+ body[data-theme] .energy-board-node{padding:10px 9px;grid-template-columns:25px 1fr auto}
+ body[data-theme] .energy-board-source{padding:10px}
+ body[data-theme] .energy-board-hub{min-height:150px}
+ body[data-theme] .energy-board-direction{font-size:19px}
+}
+@media(max-width:960px){
+ body[data-theme] .energy-board-map{display:grid;grid-template-columns:minmax(0,1fr) minmax(35px,.16fr) minmax(0,1fr);
+  gap:8px}
+ body[data-theme] .energy-board-sources{grid-column:1;grid-row:1}
+ body[data-theme] .source-wires{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board-hub{grid-column:3;grid-row:1}
+ body[data-theme] .sink-wires{grid-column:2;grid-row:2;transform:rotate(180deg)}
+ body[data-theme] .energy-board-sinks{grid-column:1;grid-row:2}
+ body[data-theme] .energy-board-foot{grid-template-columns:1fr}
+ body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:1fr 1fr}
+ body[data-theme] .energy-board-ssr .energy-board-hub{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-column:1/3;grid-row:2;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board{padding:16px 13px}
+ body[data-theme] .energy-board-header{gap:9px}
+ body[data-theme] .energy-board-flags{align-items:flex-start}
+ body[data-theme] .energy-board-map{grid-template-columns:1fr;gap:9px}
+ body[data-theme] .energy-board-sources,body[data-theme] .energy-board-hub,
+ body[data-theme] .energy-board-sinks,body[data-theme] .source-wires,body[data-theme] .sink-wires{
+   grid-column:1;grid-row:auto;transform:none}
+ body[data-theme] .energy-board-wires{display:none}
+ body[data-theme] .energy-board-sources{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+ body[data-theme] .energy-board-source{min-height:92px;align-items:flex-start}
+ body[data-theme] .energy-board-source-icon{font-size:22px;width:27px}
+ body[data-theme] .energy-board-source-text strong{font-size:16px}
+ body[data-theme] .energy-board-source-text span{font-size:9px}
+ body[data-theme] .energy-board-hub{min-height:86px;gap:3px;padding:8px}
+ body[data-theme] .energy-board-hub-icon{width:35px;height:35px;font-size:19px}
+ body[data-theme] .energy-board-hub-note{display:none}
+ body[data-theme] .energy-board-sinks{display:grid;grid-template-columns:1fr;gap:7px}
+ body[data-theme] .energy-board-node{padding:11px}
+ body[data-theme] .energy-board-modes{width:100%;justify-content:center}
+ body[data-theme] .energy-board-mode{flex:1;padding:8px 5px}
+ body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:1fr}
+ body[data-theme] .energy-board-ssr .energy-board-hub,
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-column:1;grid-row:auto}
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){body[data-theme] .energy-board-wire:after{animation:none!important}
+ body[data-theme] .energy-board-source,body[data-theme] .energy-board-node{transition:none!important;transform:none!important}}
