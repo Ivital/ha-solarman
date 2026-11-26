@@ -302,10 +302,14 @@ def run():
                     page.on("pageerror",lambda error:errors.append(str(error)))
                     for route,selector in route_targets.items():
                         page.goto(base + "/#/" + route, wait_until="load")
+                        page.reload(wait_until="load")
+                        page.wait_for_function("(route) => document.body.dataset.route === route", arg=route)
                         page.wait_for_selector("#content " + selector,timeout=20000)
                         assert page.locator("body").get_attribute("data-route") == route
                         assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), f"Overflow: {route}/{width}"
                         assert not errors,(route,errors)
+                        nav_icon = page.locator(".mobile-tabs a[data-route=overview] .mobile-tab-symbol" if width < 761 else '.nav a[href="#/overview"] .symbol').first
+                        assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
                         if route in {"history","archive","trends","parallel"}:
                             chart=page.locator("#content .product-timeseries").first
                             label=chart.locator(".product-chart-label")
@@ -313,6 +317,12 @@ def run():
                             chart.focus()
                             page.keyboard.press("Home")
                             assert label.text_content()!=before,route
+                        if route in {"pv","battery","grid","load","inverter"}:
+                            search=page.locator(".catalog-controls input")
+                            search.fill("неможливий_ключ")
+                            assert page.locator(".product-metric-catalog .metric:visible").count() == 0
+                            search.fill("")
+                            assert page.locator(".product-metric-catalog .metric:visible").count() > 0
                         if route=="parallel":
                             assert page.locator(".parallel-device").count()==2
                             assert not page.locator("details.parallel-raw-viewer").first.get_attribute("open")
