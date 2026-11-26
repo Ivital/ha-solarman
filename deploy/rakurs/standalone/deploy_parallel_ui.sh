@@ -44,7 +44,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261126-12' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261126-13' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -177,6 +177,13 @@ for fragment in ("/static/app-parallel-twin-20261125.js",
                  "/static/parallel-twin-20261125.css",
                  'Показники Deye з бази даних'): 
     assert fragment in html, "Missing HTML/DB content: " + fragment
+assert "/static/rakurs-energy-board-20261126" not in html
+assert "dashboard-toolbar-ssr" not in html
+redirected=c.get("/?ux=v7",base_url="https://localhost")
+assert redirected.status_code==302 and redirected.headers["Location"]=="/"
+for old in ("rakurs-energy-board-20261126.js","rakurs-energy-board-20261126.css"):
+    assert c.get("/static/"+old,base_url="https://localhost").status_code==404
+print("CANONICAL_SINGLE_OVERVIEW_AND_RETIRED_ASSETS=PASS")
 print("PARALLEL_EXISTING_HOME=PASS")
 deye_page = c.get("/deye", base_url="https://localhost")
 assert deye_page.status_code == 200

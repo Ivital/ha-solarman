@@ -260,6 +260,7 @@ if __name__ == '__main__':
             flow=ap.locator(".rv7-mobile [data-motion=pv1]")
             assert flow.count()==1
             assert flow.get_attribute("data-direction")=="forward"
+            assert float(ap.locator(".rv7-mobile [data-flow=pv1]").evaluate("(e)=>getComputedStyle(e).opacity")) < 0.5
             assert flow.evaluate("(e)=>getComputedStyle(e).animationName")=="rv7-energy-travel"
             initial=flow.evaluate("(e)=>getComputedStyle(e).strokeDashoffset")
             ap.wait_for_timeout(450)

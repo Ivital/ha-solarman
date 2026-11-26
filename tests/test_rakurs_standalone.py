@@ -66,6 +66,15 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertIn('"/api/v1"', js)
         self.assertNotIn("/api/states", js)
 
+    def test_experimental_overview_redirects_to_canonical(self):
+        result = self.client.get("/?ux=v7&utm_source=chatgpt.com")
+        self.assertEqual(result.status_code, 302)
+        self.assertEqual(result.headers["Location"], "/")
+        html = self.client.get("/").get_data(as_text=True)
+        self.assertIn("rakurs-server-fallback", html)
+        self.assertNotIn("/static/rakurs-energy-board-20261126", html)
+        self.assertNotIn("dashboard-toolbar-ssr", html)
+
     def test_remote_clients_denied(self):
         self.assertEqual(
             self.client.get("/", environ_overrides={"REMOTE_ADDR": "192.168.5.21"}).status_code,

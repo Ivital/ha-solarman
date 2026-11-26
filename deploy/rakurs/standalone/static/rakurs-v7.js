@@ -417,7 +417,7 @@
    put(row,h("span","","Час вимірювання"),
     h("span","",timestamps.length+" записів"));
    const restore=h("button","rv7-latest","Останній запис");restore.type="button";
-   restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;onRestore?.();if(hasRange&&endTime!==latest){endTime=latest;day.value=kyivDay(latest);chosenTime=null;fetchSeries();}else{chosenTime=timestamps.at(-1);chart();}});
+   restore.addEventListener("click",()=>{stopPlayback();explicitSelection=false;onRestore?.();if(hasRange&&endTime!==latest){endTime=latest;day.value=kyivDay(latest);chosenTime=null;fetchSeries();}else{chosenTime=availableTimes.at(-1);chart();}});
    if(!control.contains(slider))control.replaceChildren(row,slider,put(h("div","rv7-playback-actions"),play,restore));
    else control.querySelector("label").replaceChildren(...Array.from(row.childNodes));
   }

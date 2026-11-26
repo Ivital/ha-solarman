@@ -412,3 +412,12 @@ body[data-theme] .rakurs-server-fallback>p{font-size:12px;color:var(--ux-muted)}
 body[data-theme].rakurs-v7-overview .topbar .mode-indicator{display:none}
 body[data-theme].rakurs-v7-overview .topbar .updated{display:none}
 body[data-theme].rakurs-v7-overview .side-bottom{display:none}
+
+/* Contrast between the static conductor and moving energy segments. */
+.rv7-diagram .rv7-wire-pv1,.rv7-diagram .rv7-wire-pv2{opacity:.30}
+.rv7-flow-animation.flow-forward{stroke-width:3.5;stroke-dasharray:6 17;filter:drop-shadow(0 0 1.5px currentColor)}
+.rv7-flow-animation.flow-pv{color:var(--v7-pv)}
+.rv7-flow-animation.flow-load{color:var(--v7-load)}
+@keyframes rv7-energy-travel{from{stroke-dashoffset:0}to{stroke-dashoffset:-23}}
+.rv7-motion-paused .rv7-flow-animation{animation-play-state:paused}
+@media(prefers-reduced-motion:reduce){.rv7-flow-animation{filter:none;animation:none!important}}
