@@ -62,7 +62,7 @@
   function quality(item,ctx){
     if(!item?.valid)return "missing";
     if(!item.observed_at_utc)return "unverified";
-    if(ctx.isLive&&fresh(item.observed_at_utc,ctx.now))return "live";
+    if(ctx.isLive&&item.register_verified&&fresh(item.observed_at_utc,ctx.now))return "live";
     return "archive";
   }
   function differing(a,b){
@@ -105,13 +105,16 @@
     ].filter(item=>item.valid);
     const last=lastOf(validReadings);
     const reportedFresh=devices.length===2&&devices.every(d=>{
-      const timestamps=Object.values(d.values||{}).map(r=>date(r?.observed_at_utc)).filter(Boolean);
-      return timestamps.length>0&&fresh(timestamps.sort().at(-1),now);
+      return d.telemetry_error!==true&&["pv_power",...SHARED_KEYS].every(key=>{
+        const item=read(d.values,key,d);
+        return item.valid&&item.register_verified&&fresh(item.observed_at_utc,now);
+      });
     });
     // All three physical gates + firmware/register semantics must be verified.
     const isLive=Boolean(config.status?.collector_active===true&&
       config.status?.physical_topology_verified===true&&
-      config.status?.register_semantics_verified===true&&reportedFresh);
+      config.status?.register_semantics_verified===true&&reportedFresh&&
+      !SHARED_KEYS.some(key=>reports[key].conflict));
     const ctx={isLive,now};
     for(const pv of sources)pv.reading={...pv.reading,quality:quality(pv.reading,ctx)};
     for(const key of SHARED_KEYS){

@@ -208,7 +208,7 @@ def run():
                     page = context.new_page()
                     page_errors = []
                     page.on("pageerror", lambda error: page_errors.append(str(error)))
-                    page.goto(base + "/?ux=v7#/overview", wait_until="load")
+                    page.goto(base + "/", wait_until="load")
                     wait_rendered(page)
                     assert page.locator("body").get_attribute("data-theme") == theme
                     assert not page_errors, page_errors
@@ -246,7 +246,7 @@ def run():
                         page.get_by_role("tab", name="Інженерний режим").click()
                         assert page.locator(".rv7-engineer tbody tr").count() == 5
                         page.get_by_role("tab", name="Огляд").click()
-                        page.locator(".rv7-mobile [data-node='bus']").click()
+                        page.locator(".rv7-mobile [data-node='inv1']").click()
                         page.locator(".rv7-panel a[href='#/parallel']").click()
                         page.wait_for_function("location.hash === '#/parallel'")
                         page.wait_for_function(
@@ -262,7 +262,7 @@ def run():
                     server.scenario = scenario
                     context = browser.new_context(viewport={"width": 390, "height": 844})
                     page = context.new_page()
-                    page.goto(base + "/?ux=v7#/overview", wait_until="load")
+                    page.goto(base + "/", wait_until="load")
                     page.wait_for_function(
                         "() => !!document.querySelector('.banner.warning')", timeout=20000)
                     assert has_real_ssr(page), scenario + ": trusted SSR was erased"
@@ -277,7 +277,7 @@ def run():
                     server.scenario = scenario
                     context = browser.new_context(viewport={"width": 390, "height": 844})
                     page = context.new_page()
-                    page.goto(base + "/?ux=v7#/overview", wait_until="load")
+                    page.goto(base + "/", wait_until="load")
                     page.wait_for_selector(".rv7-mobile [data-node='pv2']", timeout=20000)
                     if scenario == "d2-down":
                         assert "—" in page.locator(

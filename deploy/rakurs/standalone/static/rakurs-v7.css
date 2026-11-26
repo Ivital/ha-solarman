@@ -7,10 +7,10 @@
  --v7-battery:#178b77;--v7-battery-soft:#ebf8f4;
  --v7-grid:#7561ad;--v7-grid-soft:#f4f1fc;
  --v7-shadow:0 10px 36px rgba(20,43,68,.06);
- --v7-radius:18px;--v7-gap:16px;
+ --v7-radius:12px;--v7-gap:12px;
  color:var(--v7-ink);background:var(--v7-bg);
  border-radius:20px;box-sizing:border-box;
- padding:clamp(12px,2vw,24px);max-width:1600px;margin:0 auto;
+ padding:clamp(8px,1.1vw,16px);max-width:1600px;margin:0 auto;
  font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
  font-variant-numeric:tabular-nums;font-size:14px;line-height:1.45;
 }
@@ -34,7 +34,7 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
  clip:rect(0,0,0,0);white-space:nowrap}
 .rv7-top{
  display:flex;align-items:center;justify-content:space-between;gap:12px;
- margin:0 0 16px;flex-wrap:wrap}
+ margin:0 0 8px;flex-wrap:wrap}
 .rv7-heading{display:flex;align-items:center;gap:12px;min-width:0}
 .rv7-appmark{width:42px;height:42px;display:grid;place-items:center;
  border-radius:14px;background:var(--v7-accent-bg);color:var(--v7-primary);
@@ -52,9 +52,9 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-pill.is-missing{color:var(--v7-load);background:var(--v7-load-soft)}
 .rv7-tabs{display:inline-flex;gap:3px;padding:4px;
  background:var(--v7-card);border:1px solid var(--v7-line);
- border-radius:13px;margin-bottom:16px}
+ border-radius:9px;margin-bottom:10px}
 .rv7-tab{border:0;background:transparent;border-radius:9px;
- color:var(--v7-muted);padding:9px 14px;min-height:42px;font-weight:730}
+ color:var(--v7-muted);padding:6px 12px;min-height:40px;font-weight:730}
 .rv7-tab[aria-selected="true"]{background:var(--v7-accent-bg);color:var(--v7-primary)}
 .rv7-shell{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);
  gap:var(--v7-gap);align-items:start}
@@ -62,7 +62,7 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
  border-radius:var(--v7-radius);box-shadow:var(--v7-shadow);
  overflow:hidden;min-width:0}
 .rv7-card-head{display:flex;align-items:center;justify-content:space-between;
- gap:12px;padding:18px 18px 4px}
+ gap:8px;padding:12px 14px 4px}
 .rv7-card-title{color:var(--v7-ink);font-weight:810;font-size:15px;letter-spacing:-.01em}
 .rv7-card-meta{color:var(--v7-muted);font-size:11px;font-weight:650}
 .rv7-schema-wrap{position:relative;padding:4px 12px 13px;min-width:0}
@@ -75,13 +75,13 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-diagram [data-node].is-active .rv7-node-bg{
  stroke:var(--v7-primary);stroke-width:2.5}
 .rv7-diagram [data-node] text{pointer-events:none}
-.rv7-diagram .rv7-node-bg{fill:var(--v7-card-alt);stroke:var(--v7-line);stroke-width:1.3}
+.rv7-diagram .rv7-node-bg{fill:var(--v7-card);stroke:var(--v7-line);stroke-width:1}
 .rv7-diagram .rv7-node-pv{fill:var(--v7-pv-soft);stroke:color-mix(in srgb,var(--v7-pv) 28%,var(--v7-line))}
 .rv7-diagram .rv7-node-load{fill:var(--v7-load-soft);stroke:color-mix(in srgb,var(--v7-load) 28%,var(--v7-line))}
 .rv7-diagram .rv7-node-battery{fill:var(--v7-battery-soft);stroke:color-mix(in srgb,var(--v7-battery) 28%,var(--v7-line))}
 .rv7-diagram .rv7-node-grid{fill:var(--v7-grid-soft);stroke:color-mix(in srgb,var(--v7-grid) 28%,var(--v7-line))}
 .rv7-diagram .rv7-node-bus{fill:var(--v7-accent-bg);stroke:color-mix(in srgb,var(--v7-primary) 20%,var(--v7-line))}
-.rv7-diagram .rv7-node-label{font-size:12px;font-weight:690;fill:var(--v7-muted)}
+.rv7-diagram .rv7-node-label{font-size:11px;font-weight:690;fill:var(--v7-muted)}
 .rv7-diagram .rv7-node-value{font-size:19px;font-weight:800;fill:var(--v7-ink);letter-spacing:-.02em}
 .rv7-diagram .rv7-node-icon{font-size:17px;font-weight:680;fill:var(--v7-muted)}
 .rv7-diagram .rv7-bus-title{font-weight:850;fill:var(--v7-ink);font-size:13px}
@@ -191,27 +191,27 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
  .rv7-chart{height:185px}
 }
 @media(max-width:600px){
- .rv7{padding:10px 8px 18px;border-radius:0;--v7-gap:12px}
- .rv7-top{margin:0 0 12px}
+ .rv7{padding:5px 4px 12px;border-radius:0;--v7-gap:8px}
+ .rv7-top{margin:0 0 6px}
  .rv7-appmark{width:36px;height:36px;border-radius:11px;font-size:20px}
- .rv7-title{font-size:19px}
+ .rv7-title{font-size:17px}
  .rv7-subtitle{font-size:10px}
  .rv7-status{gap:6px}
  .rv7-pill{font-size:10px;padding:4px 8px;min-height:28px}
- .rv7-tabs{display:flex;width:100%;margin-bottom:12px}
+ .rv7-tabs{display:flex;width:100%;margin-bottom:7px;padding:2px}
  .rv7-tab{flex:1;text-align:center;min-width:0;font-size:12px}
- .rv7-card{border-radius:15px}
- .rv7-card-head{padding:12px 13px 0;gap:6px}
+ .rv7-card{border-radius:12px}
+ .rv7-card-head{padding:9px 10px 0;gap:6px}
  .rv7-card-title{font-size:13px}
  .rv7-card-meta{font-size:10px}
- .rv7-schema-wrap{padding:3px 3px 7px}
- .rv7-flow-foot{padding:0 12px 10px}
+ .rv7-schema-wrap{padding:0 2px 3px}
+ .rv7-flow-foot{padding:0 8px 5px;gap:5px}
  .rv7-source-label{font-size:10px}
  .rv7-link{min-height:38px;font-size:11px}
  .rv7-ranges{gap:0}
  .rv7-range{padding:5px 6px;font-size:10px}
  .rv7-chart-box{padding:0 11px 9px;min-height:0}
- .rv7-chart{height:143px}
+ .rv7-chart{height:132px}
  .rv7-secondary{grid-template-columns:1fr;margin-top:12px;gap:12px}
  .rv7-secondary .rv7-card{padding:12px 13px}
  .rv7-panel{left:0;top:auto;bottom:0;right:0;width:100%;
@@ -227,7 +227,7 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
  .rv7 *,.rv7 *::before,.rv7 *::after{animation:none!important;transition:none!important}
 }
 
-/* V7 layout is opt-in; legacy V6 layout stays untouched. */
+/* Responsive V7 canonical overview. */
 .rv7-mobile{display:none}
 @media(max-width:600px){.rv7-mobile{display:block}.rv7-desktop{display:none}}
 
@@ -255,7 +255,7 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-history-error:empty{display:none}
 
 /* The warning summary follows the energy diagram, ahead of the archive graph. */
-.rv7-overview-left{display:grid;gap:12px;align-content:start;min-width:0}
+.rv7-overview-left{display:grid;gap:7px;align-content:start;min-width:0}
 .rv7-overview-left .rv7-warnings{margin-top:0}
 .rv7-warning-details{border:1px solid var(--v7-line);border-radius:12px;
  background:var(--v7-card);font-size:12px;color:var(--v7-muted)}
@@ -284,3 +284,10 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
   min-width:100px;padding:5px 7px}
  body[data-theme].rakurs-v7-overview .content{padding-top:6px}
 }
+
+.rv7-equipment-icon{fill:none;stroke:var(--v7-muted);stroke-width:1.55;stroke-linecap:round;stroke-linejoin:round;pointer-events:none}
+.rv7-direction{stroke:var(--v7-pv);fill:none;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
+.rv7-axis{font-size:10px;fill:var(--v7-muted)}
+.rv7-diagram .rv7-node-bg{stroke-width:1}
+.rv7-diagram .rv7-node-pv,.rv7-diagram .rv7-node-load,.rv7-diagram .rv7-node-battery,.rv7-diagram .rv7-node-grid{fill:var(--v7-card)}
+@media(max-width:600px){.rv7-top{align-items:center;gap:4px}.rv7-subtitle{display:none}.rv7-tab{min-height:40px}.rv7-diagram-card .rv7-link{min-height:44px}.rv7-warning-details summary{padding:7px 10px}.rv7-message{padding:7px 9px}.rv7-card-meta{max-width:50%;text-align:right}}

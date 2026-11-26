@@ -1,6 +1,6 @@
 "use strict";
 /* Rakurs V7: data-driven SVG dispatch, read-only archive & engineering mode.
-   No telemetry is fabricated and V6 remains the default interface. */
+   No telemetry is fabricated; V7 is the canonical overview. */
 (function(root){
  const M=root.RakursV7Model,NS="http://www.w3.org/2000/svg";
  let mode="overview",hours=24,chosenTime=null;
@@ -13,8 +13,8 @@
   if(scope.dialogClose)scope.dialogClose();
   activeScopes.delete(scope);
  }
- const classes={pv1:"pv",pv2:"pv",bus:"bus",load:"load",battery:"battery",grid:"grid"};
- const labels={pv1:"PV · Deye №1",pv2:"PV · Deye №2",bus:"Два інвертори",
+ const classes={pv1:"pv",pv2:"pv",inv1:"bus",inv2:"bus",bus:"bus",load:"load",battery:"battery",grid:"grid"};
+ const labels={pv1:"PV · Deye №1",pv2:"PV · Deye №2",bus:"Спільна шина AC",inv1:"Deye №1",inv2:"Deye №2",
   load:"Будинок",battery:"Акумулятор",grid:"Мережа"};
  const metrics=["pv_power","load_power","battery_power","grid_power","battery_soc"];
  function h(name,cls,value){
@@ -30,31 +30,39 @@
  function source(snap,id){
   if(id==="pv1")return snap.sources[0].reading;
   if(id==="pv2")return snap.sources[1].reading;
+  if(id==="inv1"||id==="inv2")return null;
   if(id==="load")return snap.reports.load_power.reading;
   if(id==="grid")return snap.reports.grid_power.reading;
   if(id==="battery")return snap.reports.battery_soc.reading;
   return null;
  }
  function geometry(mobile){
-  if(mobile)return {
-   w:360,h:330,
-   boxes:{pv1:[9,10,165,76],pv2:[186,10,165,76],bus:[105,132,150,67],
-    load:[7,236,108,81],battery:[126,236,108,81],grid:[245,236,108,81]},
-   paths:[["pv1","M91 86 V106 Q91 117 104 121 L152 132"],
-    ["pv2","M269 86 V106 Q269 117 256 121 L208 132"],
-    ["bus","M180 199 V216 M62 216 H299"],
-    ["load","M62 216 V236"],["battery","M180 216 V236"],["grid","M299 216 V236"]]
-  };
-  return {
-   w:860,h:296,
-   boxes:{pv1:[24,28,188,76],pv2:[24,182,188,76],bus:[330,104,180,84],
-    load:[650,16,190,76],battery:[650,109,190,76],grid:[650,202,190,76]},
-   paths:[["pv1","M212 66 H268 Q286 66 301 86 L330 128"],
-    ["pv2","M212 220 H268 Q286 220 301 202 L330 165"],
-    ["bus","M510 146 H606 M606 54 V240"],
-    ["load","M606 54 H650"],["battery","M606 147 H650"],["grid","M606 240 H650"]]
-
-  };
+  if(mobile)return {w:360,h:286,
+   boxes:{pv1:[20,4,152,62],pv2:[188,4,152,62],inv1:[30,88,132,46],inv2:[198,88,132,46],
+    bus:[132,156,96,26],load:[4,211,112,70],battery:[124,211,112,70],grid:[244,211,112,70]},
+   paths:[["pv1","M96 66 V88"],["pv2","M264 66 V88"],
+    ["inv1","M96 134 V145 H156 V156"],["inv2","M264 134 V145 H204 V156"],
+    ["bus","M180 182 V196 M60 196 H300"],["load","M60 196 V211"],
+    ["battery","M180 196 V211"],["grid","M300 196 V211"]]};
+  return {w:760,h:286,
+   boxes:{pv1:[12,24,142,78],pv2:[12,184,142,78],inv1:[204,32,140,62],inv2:[204,192,140,62],
+    bus:[393,116,100,54],load:[552,8,196,78],battery:[552,104,196,78],grid:[552,200,196,78]},
+   paths:[["pv1","M154 63 H204"],["pv2","M154 223 H204"],
+    ["inv1","M344 63 H368 V132 H393"],["inv2","M344 223 H368 V154 H393"],
+    ["bus","M493 143 H524 M524 47 V239"],["load","M524 47 H552"],
+    ["battery","M524 143 H552"],["grid","M524 239 H552"]]};
+ }
+ function icon(group,id,x,y){
+  const paths={
+   pv1:"M1 3h18l3 13H-2L1 3m5 0-1 13m8-13 1 13M0 9h20M7 16v4m-4 0h8",
+   pv2:"M1 3h18l3 13H-2L1 3m5 0-1 13m8-13 1 13M0 9h20M7 16v4m-4 0h8",
+   inv1:"M3 1h14v19H3zM7 5h6v4H7zM6 15q2-4 4 0t4 0",
+   inv2:"M3 1h14v19H3zM7 5h6v4H7zM6 15q2-4 4 0t4 0",
+   load:"M0 10 10 1l10 9M3 8v12h14V8m-10 12v-7h6v7",
+   battery:"M1 5h18v12H1zM19 9h3v4h-3M5 11h4m-2-2v4m6-2h3",
+   grid:"M10 1 2 21m8-20 8 20M4 15h12M6 9h8M1 5h18M1 5v4m18-4v4",
+   bus:"M1 10h18M5 5v10m10-10v10"};
+  group.appendChild(s("path",{d:paths[id],transform:"translate("+x+" "+y+")",class:"rv7-equipment-icon"}));
  }
  function modal(parent,snap,id,trigger,scope){
   if(scope?.dialogClose)scope.dialogClose();
@@ -68,8 +76,8 @@
   close.type="button";close.setAttribute("aria-label","Закрити деталі");
   put(title,h("h2","",labels[id]),close);sheet.appendChild(title);
   const reading=source(snap,id);
-  sheet.appendChild(h("div","rv7-panel-big",id==="bus"?"Deye №1 + №2":M.fmt(reading)));
-  if(id!=="bus"){
+  sheet.appendChild(h("div","rv7-panel-big",id==="bus"?"Спільна AC-шина":id.startsWith("inv")?labels[id]:M.fmt(reading)));
+  if(id!=="bus"&&!id.startsWith("inv")){
    const data=[
     ["Джерело",reading?.slot_no?"Deye №"+reading.slot_no:"Не підтверджено"],
     ["Дата запису",M.ukTime(reading?.observed_at_utc)],
@@ -90,6 +98,10 @@
      group.appendChild(h("div","", "Deye №"+row.slot_no+": "+M.fmt(row)));
     sheet.appendChild(group);
    }
+  }else if(id.startsWith("inv")){
+   const slot=Number(id.slice(-1)),dev=snap.sources[slot-1].device;
+   sheet.appendChild(h("p","rv7-panel-meta",dev?"Окремий звіт інвертора · "+M.ukTime(snap.sources[slot-1].reading.observed_at_utc):"Джерело телеметрії відсутнє"));
+   for(const key of metrics){const row=h("div","rv7-panel-item");put(row,h("small","",key),h("strong","",M.fmt(M.read(dev?.values,key,dev))));sheet.appendChild(row);}
   }else sheet.appendChild(h("p","rv7-panel-meta",
    "Два PV окремо. АКБ, мережа й навантаження — фізично спільні. Неперевірені звіти не сумуються."));
   const link=h("a","rv7-link","Інвертори");link.href="#/parallel";
@@ -117,35 +129,39 @@
    class:"rv7-diagram "+(mobile?"rv7-mobile":"rv7-desktop"),
    role:"group","aria-label":"Енергосистема: два PV, два Deye, одна АКБ, будинок і мережа"});
   for(const [id,path] of g.paths){
-   const reading=source(snap,id);
-   const supported=reading?.valid && (id!=="grid"||reading.number!==0);
-   svg.appendChild(s("path",{d:path,"data-flow":id,
-    class:"rv7-wire "+(id==="bus"||supported?"rv7-wire-"+id:"is-unknown")}));
+   const reading=id==="battery"?snap.reports.battery_power.reading:source(snap,id);
+   const supported=reading?.valid && reading.number!==0;
+   const wire=s("path",{d:path,"data-flow":id,
+    class:"rv7-wire "+(supported?"rv7-wire-"+id:"is-unknown")});
+   svg.appendChild(wire);
+   // Only verified PV production has an unambiguous directional meaning here.
+   // Shared power reports are not confirmed system totals and must not imply direction.
+   if((id==="pv1"||id==="pv2")&&supported&&reading.number>0&&reading.register_verified&&reading.quality==="live"){
+    const p=wire.getPointAtLength(wire.getTotalLength()*.6);
+    const q=wire.getPointAtLength(wire.getTotalLength()*.6+1);
+    const angle=Math.atan2(q.y-p.y,q.x-p.x)*180/Math.PI;
+    svg.appendChild(s("path",{d:"M-4 -4 L2 0 -4 4",transform:"translate("+p.x+" "+p.y+") rotate("+angle+")",class:"rv7-direction"}));
+   }
   }
-  for(const id of ["pv1","pv2","bus","load","battery","grid"]){
-   const [x,y,w,height]=g.boxes[id],small=w<130,reading=source(snap,id);
+  for(const id of ["pv1","pv2","inv1","inv2","bus","load","battery","grid"]){
+   const [x,y,w,height]=g.boxes[id],reading=source(snap,id),isInv=id.startsWith("inv"),isBus=id==="bus";
    const group=s("g",{"data-node":id,role:"button",tabindex:"0",
     "aria-label":labels[id]+(reading?": "+M.fmt(reading):"")});
-   group.appendChild(s("rect",{x,y,width:w,height,rx:15,ry:15,
-    class:"rv7-node-bg rv7-node-"+classes[id]}));
-   if(id==="bus"){
-    group.appendChild(s("circle",{cx:x+w/2,cy:y+25,r:15,
-     fill:"var(--v7-card)",stroke:"var(--v7-line)"}));
-    group.appendChild(s("text",{x:x+w/2,y:y+32,"text-anchor":"middle",
-     class:"rv7-node-icon"},"ϟ"));
-    group.appendChild(s("text",{x:x+w/2,y:y+49,"text-anchor":"middle",
-     class:"rv7-bus-title"},"Інверторна шина"));
-    group.appendChild(s("text",{x:x+w/2,y:y+61,"text-anchor":"middle",
-     class:"rv7-bus-meta"},"Deye №1 + №2"));
+   group.appendChild(s("rect",{x,y,width:w,height,rx:10,ry:10,class:"rv7-node-bg rv7-node-"+classes[id]}));
+   if(isBus){
+    group.appendChild(s("text",{x:x+w/2,y:y+height/2+4,"text-anchor":"middle",class:"rv7-bus-title"},"AC · шина"));
+   }else if(isInv){
+    icon(group,id,x+12,y+12);
+    const dev=snap.sources[Number(id.slice(-1))-1].device;
+    group.appendChild(s("text",{x:x+40,y:y+19,class:"rv7-bus-title"},labels[id]));
+    group.appendChild(s("text",{x:x+40,y:y+33,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
    }else{
-    const title=id==="battery"?"АКБ":labels[id];
-    group.appendChild(s("text",{x:x+(small?9:14),y:y+(small?21:28),
-     class:"rv7-node-label"},title));
-    group.appendChild(s("text",{x:x+(small?9:14),y:y+(small?47:56),
-     class:"rv7-node-value",style:"font-size:"+(small?14:19)+"px"},M.fmt(reading)));
-    if(id==="battery")group.appendChild(s("text",{
-     x:x+(small?9:14),y:y+height-9,class:"rv7-bus-meta"},
-     M.fmt(snap.reports.battery_power.reading)));
+    const title=id==="battery"?"АКБ":id==="pv1"?"PV 1":id==="pv2"?"PV 2":labels[id];
+    icon(group,id,x+10,y+9);
+    group.appendChild(s("text",{x:x+36,y:y+20,class:"rv7-node-label"},title));
+    group.appendChild(s("text",{x:x+10,y:y+43,class:"rv7-node-value",style:"font-size:"+(w<130?15:20)+"px"},M.fmt(reading)));
+    const detail=id==="battery"?M.fmt(snap.reports.battery_power.reading):id.startsWith("pv")?"Deye №"+id.slice(-1):"Звіт Deye "+(reading?.slot_no||"—");
+    group.appendChild(s("text",{x:x+10,y:y+height-7,class:"rv7-bus-meta"},detail));
    }
    const activate=()=>onDetails(id,group);
    group.addEventListener("click",activate);
@@ -256,15 +272,25 @@
        "За цей період немає архівних вимірювань"));
     control.replaceChildren();time.textContent="";return;
    }
-   const nums=present.flatMap(line=>line.points.map(p=>p.number));
+   const nums=present.filter(line=>line.id!=="soc").flatMap(line=>line.points.map(p=>p.number));
    const lo=Math.min(0,...nums),hi=Math.max(0,...nums),delta=Math.max(1,hi-lo);
    const first=Date.parse(timestamps[0]),last=Date.parse(timestamps.at(-1));
-   const x=t=>12+(Date.parse(t)-first)/Math.max(1,last-first)*456;
+   const x=t=>42+(Date.parse(t)-first)/Math.max(1,last-first)*398;
    const y=n=>151-(n-lo)/delta*139;
+   const socY=n=>151-n/100*139;
+   for(const frac of [0,.5,1]){
+    const val=lo+delta*frac;
+    layer.appendChild(s("text",{x:35,y:y(val)+3,"text-anchor":"end",class:"rv7-axis"},M.pretty(val,1)));
+    if(present.some(line=>line.id==="soc"))layer.appendChild(s("text",{x:446,y:socY(frac*100)+3,class:"rv7-axis"},Math.round(frac*100)+"%"));
+   }
+   layer.appendChild(s("text",{x:5,y:10,class:"rv7-axis"},"кВт"));
+   for(const t of [timestamps[0],timestamps.at(-1)])layer.appendChild(s("text",{x:x(t),y:174,"text-anchor":t===timestamps[0]?"start":"end",class:"rv7-axis"},new Date(t).toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"})));
    for(const line of present){
     let d="";
-    for(const [i,p] of line.points.entries())d+=(i?" L":"M")+
-     x(p.timestamp).toFixed(1)+" "+y(p.number).toFixed(1);
+    for(const [i,p] of line.points.entries()){
+     const gap=i&&Date.parse(p.timestamp)-Date.parse(line.points[i-1].timestamp)>1200000;
+     d+=(i&&!gap?" L":" M")+x(p.timestamp).toFixed(1)+" "+(line.id==="soc"?socY(p.number):y(p.number)).toFixed(1);
+    }
     layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"}));
    }
    if(!chosenTime||!timestamps.includes(chosenTime))chosenTime=timestamps.at(-1);
@@ -364,8 +390,8 @@
   const top=h("header","rv7-top"),heading=h("div","rv7-heading");
   const copy=h("div");
   put(copy,h("h2","rv7-title","Енергосистема"),
-   h("span","rv7-subtitle","Два паралельні Deye"));
-  put(heading,h("div","rv7-appmark","R"),copy);
+   h("span","rv7-subtitle","2 × Deye · диспетчеризація"));
+  put(heading,copy);
   const statuses=h("div","rv7-status");
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
    snap.data_state==="archive"?"◷ Архів":
@@ -401,7 +427,7 @@
    diagramCard.appendChild(wrapped);
    const foot=h("div","rv7-flow-foot");
    foot.appendChild(h("span","rv7-source-label",
-    snap.selected?.slot_no?"Вузли: архів Deye №"+snap.selected.slot_no:"Джерело не встановлено"));
+    snap.selected?.slot_no?"Спільні вузли: звіт Deye №"+snap.selected.slot_no+" · не сума":"Джерело не встановлено"));
    const actions=h("div","rv7-actions");
    const detailButton=h("button","rv7-link","Деталі");detailButton.type="button";
    detailButton.addEventListener("click",()=>{mode="engineer";render(host,config);});
@@ -479,7 +505,7 @@
   return Object.freeze({snapshot:snap,root:app,dispose:()=>disposeScope(scope)});
  }
  function enabled(){
-  return new URLSearchParams(root.location.search).get("ux")==="v7";
+  return true;
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},

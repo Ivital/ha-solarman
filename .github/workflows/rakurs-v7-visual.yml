@@ -3,6 +3,7 @@ on:
   push:
     branches:
       - 'feature/rakurs-v7-*'
+      - 'feature/deye-trb145-monitoring'
   pull_request:
     branches:
       - 'feature/deye-trb145-monitoring'

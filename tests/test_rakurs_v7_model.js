@@ -64,7 +64,13 @@ assert.equal(s.data_state,"archive",
 s=M.snapshot({...cfg,now:Date.parse(when)+30000,
   status:{collector_active:true,physical_topology_verified:true,
     register_semantics_verified:true}});
-assert.equal(s.data_state,"live");
+assert.equal(s.data_state,"archive","Global flags cannot validate unverified or conflicting readings");
+const verified=Object.fromEntries(Object.entries(d1.values).map(([key,val])=>[key,{...val,register_verified:true}]));
+const good=[{...d1,values:verified},{...d2,values:verified}];
+const liveStatus={collector_active:true,physical_topology_verified:true,register_semantics_verified:true};
+assert.equal(M.snapshot({...cfg,devices:good,now:Date.parse(when)+30000,status:liveStatus}).data_state,"live");
+const staleOne={...good[1],values:{...verified,pv_power:{...verified.pv_power,observed_at_utc:"2026-11-24T00:00:00Z"}}};
+assert.equal(M.snapshot({...cfg,devices:[good[0],staleOne],now:Date.parse(when)+30000,status:liveStatus}).data_state,"archive");
 s=M.snapshot({...cfg,now:Date.parse(when)+86_400_000,
   status:{collector_active:true,physical_topology_verified:true,
     register_semantics_verified:true}});

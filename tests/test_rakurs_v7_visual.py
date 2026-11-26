@@ -62,8 +62,8 @@ if __name__ == '__main__':
         selector = ".rv7-mobile" if mobile else ".rv7-desktop"
         board = page.locator(selector)
         assert board.is_visible(), f"{selector} should be visible"
-        assert board.locator("[data-node]").count() == 6
-        assert board.locator("[data-flow]").count() == 6
+        assert board.locator("[data-node]").count() == 8
+        assert board.locator("[data-flow]").count() == 8
         # All source/output connections are drawn within the same SVG viewport.
         result = page.evaluate("""(sel) => {
           const svg=document.querySelector(sel);
@@ -75,7 +75,7 @@ if __name__ == '__main__':
             paths:wires.map(x=>({key:x.getAttribute('data-flow'),d:x.getAttribute('d')}))}
         }""", selector)
         assert result["boxW"] > 300 and result["boxH"] <= 330
-        assert set(result["nodeIds"]) == {"pv1", "pv2", "bus", "load", "battery", "grid"}
+        assert set(result["nodeIds"]) == {"pv1", "pv2", "inv1", "inv2", "bus", "load", "battery", "grid"}
         assert all("M" in path["d"] for path in result["paths"])
         assert page.locator(selector + " [data-flow='pv1'].rv7-wire-pv1").count() == 1
         assert page.locator(selector + " [data-flow='pv2'].rv7-wire-pv2").count() == 1
