@@ -70,7 +70,7 @@
     if(a.unit!==b.unit)return true;
     // This is a difference between independent device reports, not evidence of fault.
     const delta=Math.abs(a.number-b.number),scale=Math.max(Math.abs(a.number),Math.abs(b.number),1);
-    return delta>Math.max(.15,.05*scale);
+    return delta>Math.max(.15,.02*scale);
   }
   function snapshot(config={}){
     const now=Number.isFinite(config.now)?config.now:Date.now();
