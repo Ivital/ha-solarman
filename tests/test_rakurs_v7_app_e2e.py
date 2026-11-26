@@ -27,6 +27,7 @@ TEMPLATE = None  # assigned by run(); importable by other unittest suites
 MEASURED = "2026-11-25T00:16:18Z"
 D1 = "integration_deye_1"
 D2 = "integration_deye_2"
+PAGE_GROUPS = {"pv": [("pv_power","Сонячна генерація")], "battery": [("battery_soc","Заряд"),("battery_power","Потужність АКБ")], "grid": [("grid_power","Мережа")], "load": [("load_power","Споживання")], "inverter": [("inverter_temperature","Температура")]}
 
 
 def reading(value, unit="кВт", stamp=MEASURED):
@@ -108,7 +109,7 @@ class Handler(BaseHTTPRequestHandler):
         self.server.record("GET", self.path)
         scenario = self.server.scenario
         if path == "/api/v1/catalog":
-            self.reply({"groups": {}, "all_metric_count": 0})
+            self.reply({"groups": {group: [{"key": key, "label": label} for key,label in items] for group,items in PAGE_GROUPS.items()}, "all_metric_count": 8})
         elif path == "/api/v1/status":
             self.reply({"mode": "real", "registered_devices": 2,
                         "displayed_signals": 10, "has_real_samples": True,
@@ -116,7 +117,7 @@ class Handler(BaseHTTPRequestHandler):
                         "physical_topology_verified": False,
                         "register_semantics_verified": False})
         elif path == "/api/v1/signals":
-            self.reply({"signals": []})
+            self.reply({"signals": [{"signal_key": key, "label_uk": label, "unit": "%" if key == "battery_soc" else "кВт"} for items in PAGE_GROUPS.values() for key,label in items]})
         elif path == "/api/v1/auth":
             self.reply({"authenticated": True, "role": "viewer",
                         "username": "fixture-viewer", "csrf": "fixture-only"})
@@ -160,6 +161,18 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": device_values(1)})
+        elif path in {"/api/v1/history", "/api/v1/history/range"}:
+            self.reply({"signal":{"unit":"кВт"},"points":[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(4,"кВт","2026-11-24T11:00:00Z"),reading(2,"кВт","2026-11-24T12:00:00Z")],"truncated":False})
+        elif path in {"/api/v1/modbus-fields","/api/v1/parallel/modbus-fields"}:
+            self.reply({"fields":[{"field_key":"pv_power","field_name":"PV power","group_name":"Power","registers_json":"[672]","value_decimal":"5.1","value_text":None,"unit":"кВт","observed_at_utc":MEASURED}],"register_count":1})
+        elif path == "/api/v1/parallel/raw":
+            self.reply({"total":1,"raw_registers":[{"register_address":672,"function_code":3,"raw_uint16":510}]})
+        elif path == "/api/v1/config":
+            self.reply({"available":True,"devices":[],"shared_rs485_buses":[],"enabled":False,"interval_seconds":60,"worker_online":False})
+        elif path == "/api/v1/devices":
+            self.reply({"devices":[{"device_key":D1,"kind":"inverter","model":"Deye 20 kW"}]})
+        elif path == "/api/v1/batches":
+            self.reply({"batches":[]})
         elif path == "/api/v1/parallel/events":
             self.reply({"events": []})
         elif path == "/api/v1/events":
@@ -263,6 +276,52 @@ def run():
                     context.close()
                     print("V7_INTEGRATED_TEMPLATE_%s=PASS" % width)
 
+                # Every existing internal route, both representative viewports and themes.
+                route_targets = {
+                    "pv": ".product-metric-catalog .metric",
+                    "battery": ".product-metric-catalog .metric",
+                    "grid": ".product-metric-catalog .metric",
+                    "load": ".product-metric-catalog .metric",
+                    "inverter": ".product-metric-catalog .metric",
+                    "parallel": ".parallel-device .product-timeseries",
+                    "trends": ".trend-card .product-timeseries",
+                    "history": ".history-workspace .product-timeseries",
+                    "archive": ".history-workspace .product-timeseries",
+                    "events": ".events-list",
+                    "modbus": ".modbus-table tbody tr",
+                    "registers": ".register-row",
+                    "system": ".kv",
+                    "settings": ".settings-panel"
+                }
+                for width,height,theme in [(390,844,"light"),(1440,900,"dark")]:
+                    server.scenario = "normal"
+                    context = browser.new_context(viewport={"width":width,"height":height},locale="uk-UA",reduced_motion="reduce")
+                    context.add_init_script(script=f"localStorage.setItem('rakurs_theme','{theme}')")
+                    page = context.new_page()
+                    errors = []
+                    page.on("pageerror",lambda error:errors.append(str(error)))
+                    for route,selector in route_targets.items():
+                        page.goto(base + "/#/" + route, wait_until="load")
+                        page.wait_for_selector("#content " + selector,timeout=20000)
+                        assert page.locator("body").get_attribute("data-route") == route
+                        assert page.evaluate("document.documentElement.scrollWidth <= window.innerWidth + 2"), f"Overflow: {route}/{width}"
+                        assert not errors,(route,errors)
+                        if route in {"history","archive","trends","parallel"}:
+                            chart=page.locator("#content .product-timeseries").first
+                            label=chart.locator(".product-chart-label")
+                            before=label.text_content()
+                            chart.focus()
+                            page.keyboard.press("Home")
+                            assert label.text_content()!=before,route
+                        if route=="parallel":
+                            assert page.locator(".parallel-device").count()==2
+                            assert not page.locator("details.parallel-raw-viewer").first.get_attribute("open")
+                            page.locator("details.parallel-raw-viewer summary").first.click()
+                            assert page.locator("details.parallel-raw-viewer").first.get_attribute("open") is not None
+                        page.screenshot(path=str(OUT / f"route_{route}_{width}_{theme}.png"),full_page=True,animations="disabled")
+                        report.append({"route":route,"width":width,"theme":theme,"result":"PASS"})
+                        print(f"PRODUCT_ROUTE_{route}_{width}=PASS")
+                    context.close()
                 for scenario in ["twin-down", "both-down"]:
                     server.scenario = scenario
                     context = browser.new_context(viewport={"width": 390, "height": 844})
