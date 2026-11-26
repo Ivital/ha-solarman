@@ -19,7 +19,7 @@ const views = [
   ["settings", "Керування", "⚙"]
 ];
 const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0,
-  selectedDeviceKey: null, selectedSlotNo: 1, role: "viewer", csrf: null };
+  selectedDeviceKey: null, selectedSlotNo: 1, role: "viewer", csrf: null, navQuery: "" };
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
 function setupColorTheme() {
@@ -132,23 +132,58 @@ function activeRoute() {
 }
 function buildNav() {
   clear(navigation);
+  const search=element("input","nav-search");
+  search.type="search";
+  search.placeholder="⌕ Знайти розділ…";
+  search.setAttribute("aria-label","Пошук розділу Rakurs");
+  search.value=state.navQuery;
+  navigation.appendChild(search);
   const sections = [
     ["МОНІТОРИНГ", ["overview", "parallel", "pv", "battery", "grid", "load", "inverter"]],
     ["АНАЛІТИКА", ["trends", "history", "archive", "events"]],
     ["НАЛАШТУВАННЯ", ["modbus", "registers", "settings", "system"]]
   ];
+  const groups=[];
   for (const [label, names] of sections) {
-    navigation.appendChild(element("div", "nav-group-label", label));
+    const header=element("div","nav-group-label",label);
+    navigation.appendChild(header);
+    const links=[];
     for (const name of names) {
-      const view = views.find(v => v[0] === name);
-      const item = element("a", state.route === name ? "active" : "");
-      item.href = "#/" + name;
-      if (state.route === name) item.setAttribute("aria-current", "page");
-      item.title = view[1];
-      add(item, element("span", "symbol", view[2]), element("span", "", view[1]));
+      const view=views.find(item=>item[0]===name);
+      const item=element("a",state.route===name?"active":"");
+      item.href="#/"+name;
+      if(state.route===name)item.setAttribute("aria-current","page");
+      item.title=view[1];
+      add(item,element("span","symbol",view[2]),element("span","",view[1]));
       navigation.appendChild(item);
+      links.push({item,name,label:view[1]});
     }
+    groups.push({header,links});
   }
+  const nothing=element("p","nav-empty","Нічого не знайдено. Спробуйте інший запит.");
+  navigation.appendChild(nothing);
+  function filter(){
+    const query=state.navQuery.trim().toLocaleLowerCase("uk");
+    let visible=0;
+    for(const group of groups){
+      let found=0;
+      for(const link of group.links){
+        const match=!query||(link.label+" "+link.name).toLocaleLowerCase("uk").includes(query);
+        link.item.hidden=!match;
+        if(match){found++;visible++;}
+      }
+      group.header.hidden=found===0;
+    }
+    nothing.hidden=visible>0;
+  }
+  search.addEventListener("input",()=>{state.navQuery=search.value;filter();});
+  search.addEventListener("keydown",event=>{
+    if(event.key==="Escape"){
+      state.navQuery="";search.value="";filter();
+      if(typeof search.blur==="function")search.blur();
+    }
+  });
+  filter();
 }
 function updateConnection(connected) {
   const node = document.getElementById("connection");
@@ -356,6 +391,131 @@ function overviewQuickLinks() {
   return links;
 }
 
+// Personal dashboard settings are browser-local presentation preferences, never telemetry.
+const dashboardMetrics = [
+  ["pv_power","Генерація сонця","☀","solar","Потужність фотоелектричних панелей"],
+  ["load_power","Навантаження","⌂","load","Споживання"],
+  ["battery_soc","Заряд акумулятора","▣","battery","Рівень заряду"],
+  ["grid_power","Мережа","⌁","grid","Обмін із мережею"],
+  ["battery_power","Потужність АКБ","↗","battery","Потужність накопичувача"],
+  ["inverter_temperature","Температура інвертора","♨","load","Температура"],
+  ["pv_energy_today","Вироблено за добу","☀","solar","Добовий підсумок із дати запису"],
+  ["load_energy_today","Спожито за добу","⌂","load","Добовий підсумок із дати запису"]
+];
+const dashboardDefaults=["pv_power","load_power","battery_soc","grid_power"];
+const dashboardPreferenceKey="rakurs.dashboard.metrics.v1";
+function dashboardSavedKeys(){
+  let raw="";
+  try {raw=localStorage.getItem(dashboardPreferenceKey)||"";}catch(_error){}
+  const valid=new Set(dashboardMetrics.map(metric=>metric[0]));
+  const keys=raw.split(",").filter((key,index,array)=>
+    valid.has(key)&&array.indexOf(key)===index);
+  return keys.length?keys:dashboardDefaults.slice();
+}
+function dashboardSaveKeys(keys){
+  try {localStorage.setItem(dashboardPreferenceKey,keys.join(","));}catch(_error){}
+}
+function dashboardConfigurator(deck,values){
+  let selected=dashboardSavedKeys();
+  const wrapper=element("div","dashboard-preferences");
+  const toolbar=element("div","dashboard-toolbar");
+  const description=element("div","dashboard-toolbar-copy");
+  add(description,element("strong","","Моя головна панель"),
+    element("span","", "Вибирайте важливі показники — налаштування залишаться у цьому браузері."));
+  const open=element("button","dashboard-config-button","⚙ Налаштувати картки");
+  open.type="button";
+  open.setAttribute("aria-expanded","false");
+  open.setAttribute("aria-controls","dashboard-options");
+  add(toolbar,description,open);
+  wrapper.appendChild(toolbar);
+  const options=element("section","dashboard-options");
+  options.id="dashboard-options";
+  options.hidden=true;
+  options.setAttribute("aria-label","Налаштування головних показників");
+  const top=element("div","dashboard-options-top");
+  add(top,element("strong","","Оберіть та впорядкуйте показники"),
+    element("p","","Прапорець вмикає картку, стрілки змінюють її порядок. Це не впливає на MySQL."));
+  options.appendChild(top);
+  const presets=element("div","dashboard-presets");
+  const defaultButton=element("button","dashboard-preset","Основні 4");
+  const allButton=element("button","dashboard-preset","Усі 8");
+  const rowList=element("div","dashboard-option-list");
+  const foot=element("div","dashboard-option-footer");
+  const status=element("span","dashboard-config-status","");
+  add(presets,defaultButton,allButton);
+  add(options,presets,rowList);
+  add(foot,status,element("span","","Збережено локально · не змінює показників"));
+  options.appendChild(foot);
+  wrapper.appendChild(options);
+  function drawCards(){
+    clear(deck);
+    for(const key of selected){
+      const item=dashboardMetrics.find(metric=>metric[0]===key);
+      if(!item)continue;
+      deck.appendChild(metricCard(item[1],item[2],key,values,item[3],item[4]));
+    }
+    status.textContent=selected.length+" із 8 показників на головній";
+  }
+  function choose(keys){
+    selected=keys.slice();
+    dashboardSaveKeys(selected);
+    drawCards();
+    drawOptions();
+  }
+  function drawOptions(){
+    clear(rowList);
+    for(const metric of dashboardMetrics){
+      const [key,label,icon]=metric;
+      const position=selected.indexOf(key);
+      const row=element("div","dashboard-option-row");
+      const caption=element("label","dashboard-option-label");
+      const check=element("input","dashboard-check");
+      check.type="checkbox";check.checked=position>=0;check.value=key;
+      check.setAttribute("aria-label","Показувати "+label);
+      check.addEventListener("change",()=>{
+        if(check.checked){
+          if(!selected.includes(key))choose([...selected,key]);
+        }else if(selected.length>1){
+          choose(selected.filter(item=>item!==key));
+        }else{
+          check.checked=true;
+          status.textContent="Має залишитися хоча б одна картка";
+        }
+      });
+      add(caption,check,element("span","",icon+" "+label));
+      row.appendChild(caption);
+      const arrows=element("div","dashboard-option-move");
+      for(const [step,symbol,action] of [[-1,"↑","вище"],[1,"↓","нижче"]]){
+        const button=element("button","dashboard-order-button",symbol);
+        button.type="button";
+        button.disabled=position<0||position+step<0||position+step>=selected.length;
+        button.title="Перемістити "+label+" "+action;
+        button.setAttribute("aria-label",button.title);
+        button.addEventListener("click",()=>{
+          const next=selected.slice(),i=next.indexOf(key),j=i+step;
+          if(i<0||j<0||j>=next.length)return;
+          [next[i],next[j]]=[next[j],next[i]];
+          choose(next);
+        });
+        arrows.appendChild(button);
+      }
+      row.appendChild(arrows);
+      rowList.appendChild(row);
+    }
+  }
+  defaultButton.type="button";allButton.type="button";
+  defaultButton.addEventListener("click",()=>choose(dashboardDefaults));
+  allButton.addEventListener("click",()=>choose(dashboardMetrics.map(metric=>metric[0])));
+  open.addEventListener("click",()=>{
+    options.hidden=!options.hidden;
+    open.setAttribute("aria-expanded",String(!options.hidden));
+    open.textContent=options.hidden?"⚙ Налаштувати картки":"✓ Завершити налаштування";
+  });
+  drawCards();
+  drawOptions();
+  return wrapper;
+}
+
 async function renderOverview(cycle, primedValues = null) {
   addStatusMessage();
   const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
@@ -378,13 +538,7 @@ async function renderOverview(cycle, primedValues = null) {
     "Збережені вимірювання обраного інвертора · не сума двох пристроїв");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
-  deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
-    "Потужність фотоелектричних панелей"));
-  deck.appendChild(metricCard("Навантаження", "⌂", "load_power", values, "load",
-    "Поточне споживання"));
-  deck.appendChild(metricCard("Заряд акумулятора", "▣", "battery_soc", values, "battery"));
-  const grid = metricCard("Мережа", "⌁", "grid_power", values, "grid");
-  deck.appendChild(grid);
+  main.appendChild(dashboardConfigurator(deck,values));
   main.appendChild(deck);
   main.appendChild(overviewQuickLinks());
   await renderTwinSummary(cycle);
@@ -1805,6 +1959,19 @@ async function boot() {
         localStorage.setItem("rakurs.selectedDeye",picked.device_key);
       } catch(_error) {}
       render();
+    });
+  }
+  const refresh=document.getElementById("refresh-data");
+  if(refresh){
+    refresh.addEventListener("click",async()=>{
+      if(refresh.disabled)return;
+      refresh.disabled=true;
+      refresh.textContent="◌ Оновлення…";
+      try{await render();}
+      finally{
+        refresh.disabled=false;
+        refresh.textContent="↻ Оновити";
+      }
     });
   }
   await render();

@@ -328,3 +328,78 @@ body[data-theme] .quick-actions{margin:13px 0}
 body[data-theme] .card.kpi{min-height:164px}
 body[data-theme] .parallel-device{padding:16px}
 @media(max-width:760px){body[data-theme] .trend-empty-summary{padding:19px 13px}}
+
+/* UX v4. Dashboard personalization, discoverable navigation search, manual archival refresh. */
+body[data-theme] .nav-search{width:calc(100% - 15px);max-width:100%;min-height:40px;
+ margin:0 7px 12px;padding:10px 11px;background:var(--ux-subtle);
+ border:1px solid var(--ux-line);border-radius:11px;
+ color:var(--ux-title);font:inherit;font-size:12px;box-sizing:border-box}
+body[data-theme] .nav-search::placeholder{color:var(--ux-muted);opacity:1}
+body[data-theme] .nav-empty{color:var(--ux-muted);font-size:12px;
+ padding:6px 10px;line-height:1.5;margin:0}
+body[data-theme] .nav a[hidden],body[data-theme] .nav-group-label[hidden],
+body[data-theme] .nav-empty[hidden]{display:none!important}
+body[data-theme] .refresh-data{display:inline-flex;align-items:center;justify-content:center;
+ border:1px solid var(--ux-line);border-radius:11px;min-height:38px;
+ background:var(--ux-subtle);color:var(--ux-title);
+ padding:8px 13px;font:inherit;font-size:12px;font-weight:760;cursor:pointer}
+body[data-theme] .refresh-data:hover{background:var(--ux-raised)}
+body[data-theme] .refresh-data:disabled{opacity:.65;cursor:wait}
+body[data-theme] .dashboard-preferences{margin:0 0 13px}
+body[data-theme] .dashboard-toolbar{display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:12px;border:1px solid var(--ux-line);border-radius:15px;
+ background:var(--ux-surface);padding:13px 17px;box-shadow:var(--ux-shadow)}
+body[data-theme] .dashboard-toolbar-copy{display:flex;flex-direction:column;gap:4px}
+body[data-theme] .dashboard-toolbar-copy strong{color:var(--ux-title);font-size:14px}
+body[data-theme] .dashboard-toolbar-copy span{color:var(--ux-muted);font-size:11px;line-height:1.5}
+body[data-theme] .dashboard-config-button,
+body[data-theme] .dashboard-preset{display:inline-flex;align-items:center;justify-content:center;
+ border:1px solid var(--ux-line);border-radius:11px;background:var(--ux-raised);
+ color:var(--ux-title);font:inherit;font-size:12px;font-weight:720;
+ padding:9px 13px;min-height:38px;cursor:pointer;white-space:nowrap}
+body[data-theme] .dashboard-config-button:hover,
+body[data-theme] .dashboard-preset:hover{background:var(--ux-subtle);border-color:var(--ux-accent)}
+body[data-theme] .dashboard-options{margin:11px 0 2px;padding:19px;
+ background:var(--ux-surface);border:1px solid var(--ux-line);
+ border-radius:17px;box-shadow:var(--ux-shadow)}
+body[data-theme] .dashboard-options[hidden]{display:none!important}
+body[data-theme] .dashboard-options-top strong{font-size:16px;color:var(--ux-title)}
+body[data-theme] .dashboard-options-top p{font-size:12px;line-height:1.5;color:var(--ux-muted);margin:6px 0 13px}
+body[data-theme] .dashboard-presets{display:flex;gap:9px;flex-wrap:wrap;margin:0 0 13px}
+body[data-theme] .dashboard-option-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));
+ gap:9px}
+body[data-theme] .dashboard-option-row{display:flex;justify-content:space-between;align-items:center;
+ min-width:0;gap:9px;padding:11px 13px;border:1px solid var(--ux-line);
+ background:var(--ux-subtle);border-radius:11px}
+body[data-theme] .dashboard-option-label{display:flex;align-items:center;gap:10px;
+ color:var(--ux-title);font-size:12px;font-weight:650;cursor:pointer;min-width:0}
+body[data-theme] .dashboard-option-label span{line-height:1.35}
+body[data-theme] .dashboard-check{width:17px;height:17px;min-height:17px;
+ margin:0;accent-color:var(--ux-accent);flex:none}
+body[data-theme] .dashboard-option-move{display:flex;flex:none;gap:5px}
+body[data-theme] .dashboard-order-button{width:31px;height:31px;display:grid;place-items:center;
+ border:1px solid var(--ux-line);background:var(--ux-surface);
+ color:var(--ux-link);border-radius:9px;font-size:17px;cursor:pointer}
+body[data-theme] .dashboard-order-button:hover{border-color:var(--ux-accent)}
+body[data-theme] .dashboard-order-button:disabled{opacity:.32;cursor:default}
+body[data-theme] .dashboard-option-footer{margin-top:14px;display:flex;flex-wrap:wrap;
+ gap:9px;justify-content:space-between;color:var(--ux-muted);font-size:11px}
+body[data-theme] .dashboard-config-status{color:var(--ux-accent);font-weight:760}
+body[data-theme] .cards-main{margin-top:0}
+@media(max-width:1050px) and (min-width:761px){
+  body[data-theme] .nav-search{width:45px;margin:0 4px 12px;padding:8px 5px;font-size:10px}
+}
+@media(max-width:760px){
+  body[data-theme] .nav-search{width:175px;min-width:175px;margin:0 6px 0 0;flex:none}
+  body[data-theme] .dashboard-option-list{grid-template-columns:1fr}
+}
+@media(max-width:510px){
+  body[data-theme] .dashboard-toolbar{align-items:stretch}
+  body[data-theme] .dashboard-toolbar-copy{flex-basis:100%}
+  body[data-theme] .dashboard-config-button{width:100%}
+  body[data-theme] .dashboard-options{padding:13px}
+}
+@media(prefers-reduced-motion:reduce){
+  body[data-theme] .dashboard-config-button,body[data-theme] .dashboard-preset,
+  body[data-theme] .refresh-data{transition:none!important}
+}

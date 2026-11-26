@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
   <link rel="stylesheet" href="/static/clarity-ui-20261124.css">
   <link rel="stylesheet" href="/static/events-ui-20261124.css">
-  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux3-20261126-1">
-  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-ux3-20261126-1">
-  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-ux3-20261126-1"></script>
+  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1">
+  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-ux4-20261126-1">
+  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-ux4-20261126-1"></script>
 </head>
 <body data-theme="light">
   <div class="layout">
@@ -36,6 +36,8 @@
         </div>
         <div class="top-actions">
           <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Перемкнути світлу або темну тему">☾ Темна тема</button>
+          <button id="refresh-data" class="refresh-data" type="button"
+            title="Повторно прочитати збережені показники MySQL. Не запускає опитування інвертора">↻ Оновити</button>
           <label class="device-select-wrap">Deye <select id="device-select" aria-label="Обраний інвертор" hidden></select></label>
           <span id="updated" class="updated">Оновлення даних…</span>
           <span id="mode-indicator" class="mode-indicator mode-archive" title="Збережені дані MySQL, не статус з’єднання з Deye">Архів MySQL</span>
@@ -70,6 +72,13 @@
         <div class="section-header">
           <h2>Ключові показники · Deye №1</h2>
           <span class="subtle">Останні збережені значення · час Київ</span>
+        </div>
+        <div class="dashboard-toolbar dashboard-toolbar-ssr">
+          <div class="dashboard-toolbar-copy">
+            <strong>Моя головна панель</strong>
+            <span>Оберіть показники, які хочете бачити першими. Параметри збережуться у цьому браузері.</span>
+          </div>
+          <span class="subtle">Налаштування карток доступне після завантаження інтерфейсу</span>
         </div>
         <div class="cards cards-main" aria-label="Показники Deye з бази даних">
           {% for idx in [0, 1, 3, 2] %}
