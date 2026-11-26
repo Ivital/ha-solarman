@@ -241,6 +241,14 @@ INSERT INTO rakurs_history_assert(ok) VALUES (
  IF(@new_ui=212984 AND @new_fields=210912 AND
  @old_kinds=0 AND @old_member=0 AND
  @old_quality=0 AND @old_values=0,1,NULL));
+-- Shared house/SOC must have identical values at the same archive time.
+UPDATE rakurs_samples b
+JOIN rakurs_samples a ON a.device_id=2 AND a.signal_id=b.signal_id AND a.observed_at_utc=b.observed_at_utc
+JOIN rakurs_signals s ON s.id=b.signal_id
+SET b.value_decimal=a.value_decimal
+WHERE b.device_id=3 AND s.signal_key IN ('load_power','battery_soc')
+AND a.quality='generated' AND b.quality='generated'
+AND a.value_decimal IS NOT NULL AND b.value_decimal IS NOT NULL;
 SELECT 'HISTORY_POSTINSERT_GUARD=PASS' AS result;
 COMMIT;
 

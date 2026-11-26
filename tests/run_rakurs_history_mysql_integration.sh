@@ -219,3 +219,31 @@ with patch.object(module, "selected_overview_device_id", return_value=2), patch.
         assert len(data["points"]) == 3, data
 print("INTEGRATION_MYSQL_ANALYTICS_COUNTERS_BATCH_LATEST_AND_ARCHIVE=PASS")
 PY
+
+
+# Verify the exact shared-signal migration, including refusal of measured rows,
+# repeatability and preservation of the other signals, in isolated MySQL only.
+query <<'SQL'
+INSERT INTO rakurs_signals(signal_key,label_uk,unit,verified,verification_note)
+VALUES ('load_power','Load','кВт',0,'CI fixture'),('battery_soc','SOC','%',0,'CI fixture');
+INSERT INTO rakurs_samples(device_id,signal_id,observed_at_utc,received_at_utc,value_decimal,quality,ingest_source)
+SELECT d.id,s.id,'2026-11-25 00:16:18.000786','2026-11-25 00:16:18',
+ CASE WHEN s.signal_key='load_power' THEN IF(d.id=2,6.4,6.816) ELSE IF(d.id=2,72,73.8) END,
+ 'generated','rakurs_preview_history'
+FROM rakurs_devices d CROSS JOIN rakurs_signals s WHERE s.signal_key IN ('load_power','battery_soc');
+SQL
+# The CI history fixture has precisely two archive members, polling disabled.
+for attempt in 1 2; do
+  output="$(query < "$ROOT/deploy/rakurs/standalone/sync_shared_archive.sql")"
+  echo "$output"
+  grep -Fq 'SHARED_ARCHIVE_SYNC=PASS' <<<"$output"
+done
+actual="$(query -N -B --execute="SELECT CONCAT(s.signal_key,':',a.value_decimal,':',b.value_decimal) FROM rakurs_samples a JOIN rakurs_samples b ON b.device_id=3 AND a.signal_id=b.signal_id AND a.observed_at_utc=b.observed_at_utc JOIN rakurs_signals s ON s.id=a.signal_id WHERE a.device_id=2 AND s.signal_key IN ('load_power','battery_soc') ORDER BY s.signal_key")"
+test "$actual" = $'battery_soc:72.000000000:72.000000000\nload_power:6.400000000:6.400000000'
+# Refuse if raw/physical data enters the target, even when a difference exists.
+query --execute="UPDATE rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id SET m.quality='measured',m.value_decimal=75 WHERE m.device_id=3 AND s.signal_key='battery_soc'"
+if query < "$ROOT/deploy/rakurs/standalone/sync_shared_archive.sql" >/dev/null 2>&1; then
+  echo 'SHARED_ARCHIVE_PHYSICAL_GUARD=FAIL';exit 2
+fi
+test "$(query -N -B --execute="SELECT m.value_decimal FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id WHERE m.device_id=3 AND s.signal_key='battery_soc'")" = '75.000000000'
+echo 'SHARED_ARCHIVE_MYSQL_TRANSACTION_AND_GUARDS=PASS'

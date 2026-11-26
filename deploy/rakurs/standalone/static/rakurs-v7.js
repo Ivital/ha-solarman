@@ -586,20 +586,22 @@
       snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
    layout.appendChild(shell);
-   if(snap.warnings.length){
+   // Shared report discrepancies are engineering details, not overview notifications.
+   const operationalWarnings=snap.warnings.filter(reason=>!reason.startsWith("Покази вузла «"));
+   if(operationalWarnings.length){
     const notices=h("section","rv7-warnings");
     const item=h("div","rv7-message");
-    const count=snap.warnings.length;
-    const summary=h("span","","Розбіжності показників: "+count);
+    const count=operationalWarnings.length;
+    const summary=h("span","","Доступність даних: "+count);
     const open=h("button","rv7-link","Діагностика");
     open.type="button";
     open.addEventListener("click",()=>{mode="engineer";render(host,config);});
     put(item,h("span","rv7-notice-icon","ⓘ"),summary,open);
     notices.appendChild(item);
      const details=h("details","rv7-warning-details");
-     details.appendChild(h("summary","","Що саме потребує перевірки"));
+     details.appendChild(h("summary","","Стан джерел даних"));
      const reasons=h("ul");
-     for(const reason of snap.warnings)reasons.appendChild(h("li","",reason));
+     for(const reason of operationalWarnings)reasons.appendChild(h("li","",reason));
      details.appendChild(reasons);notices.appendChild(details);
      foot.appendChild(notices);
    }

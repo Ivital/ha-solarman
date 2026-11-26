@@ -283,7 +283,8 @@ def run():
                         assert first_screen["chartTop"] < first_screen["navTop"], "Chart header must be visible on first mobile viewport"
                     assert not page.locator(".rv7 .rv7-pill.is-live").count()
                     assert "Архів" in page.locator(".rv7-pill").first.inner_text()
-                    assert page.locator(".rv7 .rv7-warnings").count() == 1
+                    assert page.locator(".rv7 .rv7-warnings").count() == 0
+                    assert "Покази вузла" not in page.locator(".rv7").inner_text()
                     assert page.evaluate(
                         "document.documentElement.scrollWidth <= window.innerWidth + 2"
                     ), "Live template introduced horizontal page overflow"
