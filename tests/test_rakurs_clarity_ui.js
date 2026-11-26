@@ -235,6 +235,8 @@ async function run() {
     "System diagram must be first, before KPI cards");
   assert(html.includes("/static/rakurs-energy-board-20261126.js"));
   assert(html.includes("/static/rakurs-energy-board-20261126.css"));
+  assert(html.includes("rakurs-energy-board-20261126.css?v=rakurs-mobile-v5-20261126"));
+  assert(html.includes("rakurs-energy-board-20261126.js?v=rakurs-mobile-v5-20261126"));
   assert(html.indexOf("rakurs-energy-board-20261126.js")<
     html.indexOf("app-parallel-twin-20261125.js"),
     "Energy diagram must load before dashboard app");
@@ -362,6 +364,22 @@ async function run() {
     "Only PV arrays are separate, one for each Deye");
   assert.equal(byClass(compareHost,"energy-board-wire").length,5,
     "Two PV links and exactly three common-node links");
+  const outputZone=byClass(compareHost,"energy-board-outputs")[0];
+  const branches=byClass(outputZone,"energy-board-output-row");
+  assert(outputZone && branches.length===3,
+    "One common output zone must contain all three bus branches");
+  const keys=["house","battery","grid"];
+  branches.forEach((branch,index)=>{
+    assert(branch.className.includes("output-"+keys[index]));
+    assert.equal(branch.childNodes.length,2,
+      "Physical output row must keep its wire adjacent to its destination card");
+    assert(branch.childNodes[0].className.includes("wire-"+keys[index]));
+    assert(branch.childNodes[1].className.includes("energy-board-"+keys[index]));
+    assert.equal(byClass(branch,"energy-board-wire").length,1);
+    assert.equal(byClass(branch,"energy-board-node").length,1);
+  });
+  assert.equal(byClass(compareHost,"source-wires")[0].childNodes.length,2);
+  console.log("CLARITY_MOBILE_PAIRED_BRANCH_DOM=PASS");
   assert.equal(byClass(compareHost,"energy-board-wire-lane").length,0,
     "One physical common node must NOT split into per-Deye physical flow lanes");
   assert.equal(byClass(compareHost,"energy-board-reading-row").length,0,
@@ -436,6 +454,25 @@ async function run() {
   assert(energyBoardCss.includes("prefers-reduced-motion"));
   assert(energyBoardCss.includes("energy-board-flow-head"),"Visible direction tips");
   console.log("CLARITY_STREAM_RESPONSIVE_AND_REDUCED_MOTION=PASS");
+  const mobileLayout=energyBoardCss.slice(energyBoardCss.indexOf("/* MOBILE V5:"));
+  assert(mobileLayout.includes("grid-template-rows:48px!important"),
+    "PV connectors must have a single 48px row, not inherited 2-row 100% tracks");
+  assert(mobileLayout.includes("height:48px!important"),
+    "Mobile PV wire container must have an explicit compact height");
+  assert(mobileLayout.includes("min-height:0!important;height:auto!important"),
+    "Mobile map must release inherited grid min-height");
+  assert(mobileLayout.includes(".energy-board-output-row"),
+    "Mobile output node and wire must share one dedicated grid row");
+  assert(mobileLayout.includes("grid-template-columns:clamp(53px,19vw,68px)"),
+    "Mobile output arrows must not consume half the viewport");
+  assert(mobileLayout.includes("@keyframes rakurs-stream-down"),
+    "PV particles must travel vertically toward the inverter hub");
+  assert(mobileLayout.includes(".energy-board-outputs::before") &&
+    mobileLayout.includes(".energy-board-outputs::after"),
+    "Shared bus must visually connect its three independent branches");
+  assert(mobileLayout.includes("@media(prefers-reduced-motion:reduce)"),
+    "OS reduced-motion preference must suppress decorative particles");
+  console.log("CLARITY_MOBILE_360PX_NO_GAPS_AND_CONNECTED_FLOWS=PASS");
   console.log("CLARITY_ONE_COMMON_LOAD_GRID_BATTERY_TWO_SEPARATE_PV=PASS");
   console.log("CLARITY_SHARED_TELEMETRY_DIAGNOSTICS_NO_AGGREGATION=PASS");
   for(const scenario of ["fail","partial"]) {
