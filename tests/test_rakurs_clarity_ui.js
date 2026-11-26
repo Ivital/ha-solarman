@@ -201,7 +201,7 @@ async function run() {
   assert(html.includes("/static/app-parallel-twin-20261125.js"));
   assert(html.includes("/static/parallel-twin-20261125.css"));
   assert(html.includes("/static/events-ui-20261124.css"));
-  assert(html.includes("/static/rakurs-color-20261125.css"));
+  assert(html.includes("/static/rakurs-color-20261125.css?v=rakurs-flow-v4-20261126"));
   assert(html.includes('id="theme-toggle"'));
   assert(html.includes('data-theme="light"'));
   assert(colorCss.includes(".kpi-solar") && colorCss.includes(".kpi-battery"));
