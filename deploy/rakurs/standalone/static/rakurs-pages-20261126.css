@@ -1,0 +1,49 @@
+/* RAKURS UX v2: login and read-only server pages share the dashboard palette. */
+body[data-theme=light]{color-scheme:light;--page:#f3f7fd;--paper:#fff;--soft:#f0f5ff;
+ --ink:#1b304c;--muted:#617891;--line:#dce6f2;--primary:#375fd2;--accent:#244d9d}
+body[data-theme=dark]{color-scheme:dark;--page:#0b1728;--paper:#14293e;--soft:#1b3349;
+ --ink:#e8f2fd;--muted:#b6c9de;--line:#35516a;--primary:#638ee8;--accent:#aacbff}
+body[data-theme]{background:var(--page);color:var(--ink)}
+body[data-theme] :is(a,input,button):focus-visible{outline:3px solid var(--primary);outline-offset:3px}
+body[data-theme] .bar{background:var(--paper);border-color:var(--line);box-shadow:0 5px 25px #123c7610}
+body[data-theme] .brand strong,body[data-theme] .auth-brand strong{color:var(--ink)}
+body[data-theme] .brand small,body[data-theme] .auth-brand small{color:var(--muted)}
+body[data-theme] .brandmark,body[data-theme] .brand-mark{border:0;color:#26496a;
+ background:linear-gradient(135deg,#ffd37b,#93e0c6);box-shadow:0 8px 20px #aa8a5335}
+body[data-theme] .bar nav a{background:var(--soft);color:var(--ink);border-color:var(--line)}
+body[data-theme] .bar nav a[aria-current=page]{background:var(--primary);border-color:var(--primary);color:#fff}
+body[data-theme] .eyebrow{color:var(--primary)}
+body[data-theme] h1,body[data-theme] h2{color:var(--ink)}
+body[data-theme] .meta,body[data-theme] .card-label,body[data-theme] .card-reading small{color:var(--muted)}
+body[data-theme] .count,body[data-theme] .card,body[data-theme] .panel{background:var(--paper);border-color:var(--line);
+ color:var(--ink);box-shadow:0 12px 32px #123d6e12}
+body[data-theme] .count strong,body[data-theme] .count span,body[data-theme] .card-reading{color:var(--ink)}
+body[data-theme] .cards .card:nth-child(4n+1){border-top:5px solid #e6a12c}
+body[data-theme] .cards .card:nth-child(4n+2){border-top:5px solid #20ae85}
+body[data-theme] .cards .card:nth-child(4n+3){border-top:5px solid #8b70de}
+body[data-theme] .cards .card:nth-child(4n){border-top:5px solid #e77466}
+body[data-theme] table{background:var(--paper);color:var(--ink)}
+body[data-theme] th{background:var(--soft);color:var(--ink)}
+body[data-theme] td,body[data-theme] th{border-color:var(--line);color:var(--ink)}
+body[data-theme] tr:nth-child(even){background:var(--soft)}
+body[data-theme] tbody tr:hover{background:var(--soft)}
+body[data-theme] code{background:var(--soft);color:var(--accent)}
+body[data-theme] .empty,body[data-theme] footer{color:var(--muted)}
+body[data-theme].auth-page{position:relative;
+ background:radial-gradient(circle at 21% 13%,#ffe7c17a,transparent 37%),
+ radial-gradient(circle at 81% 79%,#b5caff65,transparent 44%),var(--page)}
+body[data-theme=dark].auth-page{background:radial-gradient(circle at 21% 13%,#e5a75925,transparent 37%),
+ radial-gradient(circle at 81% 79%,#8f78bc26,transparent 44%),var(--page)}
+body[data-theme] .auth-card{background:var(--paper);color:var(--ink);border-color:var(--line);
+ box-shadow:0 17px 46px #1a427721;border-radius:24px;padding:36px}
+body[data-theme] .auth-card h1{color:var(--ink)}
+body[data-theme] .auth-copy,body[data-theme] .auth-foot,body[data-theme] .auth-card label{color:var(--muted)}
+body[data-theme] .auth-card input{background:var(--paper);border:1px solid var(--line);
+ color:var(--ink);border-radius:11px;padding:13px}
+body[data-theme] .auth-submit{background:var(--primary);color:#fff;border-radius:11px}
+body[data-theme] .auth-submit:hover{filter:brightness(.9)}
+body[data-theme] .auth-error{background:#fff0f0;color:#993b3f;border-color:#eec1c1}
+body[data-theme=dark] .auth-error{background:#492b35;color:#ffc3c7;border-color:#784b55}
+body[data-theme] .page-theme-toggle{padding:9px 13px;border:1px solid var(--line);border-radius:10px;
+ background:var(--soft);color:var(--ink);font-size:12px;font-weight:700;cursor:pointer}
+body[data-theme] .auth-theme-wrap{position:absolute;right:18px;top:16px}

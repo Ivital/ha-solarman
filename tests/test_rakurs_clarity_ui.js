@@ -11,6 +11,10 @@ const chartCss = fs.readFileSync(path.join(root, "static/parallel-twin-20261125.
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 const reference = JSON.parse(fs.readFileSync(path.join(root, "static/register-reference-v1053.json"), "utf8"));
 const colorCss = fs.readFileSync(path.join(root, "static/rakurs-color-20261125.css"), "utf8");
+const pagesCss = fs.readFileSync(path.join(root, "static/rakurs-pages-20261126.css"), "utf8");
+const pageTheme = fs.readFileSync(path.join(root, "static/rakurs-page-theme-20261126.js"), "utf8");
+const loginHtml = fs.readFileSync(path.join(root, "templates/login.html"), "utf8");
+const deyeHtml = fs.readFileSync(path.join(root, "templates/deye_server.html"), "utf8");
 
 class Node {
   constructor(tag) {
@@ -190,6 +194,21 @@ async function run() {
   assert(html.includes('id="theme-toggle"'));
   assert(html.includes('data-theme="light"'));
   assert(colorCss.includes(".kpi-solar") && colorCss.includes(".kpi-battery"));
+  for(const selector of [".sidebar",".parallel-fact",".parallel-reading",".parallel-raw-row",
+    ".parallel-field-row",".event-row",".event-count-card",".settings-field",
+    ".shared-bus-inverter",".shared-bus-result",".trend-card",".history-workspace",
+    ".data-table",".register-lead",".quick-link",".insight-strip",".energy-node"]) {
+    assert(colorCss.includes(selector), "Themed surface missing: "+selector);
+  }
+  assert(colorCss.includes("body[data-theme=light]") && colorCss.includes("body[data-theme=dark]"));
+  assert(pagesCss.includes(".auth-card") && pagesCss.includes(".bar"));
+  assert(pageTheme.includes("rakurs_theme"));
+  assert(loginHtml.includes("/static/rakurs-pages-20261126.css"));
+  assert(deyeHtml.includes("/static/rakurs-pages-20261126.css"));
+  assert(loginHtml.includes('id="page-theme-toggle"'));
+  assert(deyeHtml.includes('id="page-theme-toggle"'));
+  assert(html.includes("hero-layout") && html.includes("insight-strip"));
+  console.log("CLARITY_LIGHT_ALL_COMPONENTS_AND_EXTRA_PAGES=PASS");
   assert(colorCss.includes("prefers-reduced-motion"));
   assert.equal(reference.counts.document_addresses,755);
   assert.equal(reference.counts.profile_addresses,815);
@@ -201,8 +220,8 @@ async function run() {
   assert(css.includes(".energy-diagram"));
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
-  assert(html.includes('href="/static/parallel-twin-20261125.css?v=color-reference-20261125-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=color-reference-20261125-1"'));
+  assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux2-20261126"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux2-20261126"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -226,6 +245,10 @@ async function run() {
   const app=prepare("seeded");
   await settle();
   assert.equal(byClass(app.main,"kpi").length,4);
+  assert.equal(byClass(app.main,"dashboard-hero").length,1);
+  assert.equal(byClass(app.main,"insight-item").length,3);
+  assert.equal(byClass(app.main,"quick-link").length,3);
+  console.log("CLARITY_NEW_HOME_HIERARCHY=PASS");
   assert.equal(byClass(app.main,"energy-diagram").length,1);
   assert.equal(byClass(app.main,"parallel-home-device").length,2);
   assert.equal(byClass(app.main,"trend-card").length,4);

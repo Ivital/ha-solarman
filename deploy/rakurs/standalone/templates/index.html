@@ -8,9 +8,9 @@
   <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
   <link rel="stylesheet" href="/static/clarity-ui-20261124.css">
   <link rel="stylesheet" href="/static/events-ui-20261124.css">
-  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=color-reference-20261125-1">
-  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=color-reference-20261125-1">
-  <script defer src="/static/app-parallel-twin-20261125.js?v=color-reference-20261125-1"></script>
+  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux2-20261126">
+  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-ux2-20261126">
+  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-ux2-20261126"></script>
 </head>
 <body data-theme="light">
   <div class="layout">
@@ -43,19 +43,33 @@
         </div>
       </header>
       <main id="content" class="content" data-initial-mode="real">
-        <div class="dashboard-intro">
-          <div class="eyebrow">ЕНЕРГОСИСТЕМА · ОГЛЯД</div>
-          <h2>Енергія під контролем</h2>
-          <p>Основні показники, напрямки потоків та зміни за часом — на одному екрані.</p>
-        </div>
-        <div class="quick-actions" aria-label="Швидкі переходи">
-          <a class="quick-link" href="#/parallel"><b>⧉ Два інвертори</b><small>Показники Deye №1 та №2</small></a>
-          <a class="quick-link" href="#/history"><b>◷ Історія</b><small>Архів збережених вимірювань</small></a>
-          <a class="quick-link" href="#/registers"><b>▥ Регістри V105.3</b><small>Порівняння протоколу та профілю</small></a>
-        </div>
+        <section class="dashboard-intro dashboard-hero">
+          <div class="hero-layout">
+            <div class="hero-copy">
+              <div class="eyebrow">RAKURS · ЦЕНТР ЕНЕРГОСИСТЕМИ</div>
+              <h2>Енергія під вашим контролем</h2>
+              <p>Генерація, батарея, мережа й два Deye — на одному екрані.
+                 Тут показані лише збережені дані MySQL.</p>
+              <div class="hero-tags">
+                <span class="hero-tag">● Збережені вимірювання MySQL</span>
+                <span class="hero-tag pending">◷ Фізичне опитування не підтверджено</span>
+              </div>
+            </div>
+            <div class="hero-visual" aria-hidden="true">
+              <div class="hero-sun">☀</div>
+              <div class="hero-device one">⧉ Deye №1</div>
+              <div class="hero-device two">⧉ Deye №2</div>
+            </div>
+          </div>
+        </section>
+        <section class="insight-strip" aria-label="Джерело та актуальність показників">
+          <div class="insight-item"><span class="insight-icon">▣</span><span class="insight-copy"><small>Джерело даних</small><strong>Збережений архів MySQL</strong></span></div>
+          <div class="insight-item"><span class="insight-icon">◷</span><span class="insight-copy"><small>Час останнього запису</small><strong>Дивіться дату вимірювання в картках</strong></span></div>
+          <div class="insight-item"><span class="insight-icon">⌁</span><span class="insight-copy"><small>Опитування обладнання</small><strong>Не підтверджено</strong></span></div>
+        </section>
         <div class="section-header">
-          <h2>Збережений зріз</h2>
-          <span class="subtle">Останні збережені показники · час Київ</span>
+          <h2>Ключові показники · Deye №1</h2>
+          <span class="subtle">Останні збережені значення · час Київ</span>
         </div>
         <div class="cards cards-main" aria-label="Показники Deye з бази даних">
           {% for idx in [0, 1, 3, 2] %}
@@ -78,6 +92,11 @@
           </article>
           {% endfor %}
         </div>
+        <nav class="quick-actions" aria-label="Швидкі розділи Rakurs">
+          <a class="quick-link" href="#/parallel"><span class="quick-visual">⧉</span><span class="quick-text"><b>Два інвертори</b><small>Перегляд Deye №1 та Deye №2</small></span></a>
+          <a class="quick-link" href="#/history"><span class="quick-visual">◷</span><span class="quick-text"><b>Історія</b><small>Архів вимірювань за період</small></span></a>
+          <a class="quick-link" href="#/registers"><span class="quick-visual">▥</span><span class="quick-text"><b>Регістри Deye</b><small>Адреси V105.3 і кодового профілю</small></span></a>
+        </nav>
 
       </main>
       <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>

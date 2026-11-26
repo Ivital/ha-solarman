@@ -299,6 +299,58 @@ function panel(title, description) {
   return p;
 }
 function current(cycle) { return cycle === state.cycle; }
+function overviewHero() {
+  const intro=element("section","dashboard-intro dashboard-hero");
+  const layout=element("div","hero-layout"),copy=element("div","hero-copy");
+  add(copy,element("div","eyebrow","RAKURS · ЦЕНТР ЕНЕРГОСИСТЕМИ"),
+    element("h2","","Енергія під вашим контролем"),
+    element("p","","Генерація, батарея, мережа й два Deye — на одному екрані. Тут показані лише збережені дані MySQL."));
+  const tags=element("div","hero-tags");
+  add(tags,element("span","hero-tag","● Збережені вимірювання MySQL"),
+    element("span","hero-tag pending","◷ Фізичне опитування не підтверджено"));
+  copy.appendChild(tags);
+  const art=element("div","hero-visual");
+  art.setAttribute("aria-hidden","true");
+  add(art,element("div","hero-sun","☀"),
+    element("div","hero-device one","⧉ Deye №1"),
+    element("div","hero-device two","⧉ Deye №2"));
+  add(layout,copy,art);intro.appendChild(layout);
+  return intro;
+}
+function overviewInsights(values) {
+  const container=element("section","insight-strip");
+  container.setAttribute("aria-label","Джерело та актуальність показників");
+  const validDates=Object.values(values||{}).map(item=>Date.parse(item?.observed_at_utc||""))
+    .filter(value=>Number.isFinite(value));
+  const latest=validDates.length?new Date(Math.max(...validDates)).toISOString():null;
+  for(const [icon,label,value] of [
+    ["▣","Джерело даних","Збережений архів MySQL"],
+    ["◷","Час останнього запису",latest?time(latest):"Записів ще немає"],
+    ["⌁","Опитування обладнання","Не підтверджено"]
+  ]) {
+    const item=element("div","insight-item"),copy=element("div","insight-copy");
+    add(copy,element("small","",label),element("strong","",value));
+    add(item,element("span","insight-icon",icon),copy);
+    container.appendChild(item);
+  }
+  return container;
+}
+function overviewQuickLinks() {
+  const links=element("nav","quick-actions");
+  links.setAttribute("aria-label","Швидкі розділи Rakurs");
+  for(const [route,icon,label,description] of [
+    ["parallel","⧉","Два інвертори","Перегляд Deye №1 та Deye №2"],
+    ["history","◷","Історія","Архів вимірювань за період"],
+    ["registers","▥","Регістри Deye","Адреси V105.3 і кодового профілю"]
+  ]) {
+    const a=element("a","quick-link");a.href="#/"+route;
+    const copy=element("span","quick-text");
+    add(copy,element("b","",label),element("small","",description));
+    add(a,element("span","quick-visual",icon),copy);links.appendChild(a);
+  }
+  return links;
+}
+
 async function renderOverview(cycle, primedValues = null) {
   addStatusMessage();
   const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
@@ -315,27 +367,10 @@ async function renderOverview(cycle, primedValues = null) {
   }
   if (!current(cycle)) return;
 
-  const intro = element("div", "dashboard-intro");
-  add(intro, element("div", "eyebrow", "ЕНЕРГОСИСТЕМА · ОГЛЯД"),
-    element("h2", "", "Енергія під контролем"),
-    element("p", "", "Основні показники, напрямки потоків та зміни за часом — на одному екрані."));
-  main.appendChild(intro);
-  const shortcuts = element("div", "quick-actions");
-  for (const [route, label, description] of [
-    ["parallel", "⧉ Два інвертори", "Перевірити показники Deye №1 та №2"],
-    ["history", "◷ Історія", "Подивитися збережені вимірювання"],
-    ["registers", "▥ Регістри V105.3", "Звірити адреси з документом і профілем"]
-  ]) {
-    const link = element("a", "quick-link");
-    link.href = "#/" + route;
-    add(link, element("b", "", label), element("small", "", description));
-    shortcuts.appendChild(link);
-  }
-  main.appendChild(shortcuts);
-  await renderTwinSummary(cycle);
-  if (!current(cycle)) return;
-  section("Останні показники · Deye №" + state.selectedSlotNo,
-    "Дані обраного інвертора MySQL · без сумування двох пристроїв");
+  main.appendChild(overviewHero());
+  main.appendChild(overviewInsights(values));
+  section("Ключові показники · Deye №" + state.selectedSlotNo,
+    "Збережені вимірювання обраного інвертора · не сума двох пристроїв");
   const deck = element("div", "cards cards-main");
   const batteryPower = reading(values, "battery_power");
   deck.appendChild(metricCard("Генерація сонця", "☀", "pv_power", values, "solar",
@@ -346,6 +381,9 @@ async function renderOverview(cycle, primedValues = null) {
   const grid = metricCard("Мережа", "⌁", "grid_power", values, "grid");
   deck.appendChild(grid);
   main.appendChild(deck);
+  main.appendChild(overviewQuickLinks());
+  await renderTwinSummary(cycle);
+  if (!current(cycle)) return;
 
   section("Енергетична схема", "Зрозумілий напрямок потужності");
   main.appendChild(energyFlow(values));
