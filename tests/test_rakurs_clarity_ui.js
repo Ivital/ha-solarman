@@ -265,7 +265,7 @@ async function run() {
     x.includes("/latest?keys=") &&
     x.includes("&device=sim_deye20k_parallel_2")));
   assert(descendants(app.main).some(x =>
-    String(x.textContent || "").includes("Останні показники · Deye №2")));
+    String(x.textContent || "").includes("Ключові показники · Deye №2")));
   console.log("CLARITY_SWITCH_DEYE_1_2=PASS");
   const globalPicker=app.elements["device-select"];
   assert.equal(globalPicker.childNodes.length,2);
@@ -279,7 +279,7 @@ async function run() {
   await globalPicker.listeners.change();
   await settle();
   assert(descendants(app.main).some(x =>
-    String(x.textContent||"").includes("Останні показники · Deye №1")));
+    String(x.textContent||"").includes("Ключові показники · Deye №1")));
   console.log("CLARITY_GLOBAL_DEYE_PICKER=PASS");
   console.log("CLARITY_UNIFIED_MYSQL_OVERVIEW=PASS");
 
