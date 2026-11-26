@@ -250,6 +250,14 @@ body[data-theme] .register-stat span{color:var(--ux-muted)}
 body[data-theme] .register-badge.both{background:var(--ux-good-bg);color:var(--ux-good)}
 body[data-theme] .register-badge.document_only{background:var(--ux-warn-bg);color:var(--ux-warn)}
 body[data-theme] .register-badge.profile_only{background:var(--ux-grid-bg);color:var(--ux-grid)}
+/* Finish contrast coverage for legacy warning, event and battery controls. */
+body[data-theme] .event-row.event-batch .event-mark{color:var(--ux-good)}
+body[data-theme] .tag.warning{background:var(--ux-warn-bg);border-color:var(--ux-solar-line);color:var(--ux-warn)}
+body[data-theme] .settings-state{color:var(--ux-good)}
+body[data-theme] progress.soc-meter,
+body[data-theme] progress.soc-meter::-webkit-progress-bar{background:var(--ux-line);border-radius:999px}
+body[data-theme] progress.soc-meter::-webkit-progress-value{background:linear-gradient(90deg,#18a77d,#62d9b2);border-radius:999px}
+body[data-theme] progress.soc-meter::-moz-progress-bar{background:linear-gradient(90deg,#18a77d,#62d9b2);border-radius:999px}
 @media(max-width:1350px){body[data-theme] .sidebar{width:235px}}
 @media(max-width:1050px) and (min-width:761px){
  body[data-theme] .sidebar{width:76px;padding-left:10px;padding-right:10px}
