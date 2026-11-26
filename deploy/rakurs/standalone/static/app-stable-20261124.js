@@ -50,6 +50,10 @@ const SSR_ORIGINAL_NODES = SSR_PRESENT ?
 function restoreServerReadings() {
   if (SSR_ORIGINAL_NODES.length) {
     main.replaceChildren(...SSR_ORIGINAL_NODES.map(node => node.cloneNode(true)));
+    // Reveal the server snapshot only on the explicit failure path.
+    main.querySelector(".rakurs-startup")?.remove();
+    const fallback=main.querySelector(".rakurs-server-fallback");
+    if(fallback)fallback.hidden=false;
   }
 }
 

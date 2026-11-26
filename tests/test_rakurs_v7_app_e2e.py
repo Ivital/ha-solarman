@@ -62,6 +62,8 @@ class TestServer(ThreadingHTTPServer):
         super().__init__(("127.0.0.1", 0), Handler)
         self.calls = []
         self.lock = threading.Lock()
+        self.startup_gate = threading.Event()
+        self.startup_gate.set()
 
     def record(self, verb, target):
         with self.lock:
@@ -109,6 +111,7 @@ class Handler(BaseHTTPRequestHandler):
         self.server.record("GET", self.path)
         scenario = self.server.scenario
         if path == "/api/v1/catalog":
+            self.server.startup_gate.wait(timeout=15)
             self.reply({"groups": {group: [{"key": key, "label": label} for key,label in items] for group,items in PAGE_GROUPS.items()}, "all_metric_count": 8})
         elif path == "/api/v1/status":
             self.reply({"mode": "real", "registered_devices": 2,
@@ -234,6 +237,35 @@ def run():
             browser = p.chromium.launch(
                 headless=True, args=["--no-sandbox", "--disable-dev-shm-usage"])
             try:
+                # Verify actual visibility before JavaScript and while the API is delayed.
+                for width,height in [(390,844),(1440,900)]:
+                    server.scenario = "normal"
+                    nojs = browser.new_context(viewport={"width":width,"height":height},javascript_enabled=False)
+                    page = nojs.new_page()
+                    page.goto(base+"/",wait_until="load")
+                    assert has_real_ssr(page)
+                    assert not page.locator(".rakurs-server-fallback").is_visible()
+                    assert page.locator(".rakurs-startup").is_visible()
+                    assert page.locator('.rakurs-startup a[href="/deye"]').is_visible()
+                    nojs.close()
+                    ctx=browser.new_context(viewport={"width":width,"height":height})
+                    page=ctx.new_page()
+                    for attempt in range(2):
+                        server.startup_gate.clear()
+                        try:
+                            if attempt==0: page.goto(base+"/",wait_until="domcontentloaded")
+                            else: page.reload(wait_until="domcontentloaded")
+                            assert page.locator(".rakurs-startup").is_visible()
+                            assert not page.locator(".rakurs-server-fallback").is_visible()
+                            assert page.locator(".rakurs-server-fallback .card:visible").count()==0
+                            page.screenshot(path=str(OUT/f"startup_{width}_{attempt}.png"))
+                        finally:
+                            server.startup_gate.set()
+                        wait_rendered(page)
+                        assert page.locator(".rakurs-startup").count()==0
+                        assert not has_real_ssr(page)
+                    ctx.close()
+                print("RAKURS_STARTUP_NO_LEGACY_CARD_FLASH=PASS")
                 for width, height, theme in [(360, 780, "light"), (390, 844, "light"),
                                              (412, 915, "dark"), (768, 1024, "light"),
                                              (1366, 768, "dark"), (1920, 1080, "light")]:
@@ -428,6 +460,8 @@ def run():
                     page.wait_for_function(
                         "() => !!document.querySelector('.banner.warning')", timeout=20000)
                     assert has_real_ssr(page), scenario + ": trusted SSR was erased"
+                    assert page.locator(".rakurs-server-fallback").is_visible()
+                    assert page.locator(".rakurs-startup").count()==0
                     assert not page.locator(".v7-host").count()
                     assert "Огляд тимчасово недоступний" in page.locator("#content").text_content()
                     page.screenshot(path=str(OUT / ("integrated_" + scenario + ".png")),

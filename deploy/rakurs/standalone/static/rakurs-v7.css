@@ -517,3 +517,14 @@ body[data-theme] .product-zoom-plot{touch-action:pan-y}
 body[data-theme] .product-bms-gauge{height:7px;background:var(--ux-line);border-radius:6px;overflow:hidden;margin-top:8px}
 body[data-theme] .product-bms-gauge>span{height:100%;display:block;background:var(--v7-battery,#168269);border-radius:6px;transition:width .25s ease}
 @media(prefers-reduced-motion:reduce){body[data-theme] .product-bms-gauge>span{transition:none}}
+
+/* Initial document: no legacy KPI flash even before deferred JavaScript. */
+.rakurs-server-fallback[hidden]{display:none!important}
+.rakurs-startup{color:var(--ux-ink,#142536);max-width:1500px;margin:auto;padding:12px 0}
+.rakurs-startup-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
+.rakurs-startup h2{font-size:22px;letter-spacing:-.035em;margin:0;color:var(--ux-title,#142536)}
+.rakurs-startup-status{font-size:13px;color:var(--ux-muted,#53677a)}
+.rakurs-startup-placeholder{height:clamp(220px,35vh,330px);border:1px solid var(--ux-line,#dbe3eb);border-radius:16px;background:var(--ux-surface,#fff)}
+.rakurs-startup p{font-size:12px;color:var(--ux-muted,#53677a);margin:10px 0}
+.rakurs-startup a{color:var(--ux-accent,#1768df);text-decoration:underline}
+@media(max-width:760px){.rakurs-startup{padding:4px 0}.rakurs-startup h2{font-size:19px}.rakurs-startup-placeholder{height:260px}}
