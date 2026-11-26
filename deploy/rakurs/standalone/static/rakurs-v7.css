@@ -226,3 +226,7 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 @media(prefers-reduced-motion:reduce){
  .rv7 *,.rv7 *::before,.rv7 *::after{animation:none!important;transition:none!important}
 }
+
+/* V7 layout is opt-in; legacy V6 layout stays untouched. */
+.rv7-mobile{display:none}
+@media(max-width:600px){.rv7-mobile{display:block}.rv7-desktop{display:none}}

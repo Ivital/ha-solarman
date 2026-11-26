@@ -30,3 +30,6 @@ static/rakurs-energy-board-20261126.js
 static/rakurs-energy-board-20261126.css
 static/rakurs-mobile-nav-20261126.js
 static/rakurs-mobile-nav-20261126.css
+static/rakurs-v7-model.js
+static/rakurs-v7.js
+static/rakurs-v7.css

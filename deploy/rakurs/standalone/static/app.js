@@ -532,12 +532,24 @@ async function renderOverview(cycle, primedValues = null) {
   }
   if (!current(cycle)) return;
 
-  const boardHost = element("div","energy-board-host");
+  const v7 = Boolean(window.RakursV7 && window.RakursV7.enabled());
+  const boardHost = element("div",v7?"v7-host":"energy-board-host");
   main.appendChild(boardHost);
   const twinPromise = fetchParallelDevices(cycle).catch(() => null);
   let boardDevices = [];
   function showBoard(devices,loading) {
     if (!current(cycle)) return;
+    if (v7) {
+      window.RakursV7.render(boardHost,{
+        devices:devices||[],fallbackValues:values,
+        selectedDeviceKey:state.selectedDeviceKey,selectedSlotNo:state.selectedSlotNo,
+        status:state.status,loading,
+        historyLoader:(device,key,frame)=>api("/parallel/history?device="+
+          encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
+          "&hours="+encodeURIComponent(frame))
+      });
+      return;
+    }
     if (!window.RakursEnergyBoard || typeof window.RakursEnergyBoard.render !== "function") {
       clear(boardHost);
       boardHost.appendChild(createEmpty("Енергетична схема поки недоступна",
@@ -567,6 +579,7 @@ async function renderOverview(cycle, primedValues = null) {
   if(!current(cycle))return;
   boardDevices=resolvedDevices||[];
   showBoard(boardDevices,false);
+  if (v7) return;
   main.appendChild(overviewInsights(values));
   section("Ключові показники · Deye №" + state.selectedSlotNo,
     "Збережені вимірювання обраного інвертора · не сума двох пристроїв");
