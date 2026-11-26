@@ -171,6 +171,7 @@ class Handler(BaseHTTPRequestHandler):
 def wait_rendered(page):
     page.wait_for_selector(".rv7 [data-node='pv1']", state="attached", timeout=20000)
     page.wait_for_selector(".rv7 .rv7-chart-line", timeout=20000)
+    assert any(" L" in (d or "") for d in page.locator(".rv7 .rv7-chart-line").evaluate_all("(els) => els.map(e => e.getAttribute('d'))")), "Regular sparse history must retain visible line segments"
 
 
 def has_real_ssr(page):

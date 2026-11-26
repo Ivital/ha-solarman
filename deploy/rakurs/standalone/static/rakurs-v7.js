@@ -288,8 +288,11 @@
    for(const t of [timestamps[0],timestamps.at(-1)])layer.appendChild(s("text",{x:x(t),y:174,"text-anchor":t===timestamps[0]?"start":"end",class:"rv7-axis"},new Date(t).toLocaleTimeString("uk-UA",{timeZone:"Europe/Kyiv",hour:"2-digit",minute:"2-digit"})));
    for(const line of present){
     let d="";
+    const intervals=line.points.slice(1).map((p,i)=>Date.parse(p.timestamp)-Date.parse(line.points[i].timestamp)).filter(n=>n>0).sort((a,b)=>a-b);
+    const cadence=intervals.length?intervals[Math.floor((intervals.length-1)/2)]:0;
+    const gapLimit=Math.max(1200000,3*cadence);
     for(const [i,p] of line.points.entries()){
-     const gap=i&&Date.parse(p.timestamp)-Date.parse(line.points[i-1].timestamp)>1200000;
+     const gap=i&&Date.parse(p.timestamp)-Date.parse(line.points[i-1].timestamp)>gapLimit;
      d+=(i&&!gap?" L":" M")+x(p.timestamp).toFixed(1)+" "+(line.id==="soc"?socY(p.number):y(p.number)).toFixed(1);
     }
     layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"}));
@@ -311,9 +314,13 @@
    }
    const hit=s("rect",{x:0,y:0,width:480,height:180,class:"rv7-chart-hit"});
    hit.addEventListener("click",e=>{
-    const rect=layer.getBoundingClientRect(),ratio=
-     Math.max(0,Math.min(1,(e.clientX-rect.left)/Math.max(1,rect.width)));
-    select(Math.round(ratio*(timestamps.length-1)));
+    const matrix=layer.getScreenCTM();
+    if(!matrix)return;
+    const point=layer.createSVGPoint();point.x=e.clientX;point.y=e.clientY;
+    const local=point.matrixTransform(matrix.inverse());
+    const target=first+Math.max(0,Math.min(1,(local.x-42)/398))*(last-first);
+    let best=0;for(let i=1;i<timestamps.length;i++)if(Math.abs(Date.parse(timestamps[i])-target)<Math.abs(Date.parse(timestamps[best])-target))best=i;
+    select(best);
    });
    layer.appendChild(hit);chartbox.replaceChildren(layer);
    const slider=h("input");slider.type="range";
