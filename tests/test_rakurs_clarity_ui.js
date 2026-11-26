@@ -245,6 +245,10 @@ async function run() {
   assert(html.includes("dashboard-toolbar-ssr"));
   assert(colorCss.includes(".dashboard-options") && colorCss.includes(".nav-search") &&
     colorCss.includes(".refresh-data"));
+  assert(colorCss.includes("@keyframes rakurs-ui-reveal"));
+  assert(colorCss.includes(".card.kpi,.parallel-home-device,.insight-item"));
+  assert(colorCss.includes("@media(prefers-reduced-motion:reduce)"));
+  console.log("CLARITY_INTERACTIVE_CARDS_AND_RESPECT_REDUCED_MOTION=PASS");
   console.log("CLARITY_PERSONAL_DASHBOARD_ASSETS=PASS");
   console.log("CLARITY_LIGHT_ALL_COMPONENTS_AND_EXTRA_PAGES=PASS");
   assert(colorCss.includes("prefers-reduced-motion"));

@@ -403,3 +403,36 @@ body[data-theme] .cards-main{margin-top:0}
   body[data-theme] .dashboard-config-button,body[data-theme] .dashboard-preset,
   body[data-theme] .refresh-data{transition:none!important}
 }
+
+/* UX FLOW: lightweight motion for actionable controls, never simulated telemetry. */
+@keyframes rakurs-ui-reveal{
+ from{opacity:.55;transform:translateY(8px)}
+ to{opacity:1;transform:translateY(0)}
+}
+body[data-theme] :is(.insight-strip,.dashboard-toolbar,.quick-actions,.cards-main,
+ .parallel-home-device,.trend-card,.history-workspace,.energy-panel){
+ animation:rakurs-ui-reveal .36s cubic-bezier(.17,.67,.32,1) both}
+body[data-theme] .cards-main .card.kpi:nth-child(2){animation-delay:.045s}
+body[data-theme] .cards-main .card.kpi:nth-child(3){animation-delay:.09s}
+body[data-theme] .cards-main .card.kpi:nth-child(4){animation-delay:.135s}
+body[data-theme] :is(.card.kpi,.insight-item,.parallel-home-device,.quick-link,
+ .dashboard-option-row,.dashboard-preset,.dashboard-config-button,
+ .refresh-data,.energy-panel,.trend-card,.history-workspace){
+ transition:transform .22s ease,box-shadow .22s ease,
+ border-color .22s ease,background-color .22s ease}
+body[data-theme] :is(.card.kpi,.parallel-home-device,.insight-item):hover{
+ transform:translateY(-3px);
+ box-shadow:0 16px 32px rgba(45,86,143,.15)}
+body[data-theme] :is(.dashboard-option-row,.trend-card):focus-within{
+ border-color:var(--ux-accent)}
+body[data-theme] :is(.card.kpi,.quick-link,.parallel-home-device,
+ .dashboard-preset,.dashboard-config-button,.refresh-data):focus-visible{
+ outline:3px solid var(--ux-accent);outline-offset:3px}
+body[data-theme] .refresh-data:disabled{transform:none;box-shadow:none}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] :is(.insight-strip,.dashboard-toolbar,.quick-actions,.cards-main,
+ .parallel-home-device,.trend-card,.history-workspace,.energy-panel,
+ .card.kpi,.insight-item,.quick-link,.dashboard-option-row,
+ .dashboard-preset,.dashboard-config-button,.refresh-data){
+ animation:none!important;transition:none!important;transform:none!important}
+}
