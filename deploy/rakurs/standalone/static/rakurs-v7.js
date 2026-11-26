@@ -5,7 +5,14 @@
  const M=root.RakursV7Model,NS="http://www.w3.org/2000/svg";
  let mode="overview",hours=24,chosenTime=null;
  const views=new Set(["pv1","pv2","load"]);
- const handlers=new WeakMap();
+ const handlers=new WeakMap(),activeScopes=new Set();
+ function disposeScope(scope){
+  if(!scope||scope.cancelled)return;
+  scope.cancelled=true;
+  if(scope.onDispose)scope.onDispose();
+  if(scope.dialogClose)scope.dialogClose();
+  activeScopes.delete(scope);
+ }
  const classes={pv1:"pv",pv2:"pv",bus:"bus",load:"load",battery:"battery",grid:"grid"};
  const labels={pv1:"PV · Deye №1",pv2:"PV · Deye №2",bus:"Два інвертори",
   load:"Будинок",battery:"Акумулятор",grid:"Мережа"};
@@ -48,7 +55,8 @@
     ["load","M621 54 H651"],["battery","M621 147 H651"],["grid","M621 240 H651"]]
   };
  }
- function modal(parent,snap,id,trigger){
+ function modal(parent,snap,id,trigger,scope){
+  if(scope?.dialogClose)scope.dialogClose();
   const previous=parent.querySelector(".rv7-panel-backdrop");
   const prevPanel=parent.querySelector(".rv7-panel");
   if(previous)previous.remove();if(prevPanel)prevPanel.remove();
@@ -87,8 +95,10 @@
   const actions=h("div","rv7-panel-actions");actions.appendChild(link);sheet.appendChild(actions);
   const dismiss=()=>{
    backdrop.remove();sheet.remove();document.removeEventListener("keydown",keyHandler);
+   if(scope?.dialogClose===dismiss)scope.dialogClose=null;
    if(trigger?.isConnected&&trigger.focus)trigger.focus();
   };
+  if(scope)scope.dialogClose=dismiss;
   function keyHandler(e){
    if(e.key==="Escape"){e.preventDefault();dismiss();}
    if(e.key==="Tab"){
@@ -193,6 +203,10 @@
    "Дані MySQL. Натисніть на графік або перемістіть повзунок часу."));
   container.appendChild(card);
   let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
+  let failedHistoryRequests=0;
+  const historyError=h("p","rv7-history-error");
+  historyError.setAttribute("role","status");
+  card.insertBefore(historyError,time);
   const play=h("button","rv7-play","▶ Відтворити архів");
   play.type="button";
   play.setAttribute("aria-pressed","false");
@@ -237,7 +251,8 @@
    if(!timestamps.length){
     stopPlayback();
     chartbox.replaceChildren(h("div","rv7-chart-status",
-     "За цей період немає архівних вимірювань"));
+     failedHistoryRequests?"Архів тимчасово недоступний — помилка API":
+       "За цей період немає архівних вимірювань"));
     control.replaceChildren();time.textContent="";return;
    }
    const nums=present.flatMap(line=>line.points.map(p=>p.number));
@@ -287,6 +302,7 @@
    const current=++revision;
    stopPlayback();
    chartbox.replaceChildren(h("div","rv7-chart-status","Завантаження архіву…"));
+   failedHistoryRequests=0;historyError.textContent="";
    legend.replaceChildren();time.textContent="";control.replaceChildren();
    if(typeof config.historyLoader!=="function"){
     chartbox.replaceChildren(h("div","rv7-chart-status",
@@ -301,6 +317,9 @@
     return M.normalizeHistory(r?.points||[]);
    }));
    if(scope.cancelled||current!==revision)return;
+   failedHistoryRequests=got.filter(item=>item.status==="rejected").length;
+   historyError.textContent=failedHistoryRequests ?
+    "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value:[]}));
    for(const line of series.filter(row=>row.id!=="soc")){
@@ -336,8 +355,9 @@
  function render(host,config={}){
   if(!M)throw Error("RakursV7Model not loaded");
   const last=handlers.get(host);
-  if(last){last.cancelled=true;if(last.onDispose)last.onDispose();}
-  const scope={cancelled:false};handlers.set(host,scope);
+  if(last)disposeScope(last);
+  const scope={cancelled:false,dialogClose:null};handlers.set(host,scope);
+  activeScopes.add(scope);
   const snap=M.snapshot(config),app=h("div","rv7");
   app.setAttribute("aria-label","Енергосистема Rakurs V7");
   const top=h("header","rv7-top"),heading=h("div","rv7-heading");
@@ -372,7 +392,7 @@
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
    let displayed=snap;
-   const show=(id,trigger)=>modal(app,displayed,id,trigger);
+   const show=(id,trigger)=>modal(app,displayed,id,trigger,scope);
    function paint(){
     wrapped.replaceChildren(diagram(displayed,show,false),diagram(displayed,show,true));
    }
@@ -448,13 +468,12 @@
    layout.appendChild(more);
   }
   host.replaceChildren(app);
-  return Object.freeze({snapshot:snap,root:app,dispose:()=>{
-    scope.cancelled=true;if(scope.onDispose)scope.onDispose();
-   }});
+  return Object.freeze({snapshot:snap,root:app,dispose:()=>disposeScope(scope)});
  }
  function enabled(){
   return new URLSearchParams(root.location.search).get("ux")==="v7";
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
+   disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
   reset:()=>{mode="overview";hours=24;chosenTime=null;}});
 })(window);
