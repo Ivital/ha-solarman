@@ -33,7 +33,7 @@
       register_address:registerAddress,
       sign_verified:item?.sign_verified===true&&item?.register_verified===true,
       register_verified:item?.register_verified===true,
-      scope:"device_report"
+      scope:device?.device_key?"device_report":"unscoped"
     });
   }
   function lastOf(items){
@@ -81,8 +81,7 @@
     const selected=devices.find(d=>d.device_key===config.selectedDeviceKey)||
       bySlot.get(Number(config.selectedSlotNo))||devices[0]||null;
     const selectedValues=selected?.values||{};
-    const values=(selected&&Object.keys(selectedValues).length)?selectedValues:
-      config.fallbackValues||{};
+    const values=selected?selectedValues:(config.fallbackValues||{});
     // Never fabricate a second device or place fallback readings into an unknown PV slot.
     const fallbackUnscoped=!selected&&Object.keys(config.fallbackValues||{}).length>0;
     const sources=[1,2].map(slot=>{
@@ -124,6 +123,8 @@
     const warnings=[];
     if(fallbackUnscoped)warnings.push("Немає підтвердженої прив'язки архіву до конкретного Deye");
     if(devices.length<2)warnings.push("Не всі інвертори зареєстровані в архіві");
+    for(const device of devices)if(device.telemetry_error===true)
+      warnings.push("Не вдалося прочитати покази Deye №"+device.slot_no+" з API");
     for(const key of SHARED_KEYS)if(reports[key].conflict)
       warnings.push("Покази вузла «"+LABELS[key]+"» від двох Deye відрізняються");
     const alignedPv=sources.every(x=>x.reading.valid&&x.reading.unit===sources[0].reading.unit&&
