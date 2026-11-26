@@ -443,3 +443,37 @@ html.rv7-dialog-open,html.rv7-dialog-open body{overflow:hidden;overscroll-behavi
 @media(max-width:600px){.rv7-battery-power{font-size:10px}}
 .rv7-motion-paused .rv7-flow-animation{animation-play-state:paused}
 @media(prefers-reduced-motion:reduce){.rv7-flow-animation{animation:none!important}}
+
+/* Compact, single-screen mobile overview. Preserve all underlying diagnostics. */
+.rv7-flow-foot{gap:5px;padding:6px 12px}
+.rv7-flow-foot .rv7-warnings{display:flex;align-items:center;gap:4px;flex-wrap:wrap}
+.rv7-flow-foot .rv7-message{padding:0;gap:4px;font-size:11px}
+.rv7-flow-foot .rv7-message .rv7-link{min-height:30px;padding:3px 8px;font-size:11px!important}
+.rv7-flow-foot .rv7-warning-details{flex-basis:100%;padding:0}
+.rv7-flow-foot .rv7-warning-details summary{min-height:22px}
+.rv7-diagram .rv7-wire.is-unknown{stroke:var(--v7-muted);opacity:.36}
+@media(max-width:600px){
+ .rv7-top{gap:3px;margin-bottom:3px}
+ .rv7-title{font-size:19px}
+ .rv7-tab{min-height:32px;padding:3px 0 6px}
+ .rv7-tabs{margin-bottom:6px}
+ .rv7-diagram-card .rv7-card-meta{display:none}
+ .rv7-card-head{padding:7px 10px 2px}
+ .rv7-motion-toggle{min-height:32px}
+ .rv7-flow-foot{padding:3px 8px;gap:1px}
+ .rv7-flow-foot .rv7-source-label{font-size:10px}
+ .rv7-flow-foot .rv7-warnings{width:100%;justify-content:space-between}
+ .rv7-flow-foot .rv7-warning-details{display:none}
+ .rv7-flow-foot .rv7-message{width:100%}
+ .rv7-flow-foot .rv7-message .rv7-link{min-height:28px}
+ .rv7-overview-left{gap:0}
+ .rv7-shell{gap:8px}
+ .rv7-diagram .rv7-bus-title{font-size:11px}
+ .rv7-battery-power{font-size:11px}
+}
+@media(max-width:760px){
+ body[data-theme] .mobile-tabs{min-height:56px;padding-top:3px;padding-bottom:calc(3px + env(safe-area-inset-bottom,0px))}
+ body[data-theme] .mobile-tabs a,body[data-theme] .mobile-tabs button{min-height:48px;padding:4px 2px;gap:2px;border-radius:9px}
+ body[data-theme] .workarea{padding-bottom:calc(65px + env(safe-area-inset-bottom,0px))}
+ body[data-theme].rakurs-v7-overview .topbar{padding:4px 10px}
+}

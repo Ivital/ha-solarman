@@ -256,12 +256,13 @@ def run():
                     assert "5,43 кВт" in page.locator(
                         ".rv7 [data-node='pv2'] .rv7-node-value").first.text_content()
                     assert not has_real_ssr(page), "Trusted SSR should be replaced only by verified twin response"
-                    assert page.locator(".rv7-chart-stat").count() >= 3
+                    assert page.locator(".rv7-chart-stat").count() == 6
                     assert page.get_by_role("button", name="Останній запис").count() == 1
                     assert page.get_by_label("Кінцева дата архіву").input_value()=="2026-11-25"
                     ranges=[parse_qs(urlsplit(path).query) for verb,path in server.calls if urlsplit(path).path=="/api/v1/history/range"]
                     assert len(ranges)>=6 and all(q.get("end")==["2026-11-25T00:16:18.000999Z"] for q in ranges)
                     assert {q["device"][0] for q in ranges}=={D1,D2}
+                    assert all(any(q.get("device")==[device] and q.get("key")==[key] for q in ranges) for device in [D1,D2] for key in ["pv_power","load_power","battery_power","battery_soc","grid_power"])
                     assert page.locator(".rv7-chart-date").text_content()==page.locator(".rv7-status-date").text_content()
                     assert "5,1 кВт" in page.locator(".rv7-chart-stat").first.text_content()
                     assert not any(word in page.locator(".rv7").inner_text().lower() for word in ["тестові дані", "демонстраційний стан"])
@@ -270,12 +271,14 @@ def run():
                         assert not page.locator(".topbar .mobile-heading-row").is_visible()
                         first_screen = page.evaluate("""() => ({
                           navTop: document.querySelector(".mobile-tabs").getBoundingClientRect().top,
+                          chartTop: document.querySelector(".rv7-chart-card").getBoundingClientRect().top,
                           gridBottom: document.querySelector(
                             ".rv7-mobile [data-node='grid']").getBoundingClientRect().bottom,
                           batteryBottom: document.querySelector(
                             ".rv7-mobile [data-node='battery']").getBoundingClientRect().bottom
                         })""")
                         assert max(first_screen["gridBottom"], first_screen["batteryBottom"]) <                             first_screen["navTop"] - 6,                             "V7 critical energy nodes must be fully above the mobile bottom nav: " + str(first_screen)
+                        assert first_screen["chartTop"] < first_screen["navTop"], "Chart header must be visible on first mobile viewport"
                     assert not page.locator(".rv7 .rv7-pill.is-live").count()
                     assert "Архів" in page.locator(".rv7-pill").first.inner_text()
                     assert page.locator(".rv7 .rv7-warnings").count() == 1

@@ -4,7 +4,7 @@
 (function(root){
  const M=root.RakursV7Model,NS="http://www.w3.org/2000/svg";
  let mode="overview",hours=24,chosenTime=null,motionEnabled=true;
- const views=new Set(["pv1","pv2","load"]);
+ const views=new Set(["pv1","pv2","load","battery","grid","soc"]);
  const handlers=new WeakMap(),activeScopes=new Set();
  function disposeScope(scope){
   if(!scope||scope.cancelled)return;
@@ -37,14 +37,14 @@
   return null;
  }
  function geometry(mobile){
-  if(mobile)return {w:360,h:307,
-   boxes:{pv1:[4,2,172,64],pv2:[184,2,172,64],inv1:[4,82,172,58],inv2:[184,82,172,58],
-    bus:[138,164,84,26],load:[5,219,110,85],battery:[125,219,110,85],grid:[245,219,110,85]},
-   paths:[["pv1","M34 46 V86"],["pv2","M326 46 V86"],
-    ["inv1","M34 130 V148 Q34 156 44 156 H155 Q165 156 165 164"],
-    ["inv2","M326 130 V148 Q326 156 316 156 H205 Q195 156 195 164"],
-    ["bus","M180 190 V207 M60 207 H300"],["load","M60 207 V224"],
-    ["battery","M180 207 V222"],["grid","M300 207 V224"]]};
+  if(mobile)return {w:360,h:269,
+   boxes:{pv1:[4,2,172,56],pv2:[184,2,172,56],inv1:[4,68,172,48],inv2:[184,68,172,48],
+    bus:[150,136,60,20],load:[5,181,110,85],battery:[125,181,110,85],grid:[245,181,110,85]},
+   paths:[["pv1","M34 46 V72"],["pv2","M326 46 V72"],
+    ["inv1","M34 116 V122 Q34 128 44 128 H155 Q165 128 165 136"],
+    ["inv2","M326 116 V122 Q326 128 316 128 H205 Q195 128 195 136"],
+    ["bus","M180 156 V169 M60 169 H300"],["load","M60 169 V186"],
+    ["battery","M180 169 V184"],["grid","M300 169 V186"]]};
   return {w:760,h:316,
    boxes:{pv1:[8,19,174,108],pv2:[8,188,174,108],inv1:[225,28,145,88],inv2:[225,197,145,88],
     bus:[404,135,78,46],load:[547,5,205,96],battery:[547,110,205,96],grid:[547,215,205,96]},
@@ -99,6 +99,7 @@
   group.appendChild(art);
  }
  function modal(parent,snap,id,trigger,scope){
+  scope?.pausePlayback?.();
   if(scope?.dialogClose)scope.dialogClose();
   // Mount outside the animated content tree: transformed ancestors change the containing block of fixed descendants.
   const portal=h("div","rv7 rv7-dialog-root");
@@ -317,7 +318,7 @@
    play.textContent="▶ Відтворити архів";
    card.classList.remove("is-playing");
   }
-  scope.onDispose=stopPlayback;
+  scope.onDispose=stopPlayback;scope.pausePlayback=stopPlayback;
   play.addEventListener("click",()=>{
    if(timer!==null){stopPlayback();return;}
    if(availableTimes.length<2)return;
@@ -341,8 +342,8 @@
    ["soc","SOC","battery_soc",0,"var(--v7-soc)"]
   ];
   function chart(){
-   const present=series.filter(line=>views.has(line.id)&&line.points.length);
-   const timestamps=Array.from(new Set(series.flatMap(line=>
+   const present=series.filter(line=>!line.diagnostic&&views.has(line.id)&&line.points.length);
+   const timestamps=Array.from(new Set(series.filter(line=>!line.diagnostic).flatMap(line=>
     line.points.map(p=>p.timestamp)))).sort();
    const layer=s("svg",{viewBox:"0 0 480 180",class:"rv7-chart",
     role:"img","aria-label":"Архівний графік"});
@@ -356,8 +357,11 @@
        "За цей період немає архівних вимірювань"));
     const emptyRestore=h("button","rv7-latest","Останній запис");emptyRestore.type="button";
     emptyRestore.addEventListener("click",()=>{explicitSelection=false;chosenTime=null;onRestore?.();if(hasRange){endTime=latest;day.value=kyivDay(latest);}fetchSeries();});
-    control.replaceChildren(emptyRestore);time.textContent="";return;
+    control.replaceChildren(emptyRestore);time.textContent="";
+    if(explicitSelection&&hasRange)onFrame?.(new Date(endTime).toISOString(),[]);
+    return;
    }
+   if(!present.length)layer.appendChild(s("text",{x:241,y:85,"text-anchor":"middle",class:"rv7-axis"},"Оберіть показники в легенді"));
    const nums=present.filter(line=>line.id!=="soc").flatMap(line=>line.points.map(p=>p.number));
    const lo=Math.min(0,...nums),hi=Math.max(0,...nums),delta=Math.max(1,hi-lo);
    const first=Date.parse(timestamps[0]),last=Date.parse(timestamps.at(-1));
@@ -445,6 +449,11 @@
    const planned=metadata.map(([id,label,key,slot,color])=>({
     id,label,key,color,device:slot?snap.devices.find(x=>Number(x.slot_no)===slot):snap.selected
    }));
+   // Include the other inverter's shared reports in historical diagnostics;
+   // never plot them as a second physical battery/grid/load or sum them.
+   const other=snap.devices.find(d=>d.device_key!==snap.selected?.device_key);
+   if(other)for(const [id,label,key,slot,color] of metadata.filter(item=>item[3]===0))
+     planned.push({id:id+"-other",label,key,color,device:other,diagnostic:true});
    if(hasRange)periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
    const got=await Promise.allSettled(planned.map(async item=>{
     if(!item.device?.device_key)return {points:[],truncated:false};
@@ -459,7 +468,7 @@
    if(got.some(item=>item.status==="fulfilled"&&item.value.truncated))historyError.textContent+=(historyError.textContent?" · ":"")+"Ліміт записів. Для повної деталізації виберіть коротший період.";
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value.points:[]}));
-   for(const line of series){
+   for(const line of series.filter(item=>!item.diagnostic)){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
     const circle=h("span","rv7-series-dot");
@@ -529,7 +538,8 @@
    motion.type="button";motion.setAttribute("aria-pressed",String(motionEnabled));
    motion.setAttribute("aria-label","Анімація енергопотоків");
    motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;app.classList.toggle("rv7-motion-paused",!motionEnabled);motion.setAttribute("aria-pressed",String(motionEnabled));motion.textContent=motionEnabled?"Пауза руху":"Увімкнути рух";});
-   put(headActions,h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"),motion);
+   const frameMeta=h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан");frameMeta.setAttribute("aria-hidden","true");
+   put(headActions,frameMeta,motion);
    put(dh,h("strong","rv7-card-title","Енергопотоки"),headActions);
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
@@ -542,11 +552,8 @@
    diagramCard.appendChild(wrapped);
    const foot=h("div","rv7-flow-foot");
    foot.appendChild(h("span","rv7-source-label",
-    snap.selected?.slot_no?"Спільні вузли: звіт Deye №"+snap.selected.slot_no+" · не сума":"Джерело не встановлено"));
-   const actions=h("div","rv7-actions");
-   const detailButton=h("button","rv7-link","Деталі");detailButton.type="button";
-   detailButton.addEventListener("click",()=>{mode="engineer";render(host,config);});
-   actions.appendChild(detailButton);foot.appendChild(actions);
+    snap.selected?.slot_no?"Спільні показники · Deye №"+snap.selected.slot_no:"Джерело не встановлено"));
+   // The engineering tab and equipment inspectors already provide details.
    diagramCard.appendChild(foot);
    leftColumn.appendChild(diagramCard);
    shell.appendChild(leftColumn);
@@ -582,10 +589,8 @@
     const notices=h("section","rv7-warnings");
     const item=h("div","rv7-message");
     const count=snap.warnings.length;
-    const summary=h("span","",count===1?
-      "Є одна невизначеність у збережених показниках":
-      "Є "+count+" уточнення щодо архівних показників");
-    const open=h("button","rv7-link","Перевірити");
+    const summary=h("span","","Розбіжності показників: "+count);
+    const open=h("button","rv7-link","Діагностика");
     open.type="button";
     open.addEventListener("click",()=>{mode="engineer";render(host,config);});
     put(item,h("span","rv7-notice-icon","ⓘ"),summary,open);
@@ -595,7 +600,7 @@
      const reasons=h("ul");
      for(const reason of snap.warnings)reasons.appendChild(h("li","",reason));
      details.appendChild(reasons);notices.appendChild(details);
-     leftColumn.appendChild(notices);
+     foot.appendChild(notices);
    }
   }
   host.replaceChildren(app);
