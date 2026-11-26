@@ -140,11 +140,11 @@ if __name__ == '__main__':
             print("V7_BROWSER_NODE_DETAILS_ESCAPE=PASS")
 
             # Inspect historical playback at a chosen timestamp: do not carry newest PV value.
-            first_label = page.locator(".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
+            first_label = page.locator(".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
             slider = page.locator(".rv7-time-control input[type='range']")
             slider.fill("0")
             page.wait_for_timeout(100)
-            after_label = page.locator(".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
+            after_label = page.locator(".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
             assert first_label != after_label, (first_label, after_label)
             assert "Архів" in page.locator(".rv7-card-meta").first.inner_text()
             page.screenshot(path=str(OUT / "mobile_archive_cursor.png"), full_page=True)
@@ -165,12 +165,12 @@ if __name__ == '__main__':
             # Missing data and zero values must differ visually in the rendered browser.
             page.goto(FIXTURE + "?scenario=empty", wait_until="load")
             page.wait_for_selector(".rv7-mobile [data-node='pv1']")
-            assert "—" in page.locator(".rv7-mobile [data-node='pv1']").inner_text()
+            assert "—" in page.locator(".rv7-mobile [data-node='pv1']").text_content()
             assert "Немає" in page.locator(".rv7-pill").first.inner_text()
             page.screenshot(path=str(OUT / "mobile_empty_db.png"), full_page=True)
             page.goto(FIXTURE + "?scenario=zero", wait_until="load")
             page.wait_for_selector(".rv7-mobile [data-node='pv1']")
-            assert "0 кВт" in page.locator(".rv7-mobile [data-node='pv1']").inner_text()
+            assert "0 кВт" in page.locator(".rv7-mobile [data-node='pv1']").text_content()
             print("V7_BROWSER_ZERO_VS_MISSING=PASS")
 
             # Responsive rules respect OS motion preferences; no animated fake telemetry.

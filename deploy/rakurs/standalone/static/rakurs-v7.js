@@ -377,12 +377,16 @@
    layout.appendChild(shell);
    if(snap.warnings.length){
     const notices=h("section","rv7-warnings");
-    for(const warning of snap.warnings.slice(0,3)){
-     const item=h("div","rv7-message");
-     put(item,h("span","rv7-notice-icon","ⓘ"),h("span","",warning));
-     notices.appendChild(item);
-    }
-    layout.appendChild(notices);
+    const item=h("div","rv7-message");
+    const count=snap.warnings.length;
+    const summary=h("span","",count===1?
+      "Є одна невизначеність у збережених показниках":
+      "Є "+count+" уточнення щодо архівних показників");
+    const open=h("button","rv7-link","Перевірити");
+    open.type="button";
+    open.addEventListener("click",()=>{mode="engineer";render(host,config);});
+    put(item,h("span","rv7-notice-icon","ⓘ"),summary,open);
+    notices.appendChild(item);layout.appendChild(notices);
    }
    const more=h("section","rv7-secondary");
    const devices=h("div","rv7-card");
