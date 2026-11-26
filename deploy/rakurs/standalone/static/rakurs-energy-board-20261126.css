@@ -165,82 +165,40 @@ body[data-theme] .energy-board-ssr .energy-board-node small{font-size:11px;color
  body[data-theme] .energy-board-source,body[data-theme] .energy-board-node{transition:none!important;transform:none!important}}
 
 
-/* UX5: full-system values must not masquerade as a combined measurement. */
-body[data-theme] .energy-board-context{font-size:12px;line-height:1.6;font-weight:580}
-body[data-theme] .energy-board-node.is-comparison{
- display:flex;flex-direction:column;align-items:stretch;justify-content:flex-start;
- gap:9px;padding:12px 13px;min-height:0}
-body[data-theme] .energy-board-node-top{display:flex;align-items:center;gap:8px}
-body[data-theme] .energy-board-node-top .energy-board-node-icon{
- font-size:22px;line-height:1;flex:none}
-body[data-theme] .energy-board-node-top .energy-board-node-name{
- flex:1;color:var(--ux-title);font-size:13px}
-body[data-theme] .energy-board-node-unit{font-size:9px;font-weight:750;
- border:1px solid var(--ux-line);background:var(--ux-surface);
- border-radius:999px;padding:4px 7px;color:var(--ux-muted)}
-body[data-theme] .energy-board-comparison{display:grid;grid-template-columns:1fr;
- gap:6px;width:100%}
-body[data-theme] .energy-board-reading-row{display:grid;
- grid-template-columns:68px minmax(0,1fr);align-items:center;gap:3px 9px;
- background:var(--ux-surface);border:1px solid var(--ux-line);
- border-radius:10px;padding:8px 10px;text-align:left}
-body[data-theme] .energy-board-reading-row.is-missing{opacity:.72}
-body[data-theme] .energy-board-reading-label{grid-column:1;grid-row:1;
- font-size:10px;font-weight:800;color:var(--ux-accent)}
-body[data-theme] .energy-board-reading-value{grid-column:2;grid-row:1;
- font-size:16px;color:var(--ux-title);text-align:right;white-space:nowrap}
-body[data-theme] .energy-board-reading-state{grid-column:1/-1;grid-row:2;
- font-size:10px;color:var(--ux-muted);line-height:1.4}
-body[data-theme] .energy-board-wire.is-comparison-wire{
- display:flex;flex-direction:column;justify-content:space-evenly;
- gap:9px;padding:5px 0}
-body[data-theme] .energy-board-wire.is-comparison-wire::before{display:none}
-body[data-theme] .energy-board-wire-lane{width:100%;display:flex;
- align-items:center;justify-content:center;gap:3px;position:relative;
- min-height:38px;isolation:isolate}
-body[data-theme] .energy-board-wire-lane::before{content:"";position:absolute;
- left:0;right:0;top:50%;border-top:3px solid var(--ux-accent);z-index:-1}
-body[data-theme] .energy-board-wire-lane.no-flow::before{
- border-color:var(--ux-line);border-top-style:dashed}
-body[data-theme] .energy-board-wire-number{font-size:10px;font-weight:850;
- background:var(--ux-surface);color:var(--ux-muted);
- padding:3px 4px;border-radius:6px;white-space:nowrap}
-body[data-theme] .energy-board-wire-arrow{font-size:25px;font-weight:900;
- background:var(--ux-surface);color:var(--ux-accent);
- padding:0 5px;border-radius:999px;line-height:1.05}
-body[data-theme] .energy-board-wire-lane.no-flow .energy-board-wire-arrow{
- color:var(--ux-muted)}
-body[data-theme] .energy-board-wire.wire-house .energy-board-wire-lane.has-flow::before{
- border-color:var(--ux-load)}
-body[data-theme] .energy-board-wire.wire-battery .energy-board-wire-lane.has-flow::before{
- border-color:var(--ux-battery)}
-body[data-theme] .energy-board-wire.wire-grid .energy-board-wire-lane.has-flow::before{
- border-color:var(--ux-grid)}
+/* UX6: two independent PV inputs and exactly one common load/grid/battery. */
+body[data-theme] .energy-board-context{
+ font-size:12px;line-height:1.6;font-weight:600;color:var(--ux-muted);
+ background:var(--ux-subtle);border:1px solid var(--ux-line);
+ border-radius:12px;padding:10px 13px;margin-bottom:13px}
+body[data-theme] .energy-board-node.is-shared{
+ position:relative;min-height:79px;padding:13px 13px 12px}
+body[data-theme] .energy-board-shared-tag{
+ grid-column:2/4;color:var(--ux-accent);font-size:9px;
+ font-weight:800;letter-spacing:.055em;line-height:1.3}
+body[data-theme] .energy-board-node-note{
+ grid-column:2/4;color:var(--ux-muted);font-size:10px;line-height:1.35}
+body[data-theme] .energy-board-node-name{font-size:13px}
+body[data-theme] .energy-board-node-value{font-size:19px}
 body[data-theme] .energy-board-direction{min-width:28px;text-align:center;
- border-radius:999px;padding:2px 5px;background:var(--ux-surface);
- font-size:26px}
+ border-radius:999px;padding:2px 5px;background:var(--ux-surface);font-size:26px}
 body[data-theme] .energy-board-wire-title{font-size:11px;font-weight:750}
 body[data-theme] .energy-board-legend{display:flex;flex-wrap:wrap;
- gap:7px 15px;margin:15px 0 0;padding:12px 14px;
+ gap:7px 15px;margin:14px 0 0;padding:12px 14px;
  border:1px solid var(--ux-line);border-radius:12px;
  background:var(--ux-subtle)}
 body[data-theme] .energy-board-legend-key{font-size:11px;
- font-weight:650;color:var(--ux-muted);white-space:normal}
+ font-weight:650;color:var(--ux-muted)}
 body[data-theme] .energy-board-foot{margin-top:12px}
 body[data-theme] .energy-board-source:focus-visible,
 body[data-theme] .energy-board-node:focus-visible,
-body[data-theme] .energy-board-mode:focus-visible{outline:3px solid var(--ux-accent);outline-offset:3px}
+body[data-theme] .energy-board-mode:focus-visible{
+ outline:3px solid var(--ux-accent);outline-offset:3px}
 @media(max-width:1180px){
- body[data-theme] .energy-board-node.is-comparison{padding:10px 8px}
- body[data-theme] .energy-board-reading-row{grid-template-columns:55px minmax(0,1fr);gap:3px 5px;padding:7px}
- body[data-theme] .energy-board-reading-value{font-size:14px}
- body[data-theme] .energy-board-wire-number{font-size:9px}
- body[data-theme] .energy-board-wire-arrow{font-size:19px;padding:0 2px}
+ body[data-theme] .energy-board-node.is-shared{padding:10px}
+ body[data-theme] .energy-board-node-value{font-size:16px}
 }
 @media(max-width:960px){
- body[data-theme] .energy-board-node.is-comparison{padding:12px}
- body[data-theme] .energy-board-reading-value{font-size:16px}
- body[data-theme] .energy-board-wire.is-comparison-wire{transform:none}
+ body[data-theme] .energy-board-node.is-shared{padding:12px}
 }
 @media(max-width:600px){
  body[data-theme] .energy-board-wires{
@@ -250,13 +208,9 @@ body[data-theme] .energy-board-mode:focus-visible{outline:3px solid var(--ux-acc
  body[data-theme] .energy-board-wire{
   flex:1;min-width:0;min-height:43px;max-height:none}
  body[data-theme] .energy-board-wire::before{display:none}
- body[data-theme] .energy-board-wire.is-comparison-wire{
-  flex-direction:row;gap:10px;padding:0}
- body[data-theme] .energy-board-wire-lane{min-height:35px}
- body[data-theme] .energy-board-wire-lane::before{display:none}
+ body[data-theme] .energy-board-sources{grid-template-rows:none}
  body[data-theme] .energy-board-source,
  body[data-theme] .energy-board-node{min-width:0}
- body[data-theme] .energy-board-node.is-comparison{padding:12px}
  body[data-theme] .energy-board-legend{gap:8px;margin-top:10px}
  body[data-theme] .energy-board-legend-key{font-size:10px}
 }
@@ -265,19 +219,10 @@ body[data-theme] .energy-board-mode:focus-visible{outline:3px solid var(--ux-acc
 @keyframes energy-dot-reverse{from{left:calc(100% - 8px)}to{left:0}}
 body[data-theme] .energy-board.is-live .energy-board-wire.has-flow.is-reverse::after{
  animation-name:energy-dot-reverse}
-body[data-theme] .energy-board.is-live .energy-board-wire.is-comparison-wire::after{
- content:none!important}
-body[data-theme] .energy-board.is-live .energy-board-wire-lane.has-flow::after{
- content:"";position:absolute;top:calc(50% - 4px);left:0;
- width:8px;height:8px;border-radius:50%;background:var(--ux-accent);
- animation:energy-dot 1.8s linear infinite}
-body[data-theme] .energy-board.is-live .energy-board-wire-lane.has-flow.is-reverse::after{
- animation-name:energy-dot-reverse}
 @media(max-width:600px){
  body[data-theme] .energy-board-sources{grid-template-rows:none}
- body[data-theme] .energy-board.is-live .energy-board-wire-lane::after,
  body[data-theme] .energy-board.is-live .energy-board-wire::after{display:none}
 }
 @media(prefers-reduced-motion:reduce){
- body[data-theme] .energy-board.is-live .energy-board-wire-lane::after{animation:none!important;display:none!important}
+ body[data-theme] .energy-board.is-live .energy-board-wire::after{animation:none!important;display:none!important}
 }

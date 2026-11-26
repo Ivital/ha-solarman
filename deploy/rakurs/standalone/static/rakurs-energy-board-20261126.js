@@ -1,8 +1,11 @@
 "use strict";
-/* Rakurs energy flow: visual read-only view of archival MySQL readings.
- * Each Deye is independent. Shared battery/SOC/grid/load are NEVER aggregated.
- * Motion requires confirmed physical collection and measurements <=120 s old.
- * No fetch, serial I/O, writable request or persistent telemetry state. */
+/* Rakurs shared-bus energy flow from archived MySQL readings.
+ * Physical topology supplied by operator: only PV1 and PV2 are separate;
+ * battery, load and grid are each ONE common physical node.
+ * Independent inverter reports may refer to the same node, or be inverter-local
+ * contributions. Without register semantics verified, never add them and never
+ * present one selected report as an authoritative system total.
+ * Motion requires confirmed poll and fresh measurements. Read-only module. */
 (function (root) {
   const SLOT_KEYS = ["pv_power","load_power","grid_power","battery_power","battery_soc"];
   const ukTime = value => {
@@ -127,9 +130,8 @@
     }
     board.appendChild(switches);
     const context=make(doc,"div","energy-board-context",s.focus==="system"?
-      "Повна система: ліворуч генерація кожного Deye, праворуч ОКРЕМІ покази №1 та №2 для спільних вузлів. Значення не підсумовуються.":
-      "Детальний архівний зріз Deye №"+(s.selected?.slot_no||"—")+
-      ". Покази спільної батареї, будинку та мережі належать обраному інвертору.");
+      "Фізична схема: два незалежні масиви PV → два паралельні Deye → ОДНЕ спільне навантаження, ОДНА мережа й ОДНА АКБ. Значення спільних вузлів — лише архівні покази обраного джерела, не підтверджені підсумки системи.":
+      "Спільні навантаження, мережа й АКБ залишаються ОДНИМИ вузлами. Змінюється тільки джерело архівного показу (Deye №"+(s.selected?.slot_no||"—")+").");
     board.appendChild(context);
 
     const map=make(doc,"div","energy-board-map");
@@ -144,51 +146,29 @@
     const desc={
       solar1:"Фотоелектричні панелі відповідного Deye. Жодної суми без підтвердженої схеми.",
       solar2:"Показник фотоелектричних панелей другого Deye — окреме джерело.",
-      house:"Навантаження з обраного інвертора, не підтверджена загальна потужність двох.",
-      battery:"Спільна батарея. Знак потужності трактуємо як розряд (+) або заряд (−) за профілем; SOC двох Deye не додаємо.",
-      grid:"Додатне значення — імпорт із мережі; від’ємне — експорт. Нуль — відсутність обміну."
+      house:"Фізично одне спільне навантаження. Архівний регістр вибраного Deye не можна вважати перевіреним сумарним навантаженням.",
+      battery:"Фізично одна спільна АКБ. SOC не сумується. Знак регістра потужності потребує підтвердження для конкретного профілю.",
+      grid:"Фізично одне спільне підключення до мережі. Напрямок за знаком регістра потребує підтвердження; два покази не додаються."
     };
-    function node(kind,key,icon,label,num,detail,subtitle,rows=null){
-      const comparing=Array.isArray(rows)&&rows.length>0;
-      const el=make(doc,"button","energy-board-node energy-board-"+kind+
-        (comparing?" is-comparison":""),"");
+    function node(kind,key,icon,label,num,detail,subtitle,diagnostics=[]){
+      const el=make(doc,"button","energy-board-node energy-board-"+kind+" is-shared","");
       el.type="button";
-      el.setAttribute("aria-label",comparing?
-        label+": окремі показники Deye №1 та Deye №2, без підсумовування":
-        label+": "+pretty(num,"кВт"));
-      if(comparing){
-        const title=make(doc,"span","energy-board-node-top");
-        append(title,make(doc,"span","energy-board-node-icon",icon),
-          make(doc,"strong","energy-board-node-name",label),
-          make(doc,"span","energy-board-node-unit","без суми"));
-        el.appendChild(title);
-        const details=make(doc,"span","energy-board-comparison");
-        for(const row of rows){
-          const cell=make(doc,"span","energy-board-reading-row"+(row.value===null?" is-missing":""));
-          append(cell,make(doc,"span","energy-board-reading-label","Deye №"+row.slot),
-            make(doc,"strong","energy-board-reading-value",pretty(row.value,"кВт")),
-            make(doc,"small","energy-board-reading-state",
-              row.state.caption+(row.soc!==null?" · SOC "+pretty(row.soc,"%"):"")));
-          details.appendChild(cell);
-        }
-        el.appendChild(details);
-      }else{
-        append(el,make(doc,"span","energy-board-node-icon",icon),
-          make(doc,"span","energy-board-node-name",label),
-          make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
-          make(doc,"span","energy-board-node-detail",detail));
-        if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
-      }
-      const detailMessage=comparing?
-        rows.map(row=>"Deye №"+row.slot+": "+pretty(row.value,"кВт")+
-          " ("+row.state.caption+")"+
-          (row.soc!==null?" · SOC "+pretty(row.soc,"%"):"")+
-          " · "+ukTime(row.last)).join("; "):
-        detail;
-      interactive.push({el,key,label,num:comparing?null:num,
-        title:comparing?label+" · 2 незалежні покази":null,
-        detail:comparing?detailMessage+"; спільні показники не сумуються.":detail,
-        subtitle:comparing?null:subtitle});
+      el.setAttribute("aria-label",label+": спільний фізичний вузол, архів "+pretty(num,"кВт"));
+      append(el,make(doc,"span","energy-board-node-icon",icon),
+        make(doc,"span","energy-board-node-name",label),
+        make(doc,"strong","energy-board-node-value",pretty(num,"кВт")),
+        make(doc,"span","energy-board-node-detail",detail));
+      el.appendChild(make(doc,"span","energy-board-shared-tag","СПІЛЬНИЙ ВУЗОЛ"));
+      if(subtitle)el.appendChild(make(doc,"small","energy-board-node-note",subtitle));
+      const diagnosticText=diagnostics.map(row=>
+        "Deye №"+row.slot+": "+pretty(row.value,"кВт")+
+        " ("+row.state.caption+")"+
+        (row.soc!==null?" · SOC "+pretty(row.soc,"%"):"")+
+        ", запис "+ukTime(row.last)).join("; ");
+      interactive.push({el,key,label,num,
+        detail:(desc[key]||"")+" "+(diagnosticText?
+          "Окремі звіти про ЦЕЙ самий фізичний вузол (не два навантаження): "+diagnosticText+".":"Немає окремих звітів."),
+        subtitle});
       return el;
     }
     function wire(key,direction,active,caption){
@@ -198,23 +178,7 @@
       append(item,make(doc,"span","energy-board-wire-title",caption),arrow);
       wires[key]=item;return item;
     }
-    function comparisonWire(key,rows){
-      const active=rows.some(row=>row.state.active);
-      const item=make(doc,"div","energy-board-wire is-comparison-wire "+
-        (active?"has-flow":"no-flow")+" wire-"+key);
-      for(const row of rows){
-        const lane=make(doc,"span","energy-board-wire-lane "+
-          (row.state.active?"has-flow":"no-flow")+
-          (row.state.direction==="←"?" is-reverse":""));
-        lane.setAttribute("title","Deye №"+row.slot+": "+row.state.caption);
-        append(lane,make(doc,"span","energy-board-wire-number","№"+row.slot),
-          make(doc,"strong","energy-board-wire-arrow",
-            row.state.active?row.state.direction:"—"));
-        item.appendChild(lane);
-      }
-      wires[key]=item;
-      return item;
-    }
+    // A shared load, grid, or battery has exactly one physical connection.
     const source1=s.devices.find(d=>Number(d.slot_no)===1)||null;
     const source2=s.devices.find(d=>Number(d.slot_no)===2)||null;
     for(const [number,device] of [[1,source1],[2,source2]]){
@@ -249,39 +213,53 @@
     hubNote.textContent="Зв’язки показано за збереженим зрізом";
     hub.setAttribute("role","img");
     hub.setAttribute("aria-label","Спільна схема двох Deye, без розрахунку непідтвердженої суми");
-    const load=value("load_power"),battery=value("battery_power"),soc=value("battery_soc"),grid=value("grid_power");
-    const systemMode=s.focus==="system"&&s.devices.length>0;
+    const systemMode=s.focus==="system";
     const slots=[1,2].map(slot=>({slot,device:s.devices.find(d=>Number(d.slot_no)===slot)||null}));
-    function comparisonRows(info){
+    function diagnosticRows(info){
       return slots.map(({slot,device})=>{
-        const v=device?metric(device.values,info.signal):null;
-        return {slot,value:v,state:flowState(info.key,v),
+        const value=device?metric(device.values,info.signal):null;
+        return {slot,value,state:flowState(info.key,value),
           soc:info.key==="battery"&&device?metric(device.values,"battery_soc"):null,
           last:device?measured(device.values):null};
       });
     }
-    const sourceLabel="Дані "+(s.selected?"Deye №"+s.selected.slot_no:"запису MySQL");
     const outputs=[
-      {key:"house",signal:"load_power",icon:"⌂",label:"Будинок",v:load,extra:sourceLabel},
-      {key:"battery",signal:"battery_power",icon:"▣",label:"Спільна АКБ",v:battery,
-        extra:soc===null?"SOC —":("SOC "+pretty(soc,"%")+" · "+sourceLabel)},
-      {key:"grid",signal:"grid_power",icon:"⌁",label:"Електромережа",v:grid,extra:sourceLabel}
+      {key:"house",signal:"load_power",icon:"⌂",label:"Спільне навантаження"},
+      {key:"battery",signal:"battery_power",icon:"▣",label:"Спільна АКБ"},
+      {key:"grid",signal:"grid_power",icon:"⌁",label:"Спільна мережа"}
     ];
     for(const info of outputs){
-      const state=flowState(info.key,info.v);
-      const rows=systemMode?comparisonRows(info):null;
-      sinkWires.appendChild(systemMode?
-        comparisonWire(info.key,rows):
-        wire(info.key,state.direction,state.active,state.caption));
+      const rows=diagnosticRows(info);
+      const selectedRow=rows.find(row=>row.slot===Number(s.selected?.slot_no)&&row.value!==null);
+      const alternate=systemMode?rows.find(row=>row.value!==null):null;
+      const reference=selectedRow||alternate||null;
+      const reported=value(info.signal);
+      const metricValue=reported!==null?reported:reference?.value??null;
+      const referenceSlot=reported!==null?s.selected?.slot_no:reference?.slot;
+      const present=rows.filter(row=>row.value!==null);
+      const incompatible=systemMode&&present.length===2 &&
+        present[0].state.direction!==present[1].state.direction;
+      const diverged=present.length===2&&present[0].value!==present[1].value;
+      const flow=incompatible?
+        {direction:"—",caption:"Напрямок не підтверджено",active:false}:
+        flowState(info.key,metricValue);
+      const subtitle=(referenceSlot?"Архів Deye №"+referenceSlot:"Архів без прив'язки до Deye")+
+        " · це не підтверджений загальний баланс"+
+        (diverged?" · покази двох Deye відрізняються":"");
+      // Single line to the single physical node. Never create two arrows.
+      sinkWires.appendChild(wire(info.key,flow.direction,flow.active,flow.caption));
+      const stateNote=info.key==="battery"?
+        " · SOC "+pretty(reported!==null?
+          metric(s.values,"battery_soc"):reference?.soc??null,"%"):"";
       sinks.appendChild(node(info.key,info.key,info.icon,info.label,
-        info.v,state.caption,info.extra,rows));
+        metricValue,flow.caption+stateNote,subtitle,rows));
     }
     append(map,sources,sourceWires,hub,sinkWires,sinks);board.appendChild(map);
     const legend=make(doc,"div","energy-board-legend");
     append(legend,
-      make(doc,"span","energy-board-legend-key","→ напрям до вузла"),
-      make(doc,"span","energy-board-legend-key","← напрям від вузла"),
-      make(doc,"span","energy-board-legend-key","— немає потоку / даних"));
+      make(doc,"span","energy-board-legend-key","→ напрям до спільного вузла"),
+      make(doc,"span","energy-board-legend-key","← напрям від спільного вузла"),
+      make(doc,"span","energy-board-legend-key","— немає потоку / різні напрямки у звітах"));
     board.appendChild(legend);
     const foot=make(doc,"div","energy-board-foot");
     const inspector=make(doc,"div","energy-board-inspector");
@@ -290,8 +268,9 @@
       make(doc,"p","energy-board-inspector-description",
         "Натисніть на сонячні панелі, будинок, батарею або мережу — відповідний потік підсвітиться."));
     const notice=make(doc,"p","energy-board-disclaimer",
-      "Це збережені вимірювання MySQL, не онлайн-телеметрія. Стрілки відображають напрямок за знаком показника; " +
-      "спільні SOC, навантаження та мережа не сумуються. Анімація можлива лише за підтвердженого живого опитування.");
+      "Топологія: два окремі PV, одна спільна АКБ, одна мережа й одне навантаження. " +
+      "Показане число — звіт одного Deye, не підтверджений сумарний баланс; перевірка призначення регістрів ще потрібна. " +
+      "Без підтвердженого опитування схема не є онлайн.");
     append(foot,inspector,notice);board.appendChild(foot);
     function choose(item){
       for(const candidate of interactive){
