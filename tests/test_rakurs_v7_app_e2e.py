@@ -169,7 +169,7 @@ class Handler(BaseHTTPRequestHandler):
 
 
 def wait_rendered(page):
-    page.wait_for_selector(".rv7 [data-node='pv1']", timeout=20000)
+    page.wait_for_selector(".rv7 [data-node='pv1']", state="attached", timeout=20000)
     page.wait_for_selector(".rv7 .rv7-chart-line", timeout=20000)
 
 
