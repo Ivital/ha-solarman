@@ -477,3 +477,39 @@ html.rv7-dialog-open,html.rv7-dialog-open body{overflow:hidden;overscroll-behavi
  body[data-theme] .workarea{padding-bottom:calc(65px + env(safe-area-inset-bottom,0px))}
  body[data-theme].rakurs-v7-overview .topbar{padding:4px 10px}
 }
+
+/* Product analytics: shared report comparison, phase/BMS details and chart controls. */
+body[data-theme] .product-analytics{padding:14px;margin:14px 0;background:var(--ux-surface);border:1px solid var(--ux-line);border-radius:14px;min-width:0}
+body[data-theme] .product-analytics h2{font-size:18px;letter-spacing:-.025em;margin:0 0 5px}
+body[data-theme] .product-analytics p{margin:0 0 10px}
+body[data-theme] .product-analytics-controls{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
+body[data-theme] .product-analytics select{min-height:40px;max-width:100%}
+body[data-theme] .product-comparison-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
+body[data-theme] .product-comparison-card{padding:12px;border:1px solid var(--ux-line);border-radius:10px;min-width:0}
+body[data-theme] .product-comparison-card h3{font-size:16px;margin:0 0 10px}
+body[data-theme] .product-energy-row{display:grid;grid-template-columns:1fr auto;gap:4px;padding:8px 0;border-bottom:1px solid var(--ux-line)}
+body[data-theme] .product-energy-row small{grid-column:1/-1;font-size:10px}
+body[data-theme] .product-phase-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:10px 0}
+body[data-theme] .product-phase-card{background:var(--ux-subtle);padding:10px;border-radius:9px;min-width:0}
+body[data-theme] .product-phase-card h3{margin:0 0 5px;font-size:18px}
+body[data-theme] .product-phase-card>strong{display:block;font-size:21px;margin-top:4px}
+body[data-theme] .product-phase-row{display:flex;justify-content:space-between;flex-wrap:wrap;gap:4px;font-size:12px;padding:6px 0;border-bottom:1px solid var(--ux-line)}
+body[data-theme] .product-phase-row strong{overflow-wrap:anywhere}
+body[data-theme] .product-bms-modules{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+body[data-theme] .product-bms-module{border:1px solid var(--ux-line);padding:9px;border-radius:9px}
+body[data-theme] .product-bms-module summary{cursor:pointer;font-weight:650}
+body[data-theme] .product-bms-delta{display:block;font-size:15px;margin:10px 0}
+body[data-theme] .product-chart-interactive{min-width:0}
+body[data-theme] .product-zoom-controls{display:flex;gap:5px;align-items:center;flex-wrap:wrap}
+body[data-theme] .product-zoom-controls button{min-height:34px;min-width:34px;padding:4px 8px;background:var(--ux-subtle);color:var(--ux-title);border:1px solid var(--ux-line);border-radius:6px}
+body[data-theme] .product-chart-interactive>.subtle{display:block;font-size:10px;margin:5px 0}
+body[data-theme] .product-zoom-plot{touch-action:pan-y}
+@media(max-width:760px){
+ body[data-theme] .product-comparison-grid,body[data-theme] .product-bms-modules{grid-template-columns:1fr}
+ body[data-theme] .product-analytics{padding:10px}
+ body[data-theme] .product-phase-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ body[data-theme] .product-phase-card{padding:8px}
+ body[data-theme] .product-phase-card>strong{font-size:16px}
+ body[data-theme] .product-phase-row{display:grid;gap:2px;font-size:11px}
+ body[data-theme] .product-zoom-controls button{min-height:40px;min-width:40px}
+}

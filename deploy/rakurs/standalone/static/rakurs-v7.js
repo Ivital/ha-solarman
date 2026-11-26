@@ -318,7 +318,7 @@
    play.textContent="▶ Відтворити архів";
    card.classList.remove("is-playing");
   }
-  scope.onDispose=stopPlayback;scope.pausePlayback=stopPlayback;
+  scope.onDispose=stopPlayback;scope.pausePlayback=stopPlayback;scope.canAutoRefresh=()=>!explicitSelection&&timer===null&&!scope.dialogClose&&!scope.historyBusy;
   play.addEventListener("click",()=>{
    if(timer!==null){stopPlayback();return;}
    if(availableTimes.length<2)return;
@@ -437,14 +437,14 @@
    else control.querySelector("label").replaceChildren(...Array.from(row.childNodes));
   }
   async function fetchSeries(){
-   const current=++revision;
+   const current=++revision;scope.historyBusy=true;
    stopPlayback();
    chartbox.replaceChildren(h("div","rv7-chart-status","Завантаження архіву…"));
    failedHistoryRequests=0;historyError.textContent="";
    legend.replaceChildren();time.textContent="";control.replaceChildren();
    if(typeof config.historyLoader!=="function"){
     chartbox.replaceChildren(h("div","rv7-chart-status",
-     "Історія доступна після підключення до архіву MySQL"));return;
+     "Історія доступна після підключення до архіву MySQL"));scope.historyBusy=false;return;
    }
    const planned=metadata.map(([id,label,key,slot,color])=>({
     id,label,key,color,device:slot?snap.devices.find(x=>Number(x.slot_no)===slot):snap.selected
@@ -462,6 +462,7 @@
     return {points:M.normalizeHistory((r?.points||[]).map(p=>({...p,unit:p.unit||unit}))),truncated:!!r?.truncated};
    }));
    if(scope.cancelled||current!==revision)return;
+   scope.historyBusy=false;
    failedHistoryRequests=got.filter(item=>item.status==="rejected").length;
    historyError.textContent=failedHistoryRequests ?
     "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
@@ -502,7 +503,7 @@
   if(!M)throw Error("RakursV7Model not loaded");
   const last=handlers.get(host);
   if(last)disposeScope(last);
-  const scope={cancelled:false,dialogClose:null};handlers.set(host,scope);
+  const scope={cancelled:false,dialogClose:null,config,host};handlers.set(host,scope);
   activeScopes.add(scope);
   const snap=M.snapshot(config),app=h("div","rv7"+(motionEnabled?"":" rv7-motion-paused"));
   app.setAttribute("aria-label","Енергосистема Rakurs V7");
@@ -610,6 +611,8 @@
   return true;
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
+   canAutoRefresh:()=>mode==="overview"&&Array.from(activeScopes).some(s=>s.canAutoRefresh?.()),
+   updateDevices:(host,devices)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices});},
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
   reset:()=>{mode="overview";hours=24;chosenTime=null;motionEnabled=true;}});
 })(window);

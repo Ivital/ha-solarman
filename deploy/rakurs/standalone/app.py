@@ -10,7 +10,8 @@ import logging
 import os
 import re
 import stat
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+from zoneinfo import ZoneInfo
 from decimal import Decimal
 from pathlib import Path
 
@@ -374,7 +375,18 @@ def latest():
         return jsonify({"error": "Некоректний перелік сигналів"}), 400
     device_id = selected_overview_device_id()
     found = {}
-    if device_id is not None:
+    if device_id is not None and len(keys) > 1:
+        placeholders = ",".join("%s" for _ in keys)
+        result = rows(
+            "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,"
+            "m.raw_value,m.quality,m.observed_at_utc FROM rakurs_signals s "
+            "JOIN rakurs_samples m ON m.signal_id=s.id AND m.device_id=%s "
+            "AND m.observed_at_utc=(SELECT MAX(mx.observed_at_utc) FROM rakurs_samples mx "
+            "WHERE mx.device_id=%s AND mx.signal_id=s.id) "
+            "WHERE s.signal_key IN (" + placeholders + ")",
+            (device_id, device_id) + tuple(keys))
+        found = {item["signal_key"]: serialize(item) for item in result}
+    elif device_id is not None:
         for key in keys:
             result = one(
                 "SELECT s.signal_key,s.label_uk,s.unit,m.value_decimal,"
@@ -447,6 +459,68 @@ def history():
         "points": serialize(points), "truncated": truncated,
         "primary_device_id": device_id, "aggregate_verified": False,
     })
+
+
+ENERGY_COUNTERS = ("pv_energy_total", "load_energy_total", "grid_import_total",
+                   "grid_export_total", "battery_charge_total", "battery_discharge_total")
+
+
+def energy_period(anchor, period):
+    local = anchor.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Europe/Kyiv"))
+    start = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    if period == "month":
+        start = start.replace(day=1)
+    elif period == "year":
+        start = start.replace(month=1, day=1)
+    return start.astimezone(timezone.utc).replace(tzinfo=None)
+
+
+@app.get("/api/v1/energy")
+def energy():
+    """Read-only observed counter differences; never sum shared device reports."""
+    period = request.args.get("period", "day")
+    if period not in {"day", "month", "year"}:
+        abort(400, description="Некоректний період енергії")
+    device_id = selected_overview_device_id()
+    if device_id is None:
+        return jsonify({"period": period, "counters": [], "anchor": None})
+    latest_row = one("SELECT MAX(observed_at_utc) AS stamp FROM rakurs_samples "
+                     "WHERE device_id=%s", (device_id,))
+    anchor = latest_row.get("stamp") if latest_row else None
+    if not isinstance(anchor, datetime):
+        return jsonify({"period": period, "counters": [], "anchor": None})
+    if anchor.tzinfo is not None:
+        anchor = anchor.astimezone(timezone.utc).replace(tzinfo=None)
+    start = energy_period(anchor, period)
+    placeholders = ",".join("%s" for _ in ENERGY_COUNTERS)
+    # MySQL 8 window functions: inspect all stored numeric counter samples
+    # within the requested period, including any decreases/resets.
+    data = rows(
+        "WITH ordered AS ("
+        "SELECT s.signal_key,s.unit,m.observed_at_utc,m.value_decimal,"
+        "LAG(m.value_decimal) OVER (PARTITION BY s.id ORDER BY m.observed_at_utc) AS prev,"
+        "FIRST_VALUE(m.value_decimal) OVER (PARTITION BY s.id ORDER BY m.observed_at_utc) AS first_value,"
+        "ROW_NUMBER() OVER (PARTITION BY s.id ORDER BY m.observed_at_utc DESC) AS last_rank "
+        "FROM rakurs_signals s JOIN rakurs_samples m ON m.signal_id=s.id "
+        "WHERE m.device_id=%s AND s.signal_key IN (" + placeholders + ") "
+        "AND m.observed_at_utc BETWEEN %s AND %s AND m.value_decimal IS NOT NULL) "
+        "SELECT signal_key,unit,COUNT(*) AS samples,MIN(observed_at_utc) AS first_at,"
+        "MAX(observed_at_utc) AS last_at,MAX(CASE WHEN last_rank=1 THEN value_decimal END) AS last_value,"
+        "MAX(first_value) AS first_value,SUM(CASE WHEN prev>value_decimal THEN 1 ELSE 0 END) AS decreases "
+        "FROM ordered GROUP BY signal_key,unit",
+        (device_id,) + ENERGY_COUNTERS + (start, anchor))
+    result = []
+    for item in data:
+        first, last = item["first_value"], item["last_value"]
+        valid = (item["samples"] >= 2 and not item["decreases"] and
+                 first is not None and last is not None and last >= first and
+                 item["unit"] in {"кВт·год", "кВт⋅год", "кВт*год", "kWh", "кВт·г"})
+        result.append({"key": item["signal_key"], "unit": item["unit"],
+                       "value": last-first if valid else None,
+                       "samples": item["samples"], "first_at": item["first_at"],
+                       "last_at": item["last_at"], "decreases": item["decreases"]})
+    return jsonify(serialize({"period": period, "anchor": anchor, "start": start,
+                              "counters": result, "aggregate_verified": False}))
 
 
 @app.get("/api/v1/history/range")

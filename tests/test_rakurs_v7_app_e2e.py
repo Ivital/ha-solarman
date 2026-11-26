@@ -161,6 +161,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": device_values(1)})
+        elif path == "/api/v1/energy":
+            self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
             key=args.get("key",[""])[0]
             device=args["device"][0]
@@ -373,6 +375,20 @@ def run():
                             assert page.locator(".topbar").bounding_box()["height"] <= 110, f"Oversized header: {route}"
                         nav_icon = page.locator(".mobile-tabs a[data-route=overview] .mobile-tab-symbol" if width < 761 else '.nav a[href="#/overview"] .symbol').first
                         assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
+                        if route=="trends":
+                            page.wait_for_selector(".product-comparison-card .product-timeseries")
+                            page.wait_for_selector(".product-energy-row")
+                            assert page.locator(".product-energy-row").count()==12
+                            page.get_by_label("Період енергетичного звіту").select_option("month")
+                            page.wait_for_selector(".product-energy-row")
+                            assert any("/energy?" in path and "period=month" in path for _,path in server.calls)
+                            chart=page.locator(".trend-card .product-chart-interactive").first
+                            chart.get_by_role("button",name="Збільшити масштаб").click()
+                            chart.get_by_role("button",name="Скинути масштаб").click()
+                        if route in {"grid","load","inverter"}:
+                            assert page.locator(".product-phase-grid .product-phase-card").count()==3
+                        if route=="battery":
+                            assert page.locator(".bms-summary").count()==1
                         if route=="archive":
                             assert page.locator("input[type=datetime-local]").last.input_value()=="2026-11-25T02:16"
                         if route in {"history","archive","trends","parallel"}:
