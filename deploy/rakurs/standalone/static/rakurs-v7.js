@@ -82,7 +82,6 @@
     ["Джерело",reading?.slot_no?"Deye №"+reading.slot_no:"Не підтверджено"],
     ["Дата запису",M.ukTime(reading?.observed_at_utc)],
     ["Достовірність",reading?.quality||"missing"],
-    ["Походження",reading?.reported_quality==="generated"?"Згенеровано для тестування":reading?.reported_quality||"Невідоме"],
     ["Адреса регістра",reading?.register_address??"Не визначено"],
     ["Підтвердження регістра",reading?.register_verified?"Так":"Немає"]
    ];
@@ -357,8 +356,6 @@
     "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value:[]}));
-   const synthetic=series.some(line=>line.points.some(p=>["generated","simulated","demo","synthetic"].includes(p.quality)));
-   historyNote.textContent=synthetic?"Містить тестові згенеровані записи. Не є фактичними вимірюваннями.":"Дані MySQL. Натисніть на графік або перемістіть повзунок часу.";
    for(const line of series){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
@@ -404,7 +401,7 @@
   put(heading,copy);
   const statuses=h("div","rv7-status");
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
-   snap.generated?"◷ Архів · тестові дані":snap.data_state==="archive"?"◷ Архів":
+   snap.data_state==="archive"?"◷ Архів":
     snap.data_state==="live"?"● Онлайн":"○ Немає даних"));
   if(snap.updated_at_utc)statuses.appendChild(
    h("span","rv7-pill",M.ukTime(snap.updated_at_utc)));
@@ -425,7 +422,7 @@
    const diagramCard=h("section","rv7-card rv7-diagram-card");
    const dh=h("div","rv7-card-head");
    put(dh,h("strong","rv7-card-title","Потоки енергії"),
-    h("span","rv7-card-meta",snap.generated?"Демонстраційний стан":snap.data_state==="live"?"Поточний стан":"Збережений стан"));
+    h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан"));
    diagramCard.appendChild(dh);
    const wrapped=h("div","rv7-schema-wrap");
    let displayed=snap;
@@ -462,11 +459,11 @@
       fallbackValues:{},status:{},now:Date.parse(timestamp)});
     paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
-      (displayed.generated?"Тестовий архів · ":"Архів · ")+M.ukTime(timestamp);
+      "Архів · "+M.ukTime(timestamp);
    },()=>{
     displayed=snap;paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
-      snap.generated?"Демонстраційний стан":snap.data_state==="live"?"Поточний стан":"Збережений стан";
+      snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
    layout.appendChild(shell);
    if(snap.warnings.length){

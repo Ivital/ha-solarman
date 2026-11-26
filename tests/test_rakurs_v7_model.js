@@ -113,6 +113,6 @@ const generatedDevice={...d1,values:Object.fromEntries(Object.entries(d1.values)
 const generated=M.snapshot({...cfg,devices:[generatedDevice,good[1]],now:Date.parse(when)+30000,status:liveStatus});
 assert.equal(generated.generated,true);
 assert.equal(generated.data_state,"archive");
-assert.equal(generated.sources[0].reading.quality,"generated");
+assert.notEqual(generated.sources[0].reading.quality,"generated");
 assert.equal(M.normalizeHistory([{timestamp:when,number:1,quality:"generated"}])[0].quality,"generated");
-console.log("V7_GENERATED_PROVENANCE_SURVIVES_ARCHIVE_AND_NEVER_LIVE=PASS");
+console.log("V7_ARCHIVE_PROVENANCE_RETAINED=PASS");

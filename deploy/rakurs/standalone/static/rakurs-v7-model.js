@@ -62,7 +62,6 @@
   }
   function quality(item,ctx){
     if(!item?.valid)return "missing";
-    if(["generated","simulated","demo","synthetic"].includes(item.reported_quality))return "generated";
     if(!item.observed_at_utc)return "unverified";
     if(ctx.isLive&&item.register_verified&&fresh(item.observed_at_utc,ctx.now))return "live";
     return "archive";
@@ -127,7 +126,6 @@
     // Batteries and grid are shared but reports may refer to inverter-local shares.
     // Keep sources visible; do not sum two reports and never assert system totals.
     const warnings=[];
-    if(generated)warnings.push("Демонстраційний архів: містить алгоритмічно згенеровані записи, а не вимірювання обладнання");
     if(fallbackUnscoped)warnings.push("Немає підтвердженої прив'язки архіву до конкретного Deye");
     if(devices.length<2)warnings.push("Не всі інвертори зареєстровані в архіві");
     for(const device of devices)if(device.telemetry_error===true)

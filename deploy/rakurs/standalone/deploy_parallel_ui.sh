@@ -46,7 +46,7 @@ grep -Fq 'rakurs-energy-board-20261126.css?v=rakurs-premium-flow-v3' "$HERE/temp
 grep -Fq 'rakurs-energy-board-20261126.js?v=rakurs-mobile-compact-v2' "$HERE/templates/index.html"
 grep -Fq 'window.RakursEnergyBoard.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261126-4' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261126-5' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
