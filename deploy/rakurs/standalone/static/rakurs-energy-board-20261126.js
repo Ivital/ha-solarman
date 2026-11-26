@@ -133,7 +133,7 @@
       append(item,make(doc,"span","energy-board-wire-title",caption),arrow);
       wires[key]=item;return item;
     }
-    const source1=s.devices.find(d=>Number(d.slot_no)===1)||s.devices[0]||null;
+    const source1=s.devices.find(d=>Number(d.slot_no)===1)||null;
     const source2=s.devices.find(d=>Number(d.slot_no)===2)||null;
     for(const [number,device] of [[1,source1],[2,source2]]){
       const power=device?metric(device.values,"pv_power"):null;
@@ -162,7 +162,7 @@
     append(hub,make(doc,"span","energy-board-hub-icon","⚡"),
       make(doc,"strong","","ЕНЕРГЕТИЧНА ШИНА"),
       make(doc,"small","",s.focus==="system"?"Deye №1 + Deye №2":"Deye №"+s.selected?.slot_no),
-      make(doc,"span","energy-board-hub-note","", "")); // replaced below with explicit text
+      make(doc,"span","energy-board-hub-note",""));
     const hubNote=hub.childNodes[hub.childNodes.length-1];
     hubNote.textContent="Зв’язки показано за збереженим зрізом";
     hub.setAttribute("role","img");

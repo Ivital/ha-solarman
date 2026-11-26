@@ -8,6 +8,8 @@ const root = path.join(__dirname, "../deploy/rakurs/standalone");
 const js = fs.readFileSync(path.join(root, "static/app-parallel-twin-20261125.js"), "utf8");
 const css = fs.readFileSync(path.join(root, "static/clarity-ui-20261124.css"), "utf8");
 const chartCss = fs.readFileSync(path.join(root, "static/parallel-twin-20261125.css"), "utf8");
+const energyBoardJs = fs.readFileSync(path.join(root,"static/rakurs-energy-board-20261126.js"),"utf8");
+const energyBoardCss = fs.readFileSync(path.join(root,"static/rakurs-energy-board-20261126.css"),"utf8");
 const html = fs.readFileSync(path.join(root, "templates/index.html"), "utf8");
 const reference = JSON.parse(fs.readFileSync(path.join(root, "static/register-reference-v1053.json"), "utf8"));
 const colorCss = fs.readFileSync(path.join(root, "static/rakurs-color-20261125.css"), "utf8");
@@ -188,6 +190,7 @@ function prepare(mode = "seeded") {
     URLSearchParams,Number,Date,String,Array,Set,Math,
     encodeURIComponent,console:{warn(){}}
   };
+  vm.runInNewContext(energyBoardJs,{window:sandbox.window},{filename:"rakurs-energy-board-20261126.js"});
   vm.runInNewContext(js,sandbox,{filename:"app-parallel-twin-20261125.js"});
   return {main,nav,events,loc,fetchCalls,ssr,elements,body,storage};
 }
@@ -227,7 +230,17 @@ async function run() {
   assert(deyeHtml.includes("/static/rakurs-pages-20261126.css"));
   assert(loginHtml.includes('id="page-theme-toggle"'));
   assert(deyeHtml.includes('id="page-theme-toggle"'));
-  assert(html.includes("hero-layout") && html.includes("insight-strip"));
+  assert(html.includes("energy-board-ssr") && html.includes("insight-strip"));
+  assert(html.indexOf("energy-board-ssr")<html.indexOf("cards cards-main"),
+    "System diagram must be first, before KPI cards");
+  assert(html.includes("/static/rakurs-energy-board-20261126.js"));
+  assert(html.includes("/static/rakurs-energy-board-20261126.css"));
+  assert(html.indexOf("rakurs-energy-board-20261126.js")<
+    html.indexOf("app-parallel-twin-20261125.js"),
+    "Energy diagram must load before dashboard app");
+  assert(energyBoardCss.includes(".energy-board-map") && 
+    energyBoardCss.includes("prefers-reduced-motion"));
+  console.log("CLARITY_SYSTEM_DIAGRAM_FIRST_ASSETS=PASS");
   assert(html.includes('id="refresh-data"'));
   assert(html.includes("dashboard-toolbar-ssr"));
   assert(colorCss.includes(".dashboard-options") && colorCss.includes(".nav-search") &&
@@ -250,7 +263,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-ux4-20261126-1"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v1-20261126"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -265,6 +278,36 @@ async function run() {
     "All SVG chart surfaces must occupy available card width");
   console.log("CLARITY_CORRECT_CHART_LAYOUT=PASS");
   assert(!/Тестові дані|СИМУЛЯЦІЯ|ДЕМО/i.test(html));
+  const boardWindow={};
+  vm.runInNewContext(energyBoardJs,{window:boardWindow},{filename:"rakurs-energy-board-20261126.js"});
+  const separate=boardWindow.RakursEnergyBoard.snapshot({
+    devices:[
+      {device_key:"inv1",slot_no:1,values:{pv_power:latest.pv_power,
+        battery_soc:latest.battery_soc}},
+      {device_key:"inv2",slot_no:2,values:{pv_power:{...latest.pv_power,value_decimal:"7.7"},
+        battery_soc:{...latest.battery_soc,value_decimal:"73.8"}}}
+    ],
+    selectedDeviceKey:"inv1",mode:"system",
+    status:{collector_active:false,physical_topology_verified:false}});
+  assert.equal(separate.devices.length,2);
+  assert.equal(separate.confirmed,false);
+  assert.equal(separate.values.pv_power.value_decimal,"5.1",
+    "System must show independently scoped values, NOT a fabricated sum");
+  assert.equal(boardWindow.RakursEnergyBoard.metric(separate.values,"battery_soc"),72,
+    "Never sum shared battery SOC across inverters");
+  const onlySecond=boardWindow.RakursEnergyBoard.snapshot({
+    devices:[{device_key:"inv2",slot_no:2,values:{pv_power:latest.pv_power}}],
+    selectedDeviceKey:"inv2",selectedSlotNo:2,status:{collector_active:false}});
+  const host=new Node("div");
+  const doc={createElement:tag=>new Node(tag)};
+  boardWindow.RakursEnergyBoard.render(host,{document:doc,
+    devices:onlySecond.devices,selectedDeviceKey:"inv2",selectedSlotNo:2,
+    status:{collector_active:false},mode:"system"});
+  const pv1=byClass(host,"energy-board-source")[0];
+  assert(pv1.childNodes.some(x=>String(x.textContent||"")==="☀"));
+  assert(descendants(pv1).some(x=>String(x.textContent||"")==="—"),
+    "Missing first Deye must never inherit Deye 2 PV");
+  console.log("CLARITY_NO_SHARED_BATTERY_AGGREGATION_OR_INVENTED_DEVICE=PASS");
   for(const scenario of ["fail","partial"]) {
     const app=prepare(scenario);
     await settle();
@@ -283,7 +326,15 @@ async function run() {
   assert.equal(app.storage.get("rakurs_theme"),"light");
   console.log("CLARITY_THEME_SWITCH_BOTH_WAYS=PASS");
   assert.equal(byClass(app.main,"kpi").length,4);
-  assert.equal(byClass(app.main,"dashboard-hero").length,1);
+  assert.equal(byClass(app.main,"energy-board").length,1);
+  assert.equal(app.main.childNodes[0].className,"energy-board-host");
+  assert.equal(byClass(app.main,"energy-board-source").length,2);
+  assert.equal(byClass(app.main,"energy-board-node").length,3);
+  assert.equal(byClass(app.main,"energy-board-mode").length,3);
+  assert.equal(byClass(app.main,"energy-board-flag")[0].textContent,
+    "◷ Архівний зріз — не онлайн");
+  assert.equal(byClass(app.main,"energy-board")[0].className.includes("is-live"),false);
+  console.log("CLARITY_ENERGY_FLOW_ON_TOP_ARCHIVE_NOT_LIVE=PASS");
   assert.equal(byClass(app.main,"insight-item").length,3);
   assert.equal(byClass(app.main,"quick-link").length,3);
   console.log("CLARITY_NEW_HOME_HIERARCHY=PASS");
@@ -335,7 +386,7 @@ async function run() {
   assert.equal(reloadButton.disabled,false);
   assert.equal(reloadButton.textContent,"↻ Оновити");
   console.log("CLARITY_READONLY_MANUAL_REFRESH=PASS");
-  assert.equal(byClass(app.main,"energy-diagram").length,1);
+  assert.equal(byClass(app.main,"energy-board-map").length,1);
   assert(descendants(app.main).some(x=>String(x.textContent||"").includes("На дату останнього запису")));
   assert(descendants(app.main).some(x=>String(x.textContent||"").includes("Без обміну")));
   assert(!descendants(app.main).some(x=>String(x.textContent||"").includes("За сьогодні")));
@@ -373,6 +424,27 @@ async function run() {
     String(x.textContent||"").includes("Ключові показники · Deye №1")));
   console.log("CLARITY_GLOBAL_DEYE_PICKER=PASS");
   console.log("CLARITY_UNIFIED_MYSQL_OVERVIEW=PASS");
+  const nodes=byClass(app.main,"energy-board-node");
+  const gridNode=nodes.find(x=>x.className.includes("energy-board-grid"));
+  assert(gridNode);
+  gridNode.listeners.click();
+  assert.equal(gridNode.attributes["aria-pressed"],"true");
+  assert(byClass(app.main,"energy-board-inspector")[0].childNodes.some(x=>
+    String(x.textContent||"").includes("Електромережа")));
+  assert.equal(byClass(app.main,"energy-board-wire").filter(x=>x.className.includes("is-live")).length,0);
+  assert(byClass(app.main,"energy-board-wire").some(x=>
+    x.className.includes("wire-grid")&&x.className.includes("no-flow")),
+    "Zero grid import must not display an active flow");
+  const flowTabs=byClass(app.main,"energy-board-mode");
+  flowTabs.find(x=>x.textContent==="Deye №2").listeners.click();
+  await settle();
+  assert.equal(app.elements["device-select"].value,"sim_deye20k_parallel_2");
+  assert(byClass(app.main,"energy-board-context").some(x=>String(x.textContent||"").includes("Deye №2")));
+  byClass(app.main,"energy-board-mode").find(x=>x.textContent==="Уся система").listeners.click();
+  await settle();
+  assert.equal(byClass(app.main,"energy-board-mode").find(x=>
+    x.textContent==="Уся система").attributes["aria-pressed"],"true");
+  console.log("CLARITY_ENERGY_FLOW_NODE_INSPECTION_AND_MODES=PASS");
 
   app.loc.hash="#/trends";
   await app.events.hashchange();
