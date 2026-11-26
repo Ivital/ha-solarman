@@ -139,6 +139,14 @@ if __name__ == '__main__':
                     assert "Онлайн" not in page.locator(".rv7-top").inner_text()
                     assert page.locator(".rv7 [data-node='pv1']").count() == 2
                     assert page.locator(".rv7 .rv7-engineer").count() == 0
+                    assert page.locator(".rv7-warning-details summary").count() == 1
+                    if width <= 600:
+                        warning_first = page.evaluate("""() => {
+                          const w = document.querySelector(".rv7-warnings");
+                          const c = document.querySelector(".rv7-chart-card");
+                          return w.getBoundingClientRect().top < c.getBoundingClientRect().top;
+                        }""")
+                        assert warning_first, "Mobile warnings must appear before the archive graph"
                     image = OUT / f"{name}_{theme}_viewport.png"
                     page.screenshot(path=str(image), full_page=False, animations="disabled")
                     verify_looks_nonblank(image)

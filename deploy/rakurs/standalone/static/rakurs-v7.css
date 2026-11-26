@@ -253,3 +253,12 @@ body[data-theme="dark"] .rv7,.rv7[data-theme="dark"]{
 .rv7-history-error{margin:5px 16px 10px;padding:9px 12px;border:1px solid var(--v7-load);
  border-radius:9px;background:var(--v7-load-soft);color:var(--v7-ink);font-size:12px}
 .rv7-history-error:empty{display:none}
+
+/* The warning summary follows the energy diagram, ahead of the archive graph. */
+.rv7-overview-left{display:grid;gap:12px;align-content:start;min-width:0}
+.rv7-overview-left .rv7-warnings{margin-top:0}
+.rv7-warning-details{border:1px solid var(--v7-line);border-radius:12px;
+ background:var(--v7-card);font-size:12px;color:var(--v7-muted)}
+.rv7-warning-details summary{cursor:pointer;padding:10px 14px;font-weight:700}
+.rv7-warning-details ul{margin:0;padding:0 16px 13px 32px;line-height:1.55}
+.rv7-warning-details li+li{margin-top:5px}

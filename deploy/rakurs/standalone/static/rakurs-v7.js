@@ -385,7 +385,7 @@
   const layout=h("div","rv7-layout");app.appendChild(layout);
   if(mode==="engineer")engineering(layout,snap);
   else{
-   const shell=h("div","rv7-shell");
+   const shell=h("div","rv7-shell"),leftColumn=h("div","rv7-overview-left");
    const diagramCard=h("section","rv7-card rv7-diagram-card");
    const dh=h("div","rv7-card-head");
    put(dh,h("strong","rv7-card-title","Потоки енергії"),
@@ -407,7 +407,8 @@
    detailButton.addEventListener("click",()=>{mode="engineer";render(host,config);});
    actions.appendChild(detailButton);foot.appendChild(actions);
    diagramCard.appendChild(foot);
-   shell.appendChild(diagramCard);
+   leftColumn.appendChild(diagramCard);
+   shell.appendChild(leftColumn);
    paintHistory(shell,snap,config,scope,(timestamp,series)=>{
     // Historical frames are built only from near-time measurements.
     // Missing records stay missing; do not silently reuse current values.
@@ -443,7 +444,13 @@
     open.type="button";
     open.addEventListener("click",()=>{mode="engineer";render(host,config);});
     put(item,h("span","rv7-notice-icon","ⓘ"),summary,open);
-    notices.appendChild(item);layout.appendChild(notices);
+    notices.appendChild(item);
+     const details=h("details","rv7-warning-details");
+     details.appendChild(h("summary","","Що саме потребує перевірки"));
+     const reasons=h("ul");
+     for(const reason of snap.warnings)reasons.appendChild(h("li","",reason));
+     details.appendChild(reasons);notices.appendChild(details);
+     leftColumn.appendChild(notices);
    }
    const more=h("section","rv7-secondary");
    const devices=h("div","rv7-card");
