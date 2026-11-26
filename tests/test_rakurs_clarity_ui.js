@@ -365,6 +365,13 @@ async function run() {
   const arrows=byClass(wireGrid,"energy-board-wire-arrow").map(n=>n.textContent);
   assert.equal(arrows.join(","),"←,→",
     "Opposite import and export readings need separate, opposite arrows");
+  const oppositeLanes=byClass(wireGrid,"energy-board-wire-lane");
+  assert(oppositeLanes[0].className.includes("is-reverse"));
+  assert(!oppositeLanes[1].className.includes("is-reverse"));
+  assert(energyBoardCss.includes("energy-dot-reverse"),
+    "Direction-aware animation must move in the actual arrow direction");
+  assert(energyBoardCss.includes(".energy-board-wire.is-comparison-wire::after"),
+    "A shared moving dot must not contradict independent inverter flows");
   assert.equal(byClass(compareHost,"energy-board-legend").length,1);
   const wholeText=descendants(compareHost).map(node=>String(node.textContent||"")).join(" ");
   assert(!wholeText.includes("13,216")&&!wholeText.includes("2,685"),

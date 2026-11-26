@@ -192,7 +192,8 @@
       return el;
     }
     function wire(key,direction,active,caption){
-      const item=make(doc,"div","energy-board-wire "+(active?"has-flow":"no-flow")+" wire-"+key);
+      const item=make(doc,"div","energy-board-wire "+(active?"has-flow":"no-flow")+
+        (direction==="←"?" is-reverse":"")+" wire-"+key);
       const arrow=make(doc,"span","energy-board-direction",active?direction:"—");
       append(item,make(doc,"span","energy-board-wire-title",caption),arrow);
       wires[key]=item;return item;
@@ -203,7 +204,8 @@
         (active?"has-flow":"no-flow")+" wire-"+key);
       for(const row of rows){
         const lane=make(doc,"span","energy-board-wire-lane "+
-          (row.state.active?"has-flow":"no-flow"));
+          (row.state.active?"has-flow":"no-flow")+
+          (row.state.direction==="←"?" is-reverse":""));
         lane.setAttribute("title","Deye №"+row.slot+": "+row.state.caption);
         append(lane,make(doc,"span","energy-board-wire-number","№"+row.slot),
           make(doc,"strong","energy-board-wire-arrow",

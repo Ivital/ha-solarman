@@ -260,3 +260,24 @@ body[data-theme] .energy-board-mode:focus-visible{outline:3px solid var(--ux-acc
  body[data-theme] .energy-board-legend{gap:8px;margin-top:10px}
  body[data-theme] .energy-board-legend-key{font-size:10px}
 }
+
+/* Motion is permitted ONLY by the existing is-live gate and follows EACH arrow's direction. */
+@keyframes energy-dot-reverse{from{left:calc(100% - 8px)}to{left:0}}
+body[data-theme] .energy-board.is-live .energy-board-wire.has-flow.is-reverse::after{
+ animation-name:energy-dot-reverse}
+body[data-theme] .energy-board.is-live .energy-board-wire.is-comparison-wire::after{
+ content:none!important}
+body[data-theme] .energy-board.is-live .energy-board-wire-lane.has-flow::after{
+ content:"";position:absolute;top:calc(50% - 4px);left:0;
+ width:8px;height:8px;border-radius:50%;background:var(--ux-accent);
+ animation:energy-dot 1.8s linear infinite}
+body[data-theme] .energy-board.is-live .energy-board-wire-lane.has-flow.is-reverse::after{
+ animation-name:energy-dot-reverse}
+@media(max-width:600px){
+ body[data-theme] .energy-board-sources{grid-template-rows:none}
+ body[data-theme] .energy-board.is-live .energy-board-wire-lane::after,
+ body[data-theme] .energy-board.is-live .energy-board-wire::after{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board.is-live .energy-board-wire-lane::after{animation:none!important;display:none!important}
+}
