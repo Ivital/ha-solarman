@@ -706,3 +706,121 @@ body[data-theme] .energy-board .energy-board-hub{gap:8px}
   body[data-theme] .energy-board .source-wires .energy-board-flow-track{
     height:26px!important}
 }
+
+
+/* PREMIUM FLOW V3 — continuous physical connections, no disconnected color ticks.
+   Shared bus and branch lanes are deliberately quieter than data cards.
+   Read-only archival flow: animation does not imply live telemetry. */
+
+/* Improve the visual hierarchy while keeping both light/dark color tokens. */
+body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+ border-width:1px;
+ box-shadow:0 7px 22px rgba(24,150,117,.07)}
+body[data-theme] .energy-board .energy-board-source,
+body[data-theme] .energy-board .energy-board-node{
+ box-shadow:0 2px 9px rgba(18,45,76,.035);
+ transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
+body[data-theme] .energy-board .energy-board-source:focus-visible,
+body[data-theme] .energy-board .energy-board-node:focus-visible,
+body[data-theme] .energy-board .energy-board-wire:focus-visible{
+ outline:2px solid var(--ux-accent);outline-offset:3px}
+body[data-theme] .energy-board .energy-board-flow-track{
+ height:4px;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 10%,transparent);
+ border-radius:999px}
+body[data-theme] .energy-board .energy-board-flow-head{
+ width:12px;height:12px;filter:none}
+body[data-theme] .energy-board .energy-board-flow-particle{
+ width:7px;height:7px;border:0;
+ background:var(--ux-surface);opacity:0;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 45%,transparent);
+}
+body[data-theme] .energy-board .energy-board-flow-particle:nth-child(3),
+body[data-theme] .energy-board .energy-board-flow-particle:nth-child(4){
+ display:none!important}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-track{
+ background:var(--ux-line);box-shadow:none;height:2px;opacity:.92}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-head{
+ display:none!important}
+body[data-theme] .energy-board .energy-board-direction{
+ display:none!important}
+body[data-theme] .energy-board .energy-board-wire.has-flow:hover .energy-board-flow-track,
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-flow-track{
+ height:6px;box-shadow:0 0 0 3px color-mix(in srgb,var(--stream-color) 17%,transparent)}
+
+/* Mobile: one continuous common rail, with full-length branches ending at cards.
+   NO ::before short color stubs, NO dashed gray grid marks. */
+@media(max-width:600px){
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs{
+  --rail-left:12px;
+  --row-left:25px;
+  padding:12px 0 0 var(--row-left)!important;gap:9px!important;
+  margin:0!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs::before{
+  content:"";left:var(--rail-left);top:0;bottom:35px;
+  width:2px;border-radius:8px;
+  background:var(--ux-line);opacity:.8}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs::after{
+  content:"";left:var(--rail-left);top:0;
+  width:calc(50% - var(--rail-left));height:2px;
+  background:var(--ux-line);opacity:.8}
+ body[data-theme] .energy-board .energy-board-output-row::before{
+  content:none!important;display:none!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+  grid-template-columns:clamp(40px,12vw,48px) minmax(0,1fr)!important;
+  gap:0!important;align-items:center;min-height:72px!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+  min-height:72px!important;
+  padding:11px 12px!important;
+  border-radius:15px;
+  grid-template-columns:24px minmax(0,1fr) auto}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+  height:72px!important;max-height:72px!important;min-height:72px!important;
+  overflow:visible!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-track{
+  left:calc(var(--rail-left) - var(--row-left))!important;
+  right:0!important;top:50%!important;
+  height:4px!important;width:auto!important;
+  transform:translateY(-50%)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 10%,transparent)!important;
+  background:var(--stream-color);
+  border-radius:999px;opacity:1;pointer-events:none}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.no-flow .energy-board-flow-track{
+  background:var(--ux-line)!important;
+  height:2px!important;box-shadow:none!important;opacity:.84}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-head{
+  width:12px!important;height:12px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.is-forward .energy-board-flow-head{right:-1px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.is-reverse .energy-board-flow-head{left:-1px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-flow-particle{
+  width:7px;height:7px;border:0;box-shadow:0 0 0 2px
+    color-mix(in srgb,var(--stream-color) 42%,transparent)}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-direction{
+  display:none!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-name{
+  font-size:13px;line-height:1.3}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+  font-size:clamp(16px,4.1vw,19px);font-variant-numeric:tabular-nums}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-detail{
+  font-size:11px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  border-radius:16px;margin-bottom:12px!important;
+  box-shadow:0 6px 19px rgba(24,150,117,.06)}
+ /* Thinner, calmer vertical PV links with a single light pulse. */
+ body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+  width:4px!important;box-shadow:0 0 0 2px
+   color-mix(in srgb,var(--stream-color) 10%,transparent)!important}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-head{
+  width:13px!important;height:12px!important}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-particle{
+  width:6px;height:6px;border:0}
+}
+/* Keep the entire path still when motion has been paused or reduced. */
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-flow-particle{
+  display:none!important;animation:none!important}
+}
