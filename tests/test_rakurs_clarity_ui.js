@@ -263,7 +263,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v1-20261126"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-energy-v2-20261126"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -295,6 +295,32 @@ async function run() {
     "System must show independently scoped values, NOT a fabricated sum");
   assert.equal(boardWindow.RakursEnergyBoard.metric(separate.values,"battery_soc"),72,
     "Never sum shared battery SOC across inverters");
+  assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",2).direction,"←");
+  assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",-2).direction,"→");
+  assert.equal(boardWindow.RakursEnergyBoard.flowState("grid",0).active,false);
+  assert.equal(boardWindow.RakursEnergyBoard.flowState("battery",-1.3).caption,"Заряд");
+  assert.equal(boardWindow.RakursEnergyBoard.flowState("battery",1.3).caption,"Розряд");
+  const noDevice=boardWindow.RakursEnergyBoard.snapshot({
+    devices:[],fallbackValues:latest,selectedSlotNo:1,status:{collector_active:true,physical_topology_verified:true}});
+  assert.equal(noDevice.devices.length,0,"Unavailable MySQL API must not invent a device");
+  assert.equal(noDevice.confirmed,false,"No actual registered devices may ever show LIVE");
+  console.log("CLARITY_FLOW_DIRECTIONS_AND_NO_FABRICATED_DEVICES=PASS");
+  const freshNow=new Date().toISOString();
+  const freshValues={pv_power:{...latest.pv_power,observed_at_utc:freshNow}};
+  const statusConfirmed={collector_active:true,physical_topology_verified:true};
+  const mixedFresh=boardWindow.RakursEnergyBoard.snapshot({
+    devices:[
+      {device_key:"inv1",slot_no:1,values:freshValues},
+      {device_key:"inv2",slot_no:2,values:latest}
+    ],mode:"system",status:statusConfirmed});
+  assert.equal(mixedFresh.confirmed,false,"Stale second Deye must disable system animation");
+  const bothFresh=boardWindow.RakursEnergyBoard.snapshot({
+    devices:[
+      {device_key:"inv1",slot_no:1,values:freshValues},
+      {device_key:"inv2",slot_no:2,values:freshValues}
+    ],mode:"system",status:statusConfirmed});
+  assert.equal(bothFresh.confirmed,true,"Both physically confirmed, fresh devices can be animated");
+  console.log("CLARITY_LIVE_REQUIRES_TWO_FRESH_REGISTERED_DEVICES=PASS");
   const onlySecond=boardWindow.RakursEnergyBoard.snapshot({
     devices:[{device_key:"inv2",slot_no:2,values:{pv_power:latest.pv_power}}],
     selectedDeviceKey:"inv2",selectedSlotNo:2,status:{collector_active:false}});
@@ -308,6 +334,46 @@ async function run() {
   assert(descendants(pv1).some(x=>String(x.textContent||"")==="—"),
     "Missing first Deye must never inherit Deye 2 PV");
   console.log("CLARITY_NO_SHARED_BATTERY_AGGREGATION_OR_INVENTED_DEVICE=PASS");
+  const compareHost=new Node("div");
+  const sampleDeye1={...latest,grid_power:{...latest.grid_power,value_decimal:"2"},
+    battery_power:{...latest.battery_power,value_decimal:"1.3"}};
+  const sampleDeye2={...latest,load_power:{...latest.load_power,value_decimal:"6.816"},
+    grid_power:{...latest.grid_power,value_decimal:"-2"},
+    battery_power:{...latest.battery_power,value_decimal:"-1.385"},
+    battery_soc:{...latest.battery_soc,value_decimal:"73.8"}};
+  boardWindow.RakursEnergyBoard.render(compareHost,{document:doc,
+    devices:[
+      {device_key:"inv1",slot_no:1,values:sampleDeye1},
+      {device_key:"inv2",slot_no:2,values:sampleDeye2}
+    ],selectedDeviceKey:"inv2",mode:"system",
+    status:{collector_active:false,physical_topology_verified:false}});
+  const compareNodes=byClass(compareHost,"energy-board-node");
+  assert.equal(compareNodes.length,3);
+  assert.equal(byClass(compareHost,"energy-board-reading-row").length,6,
+    "System mode must show TWO independent figures for EACH shared node");
+  const house=compareNodes.find(node=>node.className.includes("energy-board-house"));
+  const houseReadings=byClass(house,"energy-board-reading-value").map(n=>n.textContent);
+  assert(houseReadings[0].includes("6,4")&&houseReadings[1].includes("6,816"),
+    "House must preserve both Deye readouts, not use only Deye2");
+  const battery=compareNodes.find(node=>node.className.includes("energy-board-battery"));
+  assert(descendants(battery).some(node=>String(node.textContent||"").includes("SOC 72")));
+  assert(descendants(battery).some(node=>String(node.textContent||"").includes("SOC 73,8")));
+  battery.listeners.click();
+  assert(byClass(compareHost,"energy-board-inspector-description")[0].textContent.includes("Deye №1"));
+  assert(byClass(compareHost,"energy-board-inspector-description")[0].textContent.includes("Deye №2"));
+  const wireGrid=byClass(compareHost,"wire-grid")[0];
+  const arrows=byClass(wireGrid,"energy-board-wire-arrow").map(n=>n.textContent);
+  assert.equal(arrows.join(","),"←,→",
+    "Opposite import and export readings need separate, opposite arrows");
+  assert.equal(byClass(compareHost,"energy-board-legend").length,1);
+  const wholeText=descendants(compareHost).map(node=>String(node.textContent||"")).join(" ");
+  assert(!wholeText.includes("13,216")&&!wholeText.includes("2,685"),
+    "Do not invent totals from shared battery or load readings");
+  console.log("CLARITY_FULL_SYSTEM_TWO_INDEPENDENT_OUTPUTS_AND_OPPOSITE_FLOWS=PASS");
+  assert(energyBoardCss.includes(".energy-board-reading-row"));
+  assert(energyBoardCss.includes(".energy-board-wire-lane"));
+  assert(energyBoardCss.includes("@media(max-width:600px)"));
+  console.log("CLARITY_READABLE_ENERGY_FLOWS_ON_DESKTOP_AND_MOBILE=PASS");
   for(const scenario of ["fail","partial"]) {
     const app=prepare(scenario);
     await settle();
