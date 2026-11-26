@@ -516,11 +516,12 @@ function dashboardConfigurator(deck,values){
   return wrapper;
 }
 
-async function renderOverview(cycle, primedValues = null) {
+async function renderOverview(cycle, primedValues = null, preparedDevices = null) {
   addStatusMessage();
+  const v7 = Boolean(window.RakursV7 && window.RakursV7.enabled());
   const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
     "battery_power", "inverter_temperature", "pv_energy_today", "load_energy_today"];
-  let values = primedValues;
+  let values = v7 && primedValues === null ? {} : primedValues;
   if (!values) {
     try {
       values = (await api("/latest?keys=" + keys.join(","))).values || {};
@@ -532,12 +533,24 @@ async function renderOverview(cycle, primedValues = null) {
   }
   if (!current(cycle)) return;
 
-  const boardHost = element("div","energy-board-host");
+  const boardHost = element("div",v7?"v7-host":"energy-board-host");
   main.appendChild(boardHost);
-  const twinPromise = fetchParallelDevices(cycle).catch(() => null);
+  const twinPromise = preparedDevices !== null ? Promise.resolve(preparedDevices) :
+    fetchParallelDevices(cycle).catch(() => null);
   let boardDevices = [];
   function showBoard(devices,loading) {
     if (!current(cycle)) return;
+    if (v7) {
+      window.RakursV7.render(boardHost,{
+        devices:devices||[],fallbackValues:values,
+        selectedDeviceKey:state.selectedDeviceKey,selectedSlotNo:state.selectedSlotNo,
+        status:state.status,loading,
+        historyLoader:(device,key,frame)=>api("/parallel/history?device="+
+          encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
+          "&hours="+encodeURIComponent(frame))
+      });
+      return;
+    }
     if (!window.RakursEnergyBoard || typeof window.RakursEnergyBoard.render !== "function") {
       clear(boardHost);
       boardHost.appendChild(createEmpty("Енергетична схема поки недоступна",
@@ -562,11 +575,12 @@ async function renderOverview(cycle, primedValues = null) {
       }
     });
   }
-  showBoard([],true);
+  if (!v7 || preparedDevices === null) showBoard([],true);
   const resolvedDevices=await twinPromise;
   if(!current(cycle))return;
   boardDevices=resolvedDevices||[];
   showBoard(boardDevices,false);
+  if (v7) return;
   main.appendChild(overviewInsights(values));
   section("Ключові показники · Deye №" + state.selectedSlotNo,
     "Збережені вимірювання обраного інвертора · не сума двох пристроїв");
@@ -1009,6 +1023,7 @@ async function fetchParallelDevices(cycle) {
   return devices.map((d, i) => ({
     ...d, slot_no: d.slot_no,
     values: responses[i].status === "fulfilled" ? (responses[i].value.values || {}) : {},
+    telemetry_error: responses[i].status !== "fulfilled",
   }));
 }
 async function renderTwinSummary(cycle,preloadedDevices=null) {
@@ -1882,7 +1897,39 @@ async function render() {
   }
   document.getElementById("view-title").textContent = views.find(v => v[0] === state.route)[1];
   let primedValues = null;
-  if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey) {
+  let preparedV7Devices = null;
+  let v7PreflightFailed = false;
+  const v7Overview = state.route === "overview" &&
+    Boolean(window.RakursV7 && window.RakursV7.enabled());
+  // Full application toolbar becomes compact only for the V7 overview.
+  // Other routes and V6 retain their original presentation.
+  if (typeof document.body?.classList?.toggle === "function")
+    document.body.classList.toggle("rakurs-v7-overview",v7Overview);
+  if (v7Overview) {
+    try { preparedV7Devices = await fetchParallelDevices(cycle); }
+    catch (_error) { v7PreflightFailed = true; }
+    if (!current(cycle)) return;
+    if (!preparedV7Devices || preparedV7Devices.length === 0 ||
+        preparedV7Devices.every(device => device.telemetry_error === true)) {
+      v7PreflightFailed = true;
+    }
+    if (v7PreflightFailed && SSR_PRESENT && !state.selectedDeviceKey) {
+      // The server-rendered MySQL readings are trusted more than a failed
+      // twin API. Never wipe them or misattribute a single-inverter reading.
+      if (window.RakursV7?.disposeAll) window.RakursV7.disposeAll();
+      if (typeof document.body?.classList?.remove === "function")
+        document.body.classList.remove("rakurs-v7-overview");
+      restoreServerReadings();
+      message("V7 тимчасово недоступний",
+        "Не вдалося підтвердити читання двох Deye. Збережено серверні показники MySQL.", true);
+      return;
+    }
+    preparedV7Devices = preparedV7Devices || [];
+    // V7 consumes only device-scoped parallel endpoints, not legacy /latest.
+    primedValues = {};
+  }
+  if (state.route === "overview" && SSR_PRESENT && !state.selectedDeviceKey &&
+      !(window.RakursV7 && window.RakursV7.enabled())) {
     // This is the key guard: a failed/stale client API must not replace the
     // successful server-rendered database values with placeholders.
     const keys = ["pv_power", "load_power", "grid_power", "battery_soc",
@@ -1919,9 +1966,16 @@ async function render() {
   }
   if (!current(cycle)) return;
   state.twinFallbackCycle = null;
+  // A route change must release V7 archive timers and dialog listeners.
+  if (window.RakursV7?.disposeAll) window.RakursV7.disposeAll();
   clear(main);
   switch (state.route) {
-    case "overview": await renderOverview(cycle, primedValues); break;
+    case "overview":
+      await renderOverview(cycle, primedValues, preparedV7Devices);
+      if (v7Overview && v7PreflightFailed && current(cycle))
+        message("Дані двох Deye недоступні",
+          "Не вдалося прочитати MySQL через API. Показники не підмінено.", true);
+      break;
     case "pv": await renderGroup(["pv"], "Сонячна генерація", cycle); break;
     case "battery": await renderGroup(
       ["battery", "bms"].concat(Array.from({length: 20}, (_, i) => "bms_module_" + (i + 1))),
