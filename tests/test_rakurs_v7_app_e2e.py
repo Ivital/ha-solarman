@@ -206,9 +206,9 @@ def run():
                     wait_rendered(page)
                     assert not page_errors, page_errors
                     assert "5,1 кВт" in page.locator(
-                        ".rv7 [data-node='pv1'] .rv7-node-value").first.inner_text()
+                        ".rv7 [data-node='pv1'] .rv7-node-value").first.text_content()
                     assert "5,43 кВт" in page.locator(
-                        ".rv7 [data-node='pv2'] .rv7-node-value").first.inner_text()
+                        ".rv7 [data-node='pv2'] .rv7-node-value").first.text_content()
                     assert not has_real_ssr(page), "Trusted SSR should be replaced only by verified twin response"
                     assert not page.locator(".rv7 .rv7-pill.is-live").count()
                     assert page.locator(".rv7 .rv7-warnings").count() == 1
@@ -222,7 +222,7 @@ def run():
                     page.screenshot(path=str(png), full_page=True, animations="disabled")
                     if width < 600:
                         page.locator(".rv7-mobile [data-node='pv2']").click()
-                        assert "Deye №2" in page.locator(".rv7-panel").inner_text()
+                        assert "Deye №2" in page.locator(".rv7-panel").text_content()
                         page.keyboard.press("Escape")
                         assert page.locator(".rv7-panel").count() == 0
                         page.get_by_role("tab", name="Інженерний режим").click()
@@ -231,7 +231,7 @@ def run():
                         page.locator(".rv7-mobile [data-node='bus']").click()
                         page.locator(".rv7-panel a[href='#/parallel']").click()
                         page.wait_for_url("**/#/parallel")
-                        assert "Паралельна система Deye" in page.locator("#content").inner_text()
+                        assert "Паралельна система Deye" in page.locator("#content").text_content()
                         page.go_back()
                         wait_rendered(page)
                     report.append({"width": width, "theme": theme, "result": "PASS"})
@@ -247,7 +247,7 @@ def run():
                         "() => !!document.querySelector('.banner.warning')", timeout=20000)
                     assert has_real_ssr(page), scenario + ": trusted SSR was erased"
                     assert not page.locator(".v7-host").count()
-                    assert "V7 тимчасово недоступний" in page.locator("#content").inner_text()
+                    assert "V7 тимчасово недоступний" in page.locator("#content").text_content()
                     page.screenshot(path=str(OUT / ("integrated_" + scenario + ".png")),
                                     full_page=True)
                     context.close()
@@ -261,19 +261,19 @@ def run():
                     page.wait_for_selector(".rv7-mobile [data-node='pv2']", timeout=20000)
                     if scenario == "d2-down":
                         assert "—" in page.locator(
-                            ".rv7-mobile [data-node='pv2'] .rv7-node-value").inner_text()
+                            ".rv7-mobile [data-node='pv2'] .rv7-node-value").text_content()
                         assert "5,1 кВт" in page.locator(
-                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
+                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
                         assert page.locator(".rv7-warnings").count() == 1
                         page.get_by_role("tab", name="Інженерний режим").click()
-                        assert "—" in page.locator(".rv7-engineer").inner_text()
+                        assert "—" in page.locator(".rv7-engineer").text_content()
                     elif scenario == "empty":
-                        assert "Немає даних" in page.locator(".rv7-top").inner_text()
+                        assert "Немає даних" in page.locator(".rv7-top").text_content()
                         assert "—" in page.locator(
-                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
+                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
                     else:
                         assert "5,1 кВт" in page.locator(
-                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").inner_text()
+                            ".rv7-mobile [data-node='pv1'] .rv7-node-value").text_content()
                     context.close()
                     print("V7_INTEGRATED_" + scenario.upper() + "=PASS")
             finally:
