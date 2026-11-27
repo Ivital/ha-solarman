@@ -583,3 +583,14 @@ body[data-theme] .product-alert-center summary{cursor:pointer}
 
 body[data-theme] .product-data-origin{display:block;margin:6px 0;color:var(--ux-muted);font-weight:600}
 .product-bms-records>summary{cursor:pointer;padding-block:10px}
+
+.rv7-chart-card .rv7-series{gap:5px;padding-block:8px}
+.rv7-chart-card .rv7-series-button{padding:4px 9px;border:1px solid var(--v7-line);border-radius:20px;min-height:30px;color:var(--v7-ink)}
+.rv7-chart-card .rv7-series-button[aria-pressed=true]{background:color-mix(in srgb,var(--series-color) 8%,var(--v7-card))}
+.rv7-chart-card .rv7-series-dot{width:13px;height:3px;border-radius:2px;background:var(--series-color)}
+.rv7-chart-card .rv7-series-button:has(.rv7-series-dot[style*="v7-soc"]) .rv7-series-dot{border:0;background:repeating-linear-gradient(to right,var(--series-color) 0 4px,transparent 4px 6px)}
+.rv7-chart-stat{border-inline-start:3px solid var(--series-color);padding:4px 8px;background:var(--v7-card-alt);border-radius:4px}
+.rv7-chart-box{background:linear-gradient(to bottom,var(--v7-card),var(--v7-card-alt));margin-inline:8px;border-radius:8px}
+body[data-theme] .product-timeseries .product-cursor-dot{stroke:var(--ux-card,#fff);stroke-width:1.6px}
+body[data-theme] .product-timeseries .product-cursor{stroke:currentColor;stroke-opacity:.7}
+@media(max-width:600px){.rv7-chart-card .rv7-series-button{min-height:32px;padding-inline:7px}.rv7-chart-box{margin-inline:2px}}

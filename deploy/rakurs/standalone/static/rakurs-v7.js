@@ -372,7 +372,7 @@
    const socY=n=>151-n/100*139;
    for(const frac of [0,.5,1]){
     const val=lo+delta*frac;
-    layer.appendChild(s("text",{x:35,y:y(val)+3,"text-anchor":"end",class:"rv7-axis"},M.pretty(val,1)));
+    if(nums.length)layer.appendChild(s("text",{x:35,y:y(val)+3,"text-anchor":"end",class:"rv7-axis"},M.pretty(val,1)));
     if(present.some(line=>line.id==="soc"))layer.appendChild(s("text",{x:446,y:socY(frac*100)+3,class:"rv7-axis"},Math.round(frac*100)+"%"));
    }
    for(const frac of first===last?[.5]:[0,.33,.67,1]){
@@ -390,7 +390,12 @@
      d+=(i&&!gap?" L":" M")+x(p.timestamp).toFixed(1)+" "+(line.id==="soc"?socY(p.number):y(p.number)).toFixed(1);
     }
     layer.appendChild(s("path",{d,stroke:line.color,class:"rv7-chart-line"+(line.id==="soc"?" rv7-chart-soc":""),"data-series":line.id}));
-    if(line.points.length===1){const p=line.points[0];layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3,fill:line.color}));}
+    for(const [i,p] of line.points.entries()){
+     const stamp=Date.parse(p.timestamp);
+     const isolatedBefore=i===0||stamp-Date.parse(line.points[i-1].timestamp)>gapLimit;
+     const isolatedAfter=i===line.points.length-1||Date.parse(line.points[i+1].timestamp)-stamp>gapLimit;
+     if(isolatedBefore&&isolatedAfter)layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3,fill:line.color}));
+    }
    }
    if(!chosenTime||!timestamps.includes(chosenTime))chosenTime=timestamps.at(-1);
    const cursor=x(chosenTime);
@@ -399,9 +404,9 @@
    for(const line of present){const p=M.historicalValue(line.points,chosenTime,0);if(p)layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3.5,fill:line.color,class:"rv7-chart-selection"}));}
    const active=present.map(line=>{
     const v=M.historicalValue(line.points,chosenTime,0);
-    const stat=h("div","rv7-chart-stat");
+    const stat=h("div","rv7-chart-stat");stat.style.setProperty("--series-color",line.color);
     const label=h("small","",line.label);label.style.color=line.color;
-    put(stat,label,h("strong","",v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—"));
+    put(stat,label,h("strong","",v?M.pretty(v.number)+" "+(v.unit||(line.id==="soc"?"%":"кВт")):"—"));
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
@@ -415,7 +420,7 @@
       if(scope.cancelled||frameToken!==frameRevision||selectedStamp!==chosenTime)return;
       const exact=series.map(l=>{const d=(result.devices||[]).find(d=>d.device_key===l.device?.device_key),r=d?.values?.[l.key];return {...l,points:r?M.normalizeHistory([r]):[]};});
       onFrame(selectedStamp,exact);
-      present.forEach((line,i)=>{const r=M.historicalValue(exact.find(x=>x.id===line.id)?.points||[],selectedStamp,0),value=active[i].querySelector("strong");if(value)value.textContent=r?M.pretty(r.number)+" "+(r.unit||"кВт"):"—";});
+      present.forEach((line,i)=>{const r=M.historicalValue(exact.find(x=>x.id===line.id)?.points||[],selectedStamp,0),value=active[i].querySelector("strong");if(value)value.textContent=r?M.pretty(r.number)+" "+(r.unit||(line.id==="soc"?"%":"кВт")):"—";});
      }).catch(()=>{if(!scope.cancelled&&frameToken===frameRevision)historyError.textContent="Точний кадр недоступний. Показано лише точки графіка.";});
     }
    }else if(!explicitSelection)onRestore?.();
@@ -485,7 +490,7 @@
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value.points:[],resolution:got[i].status==="fulfilled"?got[i].value.resolution:null}));
    for(const line of series.filter(item=>!item.diagnostic)){
-    const button=h("button","rv7-series-button");button.type="button";
+    const button=h("button","rv7-series-button");button.type="button";button.style.setProperty("--series-color",line.color);
     button.setAttribute("aria-pressed",String(views.has(line.id)));
     const circle=h("span","rv7-series-dot");
     circle.style.setProperty("--series-color",line.color);

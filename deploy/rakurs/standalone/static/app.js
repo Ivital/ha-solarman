@@ -851,7 +851,11 @@ function multiDeviceChart(lines,unit,first,last){
     for(const l of visible){const steps=l.data.slice(1).map((p,i)=>p.t-l.data[i].t).filter(n=>n>0).sort((a,b)=>a-b),gap=Math.max(1200000,(steps[Math.floor(steps.length/2)]||0)*3);let d="";
       for(const [i,p] of l.data.entries()){d+=(i&&p.t-l.data[i-1].t<=gap?" L":" M")+x(p.t)+" "+y(p.v);}
       if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,class:"product-overlay-line","data-device":l.label}));
-      if(l.data.length===1)svg.appendChild(node("circle",{cx:x(l.data[0].t),cy:y(l.data[0].v),r:4,fill:l.color}));
+      for(const [i,p] of l.data.entries()){
+        const before=i===0||p.t-l.data[i-1].t>gap;
+        const after=i===l.data.length-1||l.data[i+1].t-p.t>gap;
+        if(before&&after)svg.appendChild(node("circle",{cx:x(p.t),cy:y(p.v),r:3.5,fill:l.color}));
+      }
     }
     const cursor=node("line",{y1:top,y2:bottom,class:"product-cursor"}),label=node("text",{x:left,y:15,class:"product-chart-label"}),tip=node("text",{x:left,y:31,class:"product-axis"});add(svg,cursor,label,tip);
     let index=times.length-1;
@@ -1101,6 +1105,7 @@ async function renderGroup(groups, title, cycle) {
   search.addEventListener("input", filter);
   filter();
 }
+let chartGradientId=0;
 function svgChart(points, unit, domain={}) {
   const ns="http://www.w3.org/2000/svg";
   const node=(tag,attrs={},text)=>{const e=document.createElementNS(ns,tag);
@@ -1113,13 +1118,18 @@ function svgChart(points, unit, domain={}) {
   const left=55,right=620,top=27,bottom=181;
   const first=domain.start??real[0].t,last=domain.end??real.at(-1).t;
   const values=real.map(p=>p.v),min=domain.bounds?.[0]??Math.min(...values),max=domain.bounds?.[1]??Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
-  const low=min-span*.12,high=max+span*.12;
+  // Choose readable intervals while retaining signed flows and flat signals.
+  const rough=span/4, decade=10**Math.floor(Math.log10(rough));
+  const step=([1,2,2.5,5,10].find(v=>v*decade>=rough)||10)*decade;
+  const low=Math.floor((min===max?min-span*.12:min)/step)*step;
+  const high=Math.max(low+step,Math.ceil((min===max?max+span*.12:max)/step)*step);
   const x=t=>first===last?(left+right)/2:left+(t-first)/(last-first)*(right-left);
   const y=v=>bottom-(v-low)/(high-low)*(bottom-top);
-  for(let i=0;i<4;i++){
-    const yy=top+(bottom-top)*i/3;
+  const tickCount=Math.round((high-low)/step);
+  for(let i=0;i<=tickCount;i++){
+    const tick=i===tickCount?low:high-step*i, yy=y(tick);
     svg.appendChild(node("line",{x1:left,x2:right,y1:yy,y2:yy,class:"product-gridline"}));
-    svg.appendChild(node("text",{x:left-7,y:yy+4,"text-anchor":"end",class:"product-axis"},pretty(high-(high-low)*i/3,2)));
+    svg.appendChild(node("text",{x:left-7,y:yy+4,"text-anchor":"end",class:"product-axis"},pretty(Math.abs(tick)<step/1000?0:tick,Math.max(0,Math.ceil(-Math.log10(step))+1))));
   }
   if(unit)svg.appendChild(node("text",{x:9,y:13,class:"product-axis"},unit));
   const intervals=real.slice(1).map((p,i)=>p.t-real[i].t).filter(v=>v>0).sort((a,b)=>a-b);
@@ -1128,9 +1138,19 @@ function svgChart(points, unit, domain={}) {
   const segments=[];let segment=[];
   for(const p of real){if(segment.length&&p.t-segment.at(-1).t>gap){segments.push(segment);segment=[];}segment.push(p);}
   if(segment.length)segments.push(segment);
+  const fillId="rakurs-area-"+(++chartGradientId);
+  const defs=node("defs"),gradient=node("linearGradient",{id:fillId,x1:0,x2:0,y1:0,y2:1,gradientUnits:"objectBoundingBox"});
+  gradient.appendChild(node("stop",{offset:"0%","stop-color":"currentColor","stop-opacity":".20"}));
+  gradient.appendChild(node("stop",{offset:"100%","stop-color":"currentColor","stop-opacity":".025"}));
+  defs.appendChild(gradient);svg.appendChild(defs);
   for(const s of segments){
     if(s.length===1)svg.appendChild(node("circle",{cx:x(s[0].t),cy:y(s[0].v),r:3.5,class:"product-sample-dot"}));
-    else svg.appendChild(node("polyline",{points:s.map(p=>x(p.t).toFixed(2)+","+y(p.v).toFixed(2)).join(" "),class:"product-series-line"}));
+    else {
+      const vertices=s.map(p=>x(p.t).toFixed(2)+","+y(p.v).toFixed(2)).join(" ");
+      const baseline=y(Math.min(high,Math.max(low,0)));
+      svg.appendChild(node("polygon",{points:vertices+" "+x(s.at(-1).t)+","+baseline+" "+x(s[0].t)+","+baseline,fill:"url(#"+fillId+")","aria-hidden":"true"}));
+      svg.appendChild(node("polyline",{points:vertices,class:"product-series-line"}));
+    }
   }
   const timeFormat=new Intl.DateTimeFormat("uk-UA",{timeZone:"Europe/Kyiv",...(last-first>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})});
   const fractions=first===last?[.5]:[0,1/3,2/3,1];
