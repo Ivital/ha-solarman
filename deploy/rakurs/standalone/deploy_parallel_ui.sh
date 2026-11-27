@@ -15,7 +15,7 @@ TARGET=/opt/rakurs/standalone
 DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
   app.py auth.py config_api.py poll_worker.py parallel_support.py modbus_archive.py modbus_wire.py
-  mysql_transport.py templates/index.html templates/login.html templates/deye_server.html
+  mysql_transport.py solar_forecast.py templates/index.html templates/login.html templates/deye_server.html
   static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
   static/rakurs-color-20261125.css static/register-reference-v1053.json
@@ -29,7 +29,7 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product12"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product13"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -45,7 +45,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-26' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-27' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -68,7 +68,7 @@ fi
 bash -n "$HERE/audit_parallel_host_readonly.sh"
 python3 -m py_compile "$HERE/app.py" "$HERE/parallel_support.py" \
   "$HERE/modbus_archive.py" "$HERE/modbus_wire.py" "$HERE/mysql_transport.py" \
-  "$HERE/config_api.py" "$HERE/poll_worker.py"
+  "$HERE/config_api.py" "$HERE/poll_worker.py" "$HERE/solar_forecast.py"
 echo 'PARALLEL_UI_PREFLIGHT=PASS'
 echo 'INVERTER_WRITES=0 MODBUS_COMMANDS=0 MYSQL_WRITES=0'
 if [[ "$MODE" == "--check" ]]; then

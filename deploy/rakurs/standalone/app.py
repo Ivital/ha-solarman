@@ -635,6 +635,12 @@ def energy():
                               "counters": result, "aggregate_verified": False}))
 
 
+@app.get("/api/v1/solar-forecast")
+def solar_forecast():
+    from .solar_forecast import forecast
+    return jsonify(forecast())
+
+
 @app.get("/api/v1/history/range")
 def history_range():
     """Bounded historical export, preserving the selected Deye device."""

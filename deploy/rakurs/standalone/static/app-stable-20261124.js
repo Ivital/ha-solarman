@@ -820,7 +820,10 @@ async function renderComparativeAnalytics(cycle){
       summary.appendChild(element("h3","","Зведення енергосистеми"));
       summary.appendChild(element("p","subtle","Підсумок записів: два PV, спільні вузли враховано один раз."));
       for(const [key,label] of Object.entries(energyLabels)){const item=r.values[key],row=element("div","product-phase-row");add(row,element("span","",label),element("strong","",item?number(item.number)+" кВт·год":"—"));if(item)row.title=time(item.first_at)+" — "+time(item.last_at);summary.appendChild(row);}
-      if(r.complete){add(summary,element("p","subtle",time(r.window[0])+" — "+time(r.window[1])),element("strong","","Нерозподілена різниця: "+number(r.residual)+" кВт·год"),element("p","subtle","Різниця не є підтвердженими втратами перетворення."));}
+      if(r.complete){add(summary,element("p","subtle",time(r.window[0])+" — "+time(r.window[1])),element("strong","","Нерозподілена різниця: "+number(r.residual)+" кВт·год"),element("p","subtle","Різниця не є підтвердженими втратами перетворення."));
+        const load=r.values.load_energy_total.number,imp=r.values.grid_import_total.number;
+        if(load>0)add(summary,element("p","subtle","Імпорт / споживання: "+number(100*imp/load)+"%. Це співвідношення лічильників, а не автономність: імпорт може заряджати АКБ."));
+      }
       else summary.appendChild(element("p","subtle",r.reason));
       totals.appendChild(summary);
     }
@@ -872,6 +875,51 @@ function technicalBars(label,entries){
   function node(tag,attrs,txt){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));if(txt!==undefined)n.textContent=txt;svg.appendChild(n);}
   entries.forEach((x,i)=>{const yy=i*29+3,ok=valid.includes(x);node("text",{x:0,y:yy+13,fill:"currentColor","font-size":11},x.name);node("rect",{x:65,y:yy,width:155,height:15,rx:4,fill:"currentColor",opacity:.10});if(ok)node("rect",{x:65,y:yy,width:Math.abs(Number(x.r.value_decimal))/max*155,height:15,rx:4,fill:["#4788e6","#2e9b83","#c58b2d"][i%3]});node("text",{x:315,y:yy+13,"text-anchor":"end",fill:"currentColor","font-size":11},ok?number(x.r.value_decimal)+" "+x.r.unit:"—");});
   box.appendChild(svg);return box;
+}
+function renderSolarForecast(cycle){
+  const box=element("details","product-analytics product-forecast");
+  box.appendChild(element("summary","","Прогноз сонячної генерації · 48 годин"));
+  const body=element("div","");box.appendChild(body);main.appendChild(box);
+  let loaded=false,token=0;
+  async function refresh(){
+    if(!box.open||loaded)return;loaded=true;const revision=++token;
+    body.replaceChildren(element("p","subtle","Завантаження метеопрогнозу…"));
+    try{
+      const data=await api("/solar-forecast");
+      if(!current(cycle)||revision!==token)return;clear(body);
+      if(data.state!=="available"){
+        const text=data.state==="not_configured"?"Потрібні координати установки, потужність і орієнтація обох PV-масивів та дозвіл на метеосервіс.":data.state==="configuration_error"?"Перевірте конфігурацію прогнозу на сервері.":"Метеодані тимчасово недоступні.";
+        body.appendChild(createEmpty("Прогноз не активовано",text));loaded=false;return;
+      }
+      const lines=data.arrays.map(a=>({label:"Deye №"+a.slot,points:a.hours.map(r=>({observed_at_utc:r.start_utc,value_decimal:r.kw,unit:"кВт"}))}));
+      const times=lines.flatMap(l=>l.points.map(p=>Date.parse(p.observed_at_utc))).filter(Number.isFinite);
+      if(!times.length){body.appendChild(createEmpty("Немає прогнозних годин","Повторіть запит."));loaded=false;return;}
+      add(body,element("strong","",number(data.estimated_kwh)+" кВт·год · "+data.common_hours+" спільних годин"),
+        element("p","subtle","Оцінка потенціалу, не фактична генерація. Не враховує обмеження BMS, затінення, мережу та сніг поза заданим коефіцієнтом."),
+        multiDeviceChart(lines,"кВт",Math.min(...times),Math.max(...times)),
+        element("p","subtle","Метеодані: Open-Meteo · "+time(data.updated_at_utc)));
+      const credit=element("a","","Джерело Open-Meteo");credit.href="https://open-meteo.com/";credit.target="_blank";credit.rel="noopener noreferrer";body.appendChild(credit);
+    }catch(_error){if(current(cycle)&&revision===token)body.replaceChildren(createEmpty("Прогноз недоступний","Перевірте підключення метеосервісу."));loaded=false;}
+  }
+  box.addEventListener("toggle",refresh);
+}
+function renderBatteryEstimate(box,values){
+  const model=window.RakursV7Model;if(!model?.batteryEstimate)return;
+  const section=element("details","product-analytics product-battery-estimate");
+  section.appendChild(element("summary","","Оцінка залишкового часу та ємності"));
+  const body=element("div",""),form=element("div","settings-fields");
+  const capacity=settingsField(form,"Корисна ємність при 100% SOC, кВт·год","","number");
+  const reserve=settingsField(form,"Мінімальний SOC, %","","number");
+  const out=element("div","product-phase-grid");
+  try{const pref=JSON.parse(localStorage.getItem("rakurs.battery.estimate")||"null");if(pref){capacity.value=String(pref.capacity);reserve.value=String(pref.reserve);}}catch(_error){}
+  function update(){clear(out);const data=model.batteryEstimate(values,capacity.value,reserve.value);
+    for(const [label,value] of [["Доступна енергія",data.energyKwh==null?"—":number(data.energyKwh)+" кВт·год"],["За поточного розряду",data.hours==null?"—":number(data.hours)+" год"],["SOH (звіт BMS)",data.soh==null?"—":number(data.soh)+"%"]]){
+      const card=element("div","product-phase-card");add(card,element("small","",label),element("strong","",value));out.appendChild(card);}
+    if(capacity.value!==""&&reserve.value!==""&&data.energyKwh!==null)try{localStorage.setItem("rakurs.battery.estimate",JSON.stringify({capacity:Number(capacity.value),reserve:Number(reserve.value)}));}catch(_error){}
+  }
+  for(const input of [capacity,reserve])input.addEventListener("input",update);
+  add(body,element("p","subtle","Введіть фактичну корисну ємність спільної АКБ та нижню межу SOC. Оцінка за постійної потужності розряду, без прогнозу майбутнього навантаження."),form,out);
+  section.appendChild(body);box.appendChild(section);update();
 }
 function renderTechnicalSummary(groups,values){
   const type=groups[0],isBattery=type==="battery";
@@ -925,7 +973,7 @@ function renderTechnicalSummary(groups,values){
   const modules=element("div","product-bms-modules");
   for(let n=1;n<=20;n++){
     const prefix="bms_"+n+"_",fields=["voltage","current","temperature","soh","min_cell_voltage","max_cell_voltage","alarm","fault"];
-    if(!fields.some(k=>read(prefix+k)))continue;
+    if(!fields.some(k=>read(prefix+k))&&!Object.keys(values).some(k=>k.startsWith(prefix+"cell_")&&read(k)))continue;
     const card=element("details","product-bms-module"),min=read(prefix+"min_cell_voltage"),max=read(prefix+"max_cell_voltage");
     add(card,element("summary","","Модуль "+n+" · "+show(prefix+"voltage")));
     if(min&&max&&min.unit===max.unit&&min.observed_at_utc===max.observed_at_utc&&Number(max.value_decimal)>=Number(min.value_decimal)){
@@ -934,12 +982,16 @@ function renderTechnicalSummary(groups,values){
     }
     for(const [key,label] of [["temperature","Температура"],["current","Струм"],["soh","SOH"],["min_cell_voltage","Мін. комірка"],["max_cell_voltage","Макс. комірка"],["alarm","Код попередження"],["fault","Код помилки"]]){
       const row=element("div","product-phase-row");add(row,element("span","",label),element("strong","",show(prefix+key)));card.appendChild(row);
-    }modules.appendChild(card);
+    }
+    const cells=Object.keys(values).filter(k=>new RegExp("^"+prefix+"cell_[1-9][0-9]?_voltage$").test(k)).map(k=>({name:k.slice(prefix.length+5,-8),r:read(k)})).filter(x=>x.r).sort((a,b)=>Number(a.name)-Number(b.name));
+    if(cells.length){const latest=cells.map(x=>x.r.observed_at_utc).filter(Boolean).sort().at(-1);const aligned=cells.filter(x=>x.r.observed_at_utc===latest);if(aligned.length)card.appendChild(technicalBars("Напруги комірок · "+time(latest),aligned));if(aligned.length!==cells.length)card.appendChild(element("p","subtle","Різночасові комірки не об’єднуються."));}
+    modules.appendChild(card);
   }
   if(!modules.childNodes.length)modules.appendChild(element("p","subtle","Немає числових записів модулів BMS."));
   box.appendChild(modules);
   const temperatures=Array.from({length:20},(_,i)=>({name:"BMS "+(i+1),r:read("bms_"+(i+1)+"_temperature")})).filter(x=>x.r);
   if(temperatures.length)box.appendChild(technicalBars("Температури модулів",temperatures));
+  renderBatteryEstimate(box,values);
   main.appendChild(box);
 }
 function renderEquipmentHistory(groups,items,known,cycle){
@@ -963,6 +1015,8 @@ async function renderGroup(groups, title, cycle) {
   }
   const known = verifiedKeys();
   const keys = items.filter(i => known.has(i.key)).map(i => i.key);
+  // Recognize individually stored cell readings only; never invent cells from extrema.
+  if(groups[0]==="battery")for(const key of known)if(/^bms_(?:[1-9]|1[0-9]|20)_cell_(?:[1-9]|[1-5][0-9]|6[0-4])_voltage$/.test(key)&&!keys.includes(key))keys.push(key);
   const values = {};
   for (let i = 0; i < keys.length; i += 24) {
     try {
@@ -999,6 +1053,7 @@ async function renderGroup(groups, title, cycle) {
     main.appendChild(overview);
   }
   renderTechnicalSummary(groups,values);
+  if(groups[0]==="pv")renderSolarForecast(cycle);
   renderEquipmentHistory(groups,items,known,cycle);
   main.appendChild(controls);
   const list = element("div", "metric-list product-metric-catalog");

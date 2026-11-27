@@ -75,6 +75,27 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertNotIn("/static/rakurs-energy-board-20261126", html)
         self.assertNotIn("dashboard-toolbar-ssr", html)
 
+    def test_forecast_disabled_no_network(self):
+        from unittest.mock import patch
+        with patch("standalone.solar_forecast.load_config",return_value=None), patch("standalone.solar_forecast.retrieve") as remote:
+            response=self.client.get("/api/v1/solar-forecast")
+            self.assertEqual(response.status_code,200)
+            self.assertEqual(response.get_json()["state"],"not_configured")
+            remote.assert_not_called()
+
+    def test_forecast_radiation_end_of_hour_and_ac_cap(self):
+        from standalone.solar_forecast import model_array,validate
+        array={"slot":1,"kwp":25,"performance_ratio":0.8,"ac_limit_kw":20,"tilt":30,"azimuth":0}
+        with self.assertRaises(ValueError):
+            validate({"enabled":True,"provider":"open_meteo_noncommercial"})
+        cfg=validate({"enabled":True,"provider":"open_meteo_noncommercial","external_location_sharing_approved":True,
+                      "latitude":0,"longitude":0,"arrays":[array,{**array,"slot":2}]})
+        self.assertEqual(len(cfg["arrays"]),2)
+        result=model_array({"hourly":{"time":[3600,7200,10800,14400],"global_tilted_irradiance":[500,500,1500,None]},
+                            "hourly_units":{"global_tilted_irradiance":"W/m²"}},array,100)
+        self.assertEqual([r["kw"] for r in result],[10,20])
+        self.assertEqual(result[0]["start_utc"],"1970-01-01T01:00:00Z")
+
     def test_pwa_network_only_assets(self):
         manifest=self.client.get("/static/rakurs.webmanifest")
         self.assertEqual(manifest.status_code,200)

@@ -563,3 +563,7 @@ body[data-theme] .product-balance .product-phase-row{font-size:13px}
 body[data-theme] .product-rule-analyzer summary{cursor:pointer;font-weight:650;margin-bottom:8px}
 body[data-theme] .product-rule-analyzer .settings-fields{margin:12px 0}
 body[data-theme] .product-rule-analyzer .product-energy-row{margin-top:5px}
+
+body[data-theme] .product-forecast summary,body[data-theme] .product-battery-estimate summary{cursor:pointer;font-weight:650}
+body[data-theme] .product-forecast>div,body[data-theme] .product-battery-estimate>div{margin-top:12px}
+body[data-theme] .product-battery-estimate .settings-fields{margin:10px 0}

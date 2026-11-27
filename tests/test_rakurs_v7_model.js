@@ -143,3 +143,5 @@ const broken=M.evaluateEpisodes([row(11,"кВт","2026-11-25T00:00:00Z"),row(12,
 console.log("RAKURS_ALARM_EPISODES_DELAY_HYSTERESIS_AND_GAP=PASS");
 
 assert.equal(M.evaluateEpisodes([row(11,"кВт","2026-11-25T00:00:00Z"),row(null,"кВт","2026-11-25T00:01:00Z"),row(12,"кВт","2026-11-25T00:02:00Z")],{direction:"above",threshold:10,hysteresis:1,delaySeconds:60,maxGapSeconds:180}).length,0);
+
+const estimate=M.batteryEstimate({battery_soc:row(72,"%"),battery_power:row(2,"кВт"),battery_soh:row(98,"%")},"20","20");assert.equal(estimate.energyKwh,10.4);assert.equal(estimate.hours,5.2);assert.equal(estimate.soh,98);assert.equal(M.batteryEstimate({battery_soc:row(72,"%"),battery_power:row(-2,"кВт")},"20","20").hours,null);assert.equal(M.batteryEstimate({battery_soc:row(72,"%")},"","20").energyKwh,null);
