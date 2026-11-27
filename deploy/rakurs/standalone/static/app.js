@@ -1489,6 +1489,45 @@ async function renderParallel(cycle) {
   }
 }
 
+function renderRuleAnalyzer(cycle){
+  if(!window.RakursV7Model?.evaluateEpisodes)return;
+  const available=state.verified||[],keys=["battery_soc","battery_temperature","inverter_temperature","grid_frequency","grid_l1_voltage","grid_l2_voltage","grid_l3_voltage","load_power","pv_power","battery_power"];
+  const metrics=keys.map(k=>available.find(x=>x.signal_key===k)).filter(Boolean);if(!metrics.length)return;
+  const box=element("details","product-analytics product-rule-analyzer");box.appendChild(element("summary","","Аналіз перевищень за архівом · Deye №"+state.selectedSlotNo));
+  box.appendChild(element("p","subtle","Вкажіть власну межу, затримку та гістерезис. Це аналіз наявних записів, не автоматична аварійна сигналізація і не команда обладнанню."));
+  const controls=element("div","settings-fields");
+  const metric=settingsField(controls,"Параметр",metrics[0].signal_key,"select",metrics.map(x=>[x.signal_key,x.label_uk+" ("+(x.unit||"—")+")"]));
+  const direction=settingsField(controls,"Умова","above","select",[["above","Не менше межі"],["below","Не більше межі"]]);
+  const threshold=settingsField(controls,"Межа (в одиницях параметра)","","number");
+  const hysteresis=settingsField(controls,"Гістерезис","0","number");
+  const delay=settingsField(controls,"Затримка, хв","5","number");
+  const gap=settingsField(controls,"Макс. інтервал між записами, хв","30","number");
+  const button=element("button","settings-save","Проаналізувати 24 години");button.type="button";
+  const result=element("div","");add(box,controls,button,result);main.appendChild(box);
+  let token=0;
+  button.addEventListener("click",async()=>{
+    const revision=++token;button.disabled=true;result.replaceChildren(element("p","subtle","Читання точних записів…"));
+    try{
+      const rule={direction:direction.value,threshold:threshold.value,hysteresis:hysteresis.value,delaySeconds:Number(delay.value)*60,maxGapSeconds:Number(gap.value)*60};
+      if(!threshold.value.trim()||!delay.value.trim()||!gap.value.trim())throw Error("Заповніть межу, затримку й інтервал.");
+      const key=metric.value,latest=await api("/latest?keys="+encodeURIComponent(key)),stamp=latest.values?.[key]?.observed_at_utc;
+      const end=Date.parse(stamp);if(!Number.isFinite(end))throw Error("Немає часу останнього запису.");
+      const query="/history/range?key="+encodeURIComponent(key)+"&start="+encodeURIComponent(new Date(end-86400000).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z"));
+      let points=[],before=null;
+      for(let page=0;page<20;page++){const r=await api(query+(before?"&before="+encodeURIComponent(before):""));if(!current(cycle)||revision!==token)return;points.unshift(...(r.points||[]));if(!r.truncated){before=null;break;}if(!r.next_before||before===r.next_before)throw Error("Неповний архів");before=r.next_before;}
+      if(before)throw Error("Понад 20 000 записів; аналіз за цей період недоступний.");
+      if(!points.length)throw Error("За цей період немає вимірювань.");
+      const episodes=window.RakursV7Model.evaluateEpisodes(points,rule);
+      clear(result);result.appendChild(element("strong","","Підтверджені епізоди: "+episodes.length));
+      result.appendChild(element("p","subtle",points.length+" записів · "+time(points[0].observed_at_utc)+" — "+time(points.at(-1).observed_at_utc)));
+      for(const episode of episodes.slice(-50).reverse()){
+        const row=element("div","product-energy-row"),stateLabel={recovered:"Відновлено",open:"Триває на останньому записі",gap:"Далі немає даних"}[episode.state];
+        add(row,element("span","",time(episode.start)),element("strong","",stateLabel),element("small","subtle","Підтверджена тривалість: "+number(episode.durationSeconds/60)+" хв · Екстремум: "+number(episode.extreme)+(episode.end?" · Відновлення: "+time(episode.end):"")));result.appendChild(row);
+      }
+    }catch(error){if(current(cycle)&&revision===token)result.replaceChildren(createEmpty("Аналіз недоступний",error.message));}
+    finally{button.disabled=false;}
+  });
+}
 async function renderEvents(cycle) {
   section("Журнал подій", "Події обладнання та підтверджені операції імпорту MySQL");
   const summary = element("div", "event-summary");
@@ -1597,6 +1636,7 @@ async function renderEvents(cycle) {
     "Відсутність записів у журналі подій не доводить, що аварій не було: " +
     "потрібне підключене джерело подій та його опитування.");
   main.appendChild(note);
+  renderRuleAnalyzer(cycle);
 }
 
 async function renderTable(path, sectionName, headings, fields, cycle) {
@@ -2416,3 +2456,6 @@ async function boot() {
 }
 window.addEventListener("hashchange", render);
 boot();
+// An installable, network-only shell; never store authenticated telemetry.
+if(typeof navigator!=="undefined"&&navigator.serviceWorker&&window.isSecureContext){navigator.serviceWorker.register("/static/rakurs-sw.js",{scope:"/"}).catch(()=>{});}
+

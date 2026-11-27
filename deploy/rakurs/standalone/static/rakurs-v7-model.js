@@ -197,8 +197,7 @@
       if(!window[0]||!window[1]||window[0]>=window[1]||window[0]!==date(b.first_at)||window[1]!==date(b.last_at))continue;
       if(key!=="pv_energy_total"&&NUM(a.value)!==NUM(b.value))continue;
       result.values[key]={number:key==="pv_energy_total"?NUM(a.value)+NUM(b.value):NUM(a.value),first_at:window[0],last_at:window[1]};
-      if(!common)common=window;else if(common[0]!==window[0]||common[1]!==window[1])common=false;
-      if(common===false)break;
+      if(common===null)common=window;else if(common!==false&&(common[0]!==window[0]||common[1]!==window[1]))common=false;
     }
     if(common&&keys.every(k=>result.values[k])){
       const n=k=>result.values[k].number;
@@ -207,6 +206,29 @@
     }else result.reason="Для балансу потрібні всі шість узгоджених лічильників з однаковим початком і кінцем";
     return result;
   }
-  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,pairEnergy,
+  // Deterministic read-only episode detector. Never bridge absent data.
+  // Duration is between actual observed points, not assumed wall-clock time.
+  function evaluateEpisodes(points,rule){
+    const threshold=NUM(rule?.threshold),h=NUM(rule?.hysteresis),delay=NUM(rule?.delaySeconds),gap=NUM(rule?.maxGapSeconds);
+    if(threshold===null||h===null||h<0||delay===null||delay<0||gap===null||gap<=0||!["above","below"].includes(rule?.direction))throw Error("Некоректні межі правила");
+    const normalized=normalizeHistory(points),episodes=[];let pending=null,previous=null;
+    const enters=v=>rule.direction==="above"?v>=threshold:v<=threshold;
+    const exits=v=>rule.direction==="above"?v<threshold-h:v>threshold+h;
+    function finish(end,reason){
+      if(!pending)return;
+      if(pending.confirmed)episodes.push({start:pending.start,last:pending.last,end:reason==="recovered"?end:null,durationSeconds:(Date.parse(pending.last)-Date.parse(pending.start))/1000,state:reason,extreme:pending.extreme});
+      pending=null;
+    }
+    for(const p of normalized){
+      if(previous&&(Date.parse(p.timestamp)-Date.parse(previous.timestamp))/1000>gap)finish(previous.timestamp,"gap");
+      if(pending&&exits(p.number))finish(p.timestamp,"recovered");
+      if(!pending&&enters(p.number))pending={start:p.timestamp,last:p.timestamp,confirmed:delay===0,extreme:p.number};
+      if(pending){pending.last=p.timestamp;pending.extreme=rule.direction==="above"?Math.max(pending.extreme,p.number):Math.min(pending.extreme,p.number);if((Date.parse(p.timestamp)-Date.parse(pending.start))/1000>=delay)pending.confirmed=true;}
+      previous=p;
+    }
+    finish(previous?.timestamp,"open");
+    return episodes;
+  }
+  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,pairEnergy,evaluateEpisodes,
     historicalValue,differing,POWER_KEYS,SHARED_KEYS});
 });

@@ -75,6 +75,15 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertNotIn("/static/rakurs-energy-board-20261126", html)
         self.assertNotIn("dashboard-toolbar-ssr", html)
 
+    def test_pwa_network_only_assets(self):
+        manifest=self.client.get("/static/rakurs.webmanifest")
+        self.assertEqual(manifest.status_code,200)
+        self.assertEqual(json.loads(manifest.data)["display"],"standalone")
+        worker=self.client.get("/static/rakurs-sw.js")
+        self.assertEqual(worker.headers["Service-Worker-Allowed"],"/")
+        self.assertEqual(worker.headers["Cache-Control"],"no-store")
+        self.assertNotIn("caches.open",worker.get_data(as_text=True))
+
     def test_remote_clients_denied(self):
         self.assertEqual(
             self.client.get("/", environ_overrides={"REMOTE_ADDR": "192.168.5.21"}).status_code,

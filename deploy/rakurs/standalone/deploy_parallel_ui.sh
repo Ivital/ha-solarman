@@ -22,13 +22,14 @@ FILES=(
   static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js
   static/rakurs-mobile-nav-20261126.js static/rakurs-mobile-nav-20261126.css
   static/rakurs-v7-model.js static/rakurs-v7.js static/rakurs-v7.css
+  static/rakurs.webmanifest static/rakurs-app-icon.svg static/rakurs-sw.js
 )
 RETIRED=(static/rakurs-energy-board-20261126.js static/rakurs-energy-board-20261126.css)
 cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product10"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product11"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -44,7 +45,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-24' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-25' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -239,7 +240,8 @@ for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.c
             static/rakurs-color-20261125.css static/register-reference-v1053.json \
             static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js \
              static/rakurs-mobile-nav-20261126.js static/rakurs-mobile-nav-20261126.css \
-             static/rakurs-v7-model.js static/rakurs-v7.js static/rakurs-v7.css; do
+             static/rakurs-v7-model.js static/rakurs-v7.js static/rakurs-v7.css \
+             static/rakurs.webmanifest static/rakurs-app-icon.svg static/rakurs-sw.js; do
   expected="$(sha256sum "$HERE/$path" | awk '{print $1}')"
   tmp="$(mktemp)"
   for route in LOCAL PUBLIC; do

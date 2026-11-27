@@ -559,3 +559,7 @@ body[data-theme] .event-filter select{max-width:100%;min-height:40px}
 
 body[data-theme] .product-balance>strong{display:block;margin:10px 0;font-size:17px}
 body[data-theme] .product-balance .product-phase-row{font-size:13px}
+
+body[data-theme] .product-rule-analyzer summary{cursor:pointer;font-weight:650;margin-bottom:8px}
+body[data-theme] .product-rule-analyzer .settings-fields{margin:12px 0}
+body[data-theme] .product-rule-analyzer .product-energy-row{margin-top:5px}

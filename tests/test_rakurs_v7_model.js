@@ -135,3 +135,9 @@ const balance=M.pairEnergy([energy1,energy2]);assert(balance.complete);assert.eq
 const wrong=makeEnergy([4,11,2,1,1,2]);assert.equal(M.pairEnergy([energy1,wrong]).complete,false);assert.equal(M.pairEnergy([energy1,null]).complete,false);
 wrong.counters[0].first_at="2026-11-25T00:00:00.000001Z";assert(!M.pairEnergy([energy1,wrong]).values.pv_energy_total);
 console.log("RAKURS_EXACT_MICROSECOND_AND_SHARED_COUNTER_BALANCE=PASS");
+
+const episodePoints=[0,1,2,3,4,5,10,11,12].map((minute,i)=>row([4,11,12,9,8,7,12,13,14][i],"кВт",new Date(Date.UTC(2026,10,25,0,minute)).toISOString()));
+const episodes=M.evaluateEpisodes(episodePoints,{direction:"above",threshold:10,hysteresis:2,delaySeconds:60,maxGapSeconds:90});
+assert.equal(episodes.length,2);assert.equal(episodes[0].state,"recovered");assert.equal(episodes[0].durationSeconds,180);assert.equal(episodes[1].state,"open");assert.equal(episodes[1].durationSeconds,120);
+const broken=M.evaluateEpisodes([row(11,"кВт","2026-11-25T00:00:00Z"),row(12,"кВт","2026-11-25T00:10:00Z")],{direction:"above",threshold:10,hysteresis:1,delaySeconds:60,maxGapSeconds:90});assert.equal(broken.length,0);
+console.log("RAKURS_ALARM_EPISODES_DELAY_HYSTERESIS_AND_GAP=PASS");

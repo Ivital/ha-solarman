@@ -78,6 +78,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", media_type)
         self.send_header("Cache-Control", "no-store")
+        if urlsplit(self.path).path=="/static/rakurs-sw.js":
+            self.send_header("Service-Worker-Allowed","/")
         self.send_header("Content-Length", str(len(content)))
         self.end_headers()
         self.wfile.write(content)
@@ -266,6 +268,16 @@ def run():
                         assert not has_real_ssr(page)
                     ctx.close()
                 print("RAKURS_STARTUP_NO_LEGACY_CARD_FLASH=PASS")
+                pwa=browser.new_context(viewport={"width":390,"height":844})
+                page=pwa.new_page();page.goto(base+"/",wait_until="load");wait_rendered(page)
+                page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=15000)
+                assert page.locator('link[rel="manifest"]').get_attribute("href")=="/static/rakurs.webmanifest"
+                assert page.evaluate("async()=>await caches.keys()")==[]
+                pwa.set_offline(True)
+                page.goto(base+"/",wait_until="load")
+                assert "Показники не завантажено" in page.locator("body").inner_text()
+                pwa.set_offline(False);pwa.close()
+                print("RAKURS_PWA_NETWORK_ONLY_OFFLINE_NO_TELEMETRY_CACHE=PASS")
                 for width, height, theme in [(360, 780, "light"), (390, 844, "light"),
                                              (412, 915, "dark"), (768, 1024, "light"),
                                              (1366, 768, "dark"), (1920, 1080, "light")]:

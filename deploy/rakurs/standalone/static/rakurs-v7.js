@@ -4,7 +4,9 @@
 (function(root){
  const M=root.RakursV7Model,NS="http://www.w3.org/2000/svg";
  let mode="overview",hours=24,chosenTime=null,motionEnabled=true;
- const views=new Set(["pv1","pv2","load","battery","grid","soc"]);
+ const defaultViews=["pv1","pv2","load","battery","grid","soc"],views=new Set(defaultViews);
+ try{const prefs=JSON.parse(root.localStorage.getItem("rakurs.overview.preferences")||"null");if(prefs){if([24,72,168].includes(prefs.hours))hours=prefs.hours;if(typeof prefs.motion==="boolean")motionEnabled=prefs.motion;if(Array.isArray(prefs.series)){views.clear();for(const id of prefs.series)if(defaultViews.includes(id))views.add(id);}}}catch(_error){}
+ function savePreferences(){try{root.localStorage.setItem("rakurs.overview.preferences",JSON.stringify({hours,motion:motionEnabled,series:[...views]}));}catch(_error){}}
  const handlers=new WeakMap(),activeScopes=new Set();
  function disposeScope(scope){
   if(!scope||scope.cancelled)return;
@@ -477,7 +479,7 @@
     circle.style.setProperty("--series-color",line.color);
     put(button,circle,h("span","",line.label));
     button.addEventListener("click",()=>{
-     if(views.has(line.id))views.delete(line.id);else views.add(line.id);
+     if(views.has(line.id))views.delete(line.id);else views.add(line.id);savePreferences();
      button.setAttribute("aria-pressed",String(views.has(line.id)));
      chart();
     });
@@ -491,7 +493,7 @@
     const button=h("button","rv7-range",label);
     button.type="button";button.setAttribute("aria-pressed",String(hours===value));
     button.addEventListener("click",()=>{
-     hours=value;chosenTime=null;explicitSelection=hasRange&&endTime!==latest;
+     hours=value;savePreferences();chosenTime=null;explicitSelection=hasRange&&endTime!==latest;
      if(!explicitSelection&&typeof onRestore==="function")onRestore();
      drawRanges();fetchSeries();
     });
@@ -539,7 +541,7 @@
    const motion=h("button","rv7-motion-toggle",motionEnabled?"Пауза руху":"Увімкнути рух");
    motion.type="button";motion.setAttribute("aria-pressed",String(motionEnabled));
    motion.setAttribute("aria-label","Анімація енергопотоків");
-   motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;app.classList.toggle("rv7-motion-paused",!motionEnabled);motion.setAttribute("aria-pressed",String(motionEnabled));motion.textContent=motionEnabled?"Пауза руху":"Увімкнути рух";});
+   motion.addEventListener("click",()=>{motionEnabled=!motionEnabled;savePreferences();app.classList.toggle("rv7-motion-paused",!motionEnabled);motion.setAttribute("aria-pressed",String(motionEnabled));motion.textContent=motionEnabled?"Пауза руху":"Увімкнути рух";});
    const frameMeta=h("span","rv7-card-meta",snap.data_state==="live"?"Поточний стан":"Збережений стан");frameMeta.setAttribute("aria-hidden","true");
    put(headActions,frameMeta,motion);
    put(dh,h("strong","rv7-card-title","Енергопотоки"),headActions);
@@ -615,7 +617,7 @@
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
    canAutoRefresh:()=>mode==="overview"&&Array.from(activeScopes).some(s=>s.canAutoRefresh?.()),
-   updateDevices:(host,devices,status)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices,status:status??scope.config.status});},
+   updateDevices:(host,devices,status)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices,status:status===undefined?scope.config.status:status});},
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
   reset:()=>{mode="overview";hours=24;chosenTime=null;motionEnabled=true;}});
 })(window);
