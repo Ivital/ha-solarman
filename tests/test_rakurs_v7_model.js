@@ -34,13 +34,12 @@ assert.equal(s.reports.battery_soc.conflict,true);
 assert(s.warnings.some(x=>x.includes("відрізняються")));
 assert.equal(s.read_only,true);
 console.log("V7_TOPOLOGY_TWO_PV_ONE_LOAD_ONE_BATTERY_ONE_GRID=PASS");
-s=M.snapshot({...cfg,selectedDeviceKey:"deye_2"});
-assert.equal(s.reports.load_power.reading.number,6.816,
-  "Switch report source, but do not sum or invent a system total");
-assert.equal(s.reports.battery_soc.reading.number,73.8);
-assert.equal(s.sources[0].reading.number,5.1,
-  "Independent PV source must not change when selected shared-device report changes");
-console.log("V7_SHARED_REPORT_SELECTION_NO_DOUBLE_COUNT=PASS");
+const firstSelection=s;
+s=M.snapshot({...cfg,devices:[d2,d1],selectedDeviceKey:"deye_2"});
+assert.deepEqual(s.reports,firstSelection.reports);
+assert.deepEqual(s.sources,firstSelection.sources);
+assert.equal(s.sharedDevice.device_key,d1.device_key);
+console.log("V7_SHARED_NODES_INDEPENDENT_OF_DEVICE_PICKER=PASS");
 let empty=M.snapshot({devices:[],fallbackValues:{},now:Date.parse(when)});
 assert.equal(empty.sources.length,2);
 assert(empty.sources.every(x=>x.device===null&&!x.reading.valid));

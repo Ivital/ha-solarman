@@ -227,7 +227,7 @@ if __name__ == '__main__':
             page.get_by_role("tab", name="Інженерний режим").click()
             assert page.locator(".rv7-engineer").is_visible()
             assert page.locator(".rv7-engineer tbody tr").count() == 5
-            assert "Не системний підсумок" in page.locator(".rv7-engineer").inner_text() or \
+            assert "Спільний вузол" in page.locator(".rv7-engineer").inner_text() or \
                    "Відмінні звіти" in page.locator(".rv7-engineer").inner_text()
             assert page.locator(".rv7-engineer a[href='#/registers']").count() == 1
             page.screenshot(path=str(OUT / "mobile_engineering.png"), full_page=True)

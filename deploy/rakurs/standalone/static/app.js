@@ -2557,6 +2557,7 @@ async function boot() {
       try {if(typeof localStorage!=="undefined")
         localStorage.setItem("rakurs.selectedDeye",picked.device_key);
       } catch(_error) {}
+      if(state.route==="overview" && main.querySelector(".v7-host"))return;
       render();
     });
   }

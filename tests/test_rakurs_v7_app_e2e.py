@@ -333,6 +333,11 @@ def run():
                     assert all(any(q.get("device")==[device] and q.get("key")==[key] for q in ranges) for device in [D1,D2] for key in ["pv_power","load_power","battery_power","battery_soc","grid_power"])
                     assert page.locator(".rv7-chart-date").text_content()==page.locator(".rv7-status-date").text_content()
                     assert "5,1 кВт" in page.locator(".rv7-chart-stat").first.text_content()
+                    picker = page.get_by_label("Обраний інвертор")
+                    overview_state = page.locator(".rv7-chart-stat, .rv7-chart-date").all_text_contents()
+                    picker.select_option(D2)
+                    assert overview_state == page.locator(".rv7-chart-stat, .rv7-chart-date").all_text_contents()
+                    picker.select_option(D1)
                     assert not any(word in page.locator(".rv7").inner_text().lower() for word in ["тестові дані", "демонстраційний стан"])
                     if width < 600:
                         assert page.locator("body.rakurs-v7-overview").count() == 1

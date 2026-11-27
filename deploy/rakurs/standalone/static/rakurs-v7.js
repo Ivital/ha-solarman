@@ -261,7 +261,7 @@
     row.appendChild(h("td","",sample?M.fmt(sample):"—"));
    }
    row.appendChild(h("td","",key==="pv_power"?"Окремі PV":
-    snap.reports[key].conflict?"Відмінні звіти":"Не системний підсумок"));
+    snap.reports[key].conflict?"Спільний вузол · відмінні звіти":"Спільний вузол"));
    tbody.appendChild(row);
   }
   table.appendChild(tbody);box.appendChild(table);card.appendChild(box);
@@ -466,11 +466,11 @@
      "Історія доступна після підключення до архіву MySQL"));scope.historyBusy=false;return;
    }
    const planned=metadata.map(([id,label,key,slot,color])=>({
-    id,label,key,color,device:slot?snap.devices.find(x=>Number(x.slot_no)===slot):snap.selected
+    id,label,key,color,device:slot?snap.devices.find(x=>Number(x.slot_no)===slot):snap.sharedDevice
    }));
    // Include the other inverter's shared reports in historical diagnostics;
    // never plot them as a second physical battery/grid/load or sum them.
-   const other=snap.devices.find(d=>d.device_key!==snap.selected?.device_key);
+   const other=snap.devices.find(d=>d.device_key!==snap.sharedDevice?.device_key);
    if(other)for(const [id,label,key,slot,color] of metadata.filter(item=>item[3]===0))
      planned.push({id:id+"-other",label,key,color,device:other,diagnostic:true});
    if(hasRange)periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
@@ -575,7 +575,7 @@
    diagramCard.appendChild(wrapped);
    const foot=h("div","rv7-flow-foot");
    foot.appendChild(h("span","rv7-source-label",
-    snap.selected?.slot_no?"Будинок, АКБ і мережа · за Deye №"+snap.selected.slot_no:"Джерело не встановлено"));
+    "Спільні для обох інверторів: навантаження, акумулятор і мережа"));
    // The engineering tab and equipment inspectors already provide details.
    diagramCard.appendChild(foot);
    leftColumn.appendChild(diagramCard);

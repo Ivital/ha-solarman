@@ -82,12 +82,9 @@
       .filter(d=>d&&[1,2].includes(Number(d.slot_no)))
       .sort((a,b)=>Number(a.slot_no)-Number(b.slot_no));
     const bySlot=new Map(devices.map(d=>[Number(d.slot_no),d]));
-    const selected=devices.find(d=>d.device_key===config.selectedDeviceKey)||
-      bySlot.get(Number(config.selectedSlotNo))||devices[0]||null;
-    const selectedValues=selected?.values||{};
-    const values=selected?selectedValues:(config.fallbackValues||{});
-    // Never fabricate a second device or place fallback readings into an unknown PV slot.
-    const fallbackUnscoped=!selected&&Object.keys(config.fallbackValues||{}).length>0;
+    // One archive channel for the common bus, independent of the detail-page picker.
+    const sharedDevice=devices[0]||null;
+    const fallbackUnscoped=!sharedDevice&&Object.keys(config.fallbackValues||{}).length>0;
     const sources=[1,2].map(slot=>{
       const device=bySlot.get(slot);
       return {slot,device:device||null,reading:read(device?.values||{},"pv_power",device)};
@@ -95,9 +92,7 @@
     const reports={};
     for(const key of SHARED_KEYS){
       const byDevice=devices.map(device=>read(device.values,key,device));
-      const first=byDevice.find(item=>item.device_key===selected?.device_key);
-      const primary=first?.valid?first:
-        (read(values,key,selected).valid?read(values,key,selected):first||read(values,key,selected));
+      const primary=byDevice[0]||read(config.fallbackValues||{},key,null);
       reports[key]={
         key,reading:primary,
         reports:byDevice,conflict:byDevice.length>=2&&differing(byDevice[0],byDevice[1]),
@@ -140,7 +135,7 @@
       Math.abs(Date.parse(x.reading.observed_at_utc)-Date.parse(sources[0].reading.observed_at_utc))<=60000);
     // Even with aligned PV timestamps, a verified aggregate is still required.
     return Object.freeze({
-      devices,selected,source:"MySQL",data_state:isLive?"live":validReadings.length?"archive":"missing",
+      devices,sharedDevice,source:"MySQL",data_state:isLive?"live":validReadings.length?"archive":"missing",
       updated_at_utc:last,generated,show_aggregate_pv:false,pv_time_aligned:alignedPv,
       sources,reports,warnings,read_only:true,
       physical:{pv_arrays:2,inverters:2,load_nodes:1,battery_nodes:1,grid_nodes:1}
