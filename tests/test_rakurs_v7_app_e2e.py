@@ -182,6 +182,11 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": {**device_values(1),"battery_soh":reading(98,"%"),"grid_l1_voltage":reading(230,"В"),"grid_l2_voltage":reading(231,"В"),"grid_l3_voltage":reading(229,"В"),"bms_1_min_cell_voltage":reading(3.31,"В"),"bms_1_max_cell_voltage":reading(3.35,"В"),"bms_1_voltage":reading(53.2,"В")}})
+        elif path == "/api/v1/bms/history":
+            if "at" in args:
+                self.reply({"modules":{"1":{"cell_1_voltage":3310,"cell_2_voltage":3350},"2":{"min_cell_voltage":3300,"max_cell_voltage":3360}}})
+            else:
+                self.reply({"peak":{"module":"2","stamp":MEASURED,"spread":60}})
         elif path == "/api/v1/bms/cells":
             self.reply({"values":{"bms_1_cell_1_voltage":reading(3.31,"В"),"bms_1_cell_2_voltage":reading(3.35,"В")}})
         elif path == "/api/v1/alerts":
@@ -481,6 +486,14 @@ def run():
                         if route in {"grid","load","inverter"}:
                             assert page.locator(".product-phase-grid .product-phase-card").count()==3
                         if route=="battery":
+                            await_logo=page.locator(".brand img")
+                            assert await_logo.evaluate("(img)=>img.complete && img.naturalWidth===200")
+                            page.get_by_role("button",name="Найбільший розкид за добу").click()
+                            page.wait_for_function("document.querySelector('.battery-module strong')?.textContent==='Модуль 2'")
+                            assert "60 мВ" in page.locator(".battery-module").first.inner_text()
+                            assert page.locator(".battery-plots svg").count()==2
+                            assert page.locator(".battery-cell").count()==2
+                            page.locator(".battery-history").screenshot(path=str(OUT/f"battery-history-{width}.png"))
                             assert page.locator(".bms-summary").count()==1
                             assert page.locator(".product-bms-gauge").count()==2
                             page.locator(".product-bms-records > summary").click()

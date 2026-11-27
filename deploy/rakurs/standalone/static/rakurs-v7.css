@@ -619,3 +619,8 @@ body[data-theme] .product-timeseries .product-cursor{stroke:currentColor;stroke-
 body[data-theme] .solar-analysis .product-chart-legend span[data-series="0"]:before{background:#ad7109}
 body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:before{background:repeating-linear-gradient(90deg,#3779d2 0 4px,transparent 4px 6px)}
 .solar-detail button[hidden]{display:none}
+.battery-history-head,.battery-history-tools,.battery-cells{display:flex;align-items:center;gap:.65rem;flex-wrap:wrap}
+.battery-history-head{justify-content:space-between}.battery-latest{display:inline-block;font-size:1.35rem;margin-right:.4rem}.battery-history-head small{margin-right:1rem}
+.battery-plots svg{width:100%;height:clamp(140px,15vw,225px);display:block}.battery-frame h3,.battery-plots h3{margin:.8rem 0 .3rem}
+.battery-module{padding:.65rem 0;border-top:1px solid #8b98aa40}.battery-spread{margin-left:1rem}
+.battery-cell{display:grid;padding:.45rem .65rem;border:1px solid #8b98aa55;border-radius:.4rem;font-variant-numeric:tabular-nums}.battery-cells{margin-top:.4rem}.battery-cell small{font-weight:700}

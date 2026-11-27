@@ -16,7 +16,7 @@ DOMAIN=rakurs.zakryttya.org.ua
 FILES=(
   app.py auth.py config_api.py poll_worker.py parallel_support.py modbus_archive.py modbus_wire.py
   mysql_transport.py solar_forecast.py alert_monitor.py templates/index.html templates/login.html templates/deye_server.html
-  static/app.js static/app-stable-20261124.js
+  static/rakurs-logo.png static/app.js static/app-stable-20261124.js
   static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css
   static/rakurs-color-20261125.css static/register-reference-v1053.json
   static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js
@@ -29,7 +29,7 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product23"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product24"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -45,7 +45,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-37' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-38' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -263,6 +263,14 @@ for item in profile["devices"]:
         assert match["values"]["pv_power"]["value_decimal"]==pv["value_decimal"]
         end=datetime.fromisoformat(at.replace("Z","+00:00"))
         start=end-timedelta(hours=24)
+        if int(item["slot_no"])==1:
+            peak=c.get("/api/v1/bms/history?"+urlencode({"start":start.isoformat(),"end":end.isoformat()}),base_url="https://localhost")
+            assert peak.status_code==200
+            chosen=peak.get_json()["peak"]
+            snapshot=c.get("/api/v1/bms/history?"+urlencode({"at":chosen["stamp"] if chosen else at}),base_url="https://localhost")
+            assert snapshot.status_code==200
+            if chosen:
+                assert str(chosen["module"]) in snapshot.get_json()["modules"]
         chart=c.get("/api/v1/history/range?"+urlencode({"device":device,"key":"pv_power","start":start.isoformat(),"end":end.isoformat(),"resolution":"auto"}),base_url="https://localhost")
         assert chart.status_code==200
         assert chart.get_json()["sample_count"]>=1
@@ -273,7 +281,7 @@ print("MYSQL_READ_ONLY=PASS")
 PY
 
 echo '=== VERIFY NEW ASSETS LOCALLY AND THROUGH PUBLIC HTTPS ==='
-for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css \
+for path in static/rakurs-logo.png static/app-parallel-twin-20261125.js static/parallel-twin-20261125.css \
             static/app.js static/app-stable-20261124.js \
             static/rakurs-color-20261125.css static/register-reference-v1053.json \
             static/rakurs-pages-20261126.css static/rakurs-page-theme-20261126.js \

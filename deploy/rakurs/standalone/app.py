@@ -414,6 +414,52 @@ def signals():
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
 
 
+CELL_FRAME_PATTERN = r"^bms_([1-9]|1[0-9]|20)_((min|max)_cell_voltage|cell_([1-9]|[1-5][0-9]|6[0-4])_voltage)$"
+
+
+@app.get("/api/v1/bms/history")
+def battery_history():
+    devices = parallel_registered_devices()
+    if not devices:
+        return jsonify({"modules": {}, "peak": None})
+    device_id = devices[0]["id"]
+    # Convert each original unit before comparing synchronous values.
+    criteria = (" FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+                "WHERE m.device_id=%s AND REGEXP_LIKE(s.signal_key,%s,'c') "
+                "AND s.unit IN ('В','V','мВ','mV') AND m.value_decimal IS NOT NULL ")
+    scale = "m.value_decimal * CASE WHEN s.unit IN ('В','V') THEN 1000 ELSE 1 END"
+    if request.args.get("at"):
+        stamp = checked_utc("at")
+        records = rows("SELECT s.signal_key," + scale + " AS mv" + criteria +
+                       "AND m.observed_at_utc=%s", (device_id, CELL_FRAME_PATTERN, stamp))
+        modules = {}
+        for record in records:
+            _, module, key = record["signal_key"].split("_", 2)
+            modules.setdefault(module, {})[key] = record["mv"]
+        return jsonify(serialize({"at": stamp, "modules": modules}))
+    start, end = checked_utc("start"), checked_utc("end")
+    if not 0 < (end-start).total_seconds() <= 25*3600:
+        abort(400, description="Оберіть одну добу")
+    peak = one(
+        "WITH samples AS (SELECT m.observed_at_utc AS stamp,"
+        "SUBSTRING_INDEX(SUBSTRING_INDEX(s.signal_key,'_',2),'_',-1) AS module,"
+        "SUBSTRING(s.signal_key,LOCATE('_',s.signal_key,5)+1) AS field_key,"
+        + scale + " AS mv" + criteria + "AND m.observed_at_utc BETWEEN %s AND %s),"
+        "frames AS (SELECT stamp,module,"
+        "MIN(CASE WHEN field_key='min_cell_voltage' THEN mv END) AS lo,"
+        "MAX(CASE WHEN field_key='max_cell_voltage' THEN mv END) AS hi,"
+        "COUNT(DISTINCT CASE WHEN LEFT(field_key,5)='cell_' THEN field_key END) AS n,"
+        "MIN(CASE WHEN LEFT(field_key,5)='cell_' THEN mv END) AS cell_lo,"
+        "MAX(CASE WHEN LEFT(field_key,5)='cell_' THEN mv END) AS cell_hi "
+        "FROM samples GROUP BY stamp,module),"
+        "spreads AS (SELECT stamp,module,CASE WHEN hi>=lo THEN hi-lo "
+        "WHEN n>=2 THEN cell_hi-cell_lo END AS spread FROM frames) "
+        "SELECT stamp,module,spread FROM spreads WHERE spread IS NOT NULL "
+        "ORDER BY spread DESC,stamp DESC,CAST(module AS UNSIGNED) LIMIT 1",
+        (device_id, CELL_FRAME_PATTERN, start, end))
+    return jsonify(serialize({"peak": peak}))
+
+
 @app.get("/api/v1/bms/cells")
 def bms_cells():
     """Stored cell-level readings only, independent of the generic signal list limit."""

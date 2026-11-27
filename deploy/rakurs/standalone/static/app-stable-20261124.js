@@ -1150,6 +1150,90 @@ function renderSolarForecast(cycle){
   }
   box.addEventListener("toggle",refresh);
 }
+async function renderBatteryHistory(host,cycle,devices){
+  if(!devices?.length){host.textContent="Записів АКБ немає.";return;}
+  const device=devices[0],values=device.values||{};
+  const stamps=["battery_soc","battery_power"].map(k=>Date.parse(values[k]?.observed_at_utc)).filter(Number.isFinite);
+  const anchor=stamps.length?Math.max(...stamps):Date.now();
+  const header=element("div","battery-history-head"),latest=element("div",""),tools=element("div","battery-history-tools");
+  latest.appendChild(element("h2","","Спільна АКБ"));
+  for(const [key,unit] of [["battery_soc","%"],["battery_power","кВт"]]){
+    const r=values[key];
+    if(r?.value_decimal==null)continue;
+    const v=Number(r.value_decimal),label=key==="battery_power"?(v>0?"Розряд ":v<0?"Заряд ":""):"";
+    latest.appendChild(element("strong","battery-latest",label+pretty(Math.abs(v))+" "+unit));
+    latest.appendChild(element("small","subtle",time(r.observed_at_utc)));
+  }
+  const day=settingsField(tools,"Доба за Києвом",localValue(new Date(anchor)).slice(0,10),"date");
+  const peak=element("button","rv7-range","Найбільший розкид за добу");peak.type="button";
+  const peakInfo=element("span","subtle");
+  add(tools,peak,peakInfo);add(header,latest,tools);
+  const plots=element("div","battery-plots"),frame=element("div","battery-frame");
+  add(host,header,plots,frame);
+  let rangeToken=0,frameToken=0,timer,best=null,charts=[];
+  function select(stamp,highlight=null){
+    const token=++frameToken;
+    clearTimeout(timer);
+    charts.forEach(g=>g.showStamp?.(Date.parse(stamp),g.dataset.signal));
+    frame.textContent="Комірки · "+time(stamp)+" · завантаження…";
+    timer=setTimeout(async()=>{
+      if(!current(cycle)||token!==frameToken)return;
+      try{
+        const response=await api("/bms/history?at="+encodeURIComponent(stamp));
+        if(!current(cycle)||token!==frameToken)return;
+        frame.replaceChildren(element("h3","","Напруга комірок · "+time(stamp)));
+        const modules=Object.entries(response.modules||{}).sort(([a],[b])=>Number(b===highlight)-Number(a===highlight)||Number(a)-Number(b));
+        if(!modules.length)frame.appendChild(element("p","subtle","За вибрану мить показів комірок немає."));
+        for(const [id,fields] of modules){
+          const cells=Object.entries(fields).filter(([k])=>/^cell_\d+_voltage$/.test(k)).map(([k,v])=>({n:Number(k.split("_")[1]),v:Number(v)})).sort((a,b)=>a.n-b.n);
+          const pair=fields.min_cell_voltage!=null&&fields.max_cell_voltage!=null&&Number(fields.max_cell_voltage)>=Number(fields.min_cell_voltage);
+          const lo=pair?Number(fields.min_cell_voltage):cells.length>=2?Math.min(...cells.map(c=>c.v)):null;
+          const hi=pair?Number(fields.max_cell_voltage):cells.length>=2?Math.max(...cells.map(c=>c.v)):null;
+          const box=element("article","battery-module"),head=element("strong","","Модуль "+id);
+          box.appendChild(head);
+          if(lo!=null)box.appendChild(element("span","battery-spread","Мін. "+pretty(lo/1000,3)+" В · Макс. "+pretty(hi/1000,3)+" В · Розкид "+pretty(hi-lo,2)+" мВ"));
+          const tiles=element("div","battery-cells");
+          for(const c of cells){
+            const tag=element("span","battery-cell","C"+c.n+" · "+pretty(c.v/1000,3)+" В");
+            if(c.v===lo||c.v===hi)tag.appendChild(element("small","",lo===hi?"Мін./макс.":c.v===lo?"Мін.":"Макс."));
+            tiles.appendChild(tag);
+          }
+          add(box,tiles);frame.appendChild(box);
+        }
+      }catch(error){if(current(cycle)&&token===frameToken)frame.textContent="Не вдалося прочитати кадр BMS.";}
+    },120);
+  }
+  async function refresh(){
+    const token=++rangeToken;frameToken++;clearTimeout(timer);best=null;peak.disabled=true;charts=[];
+    plots.replaceChildren();frame.replaceChildren();peakInfo.textContent="";
+    if(!day.value)return;
+    const next=new Date(day.value+"T12:00:00Z");next.setUTCDate(next.getUTCDate()+1);
+    const start=+parseKyiv(day.value+"T00:00",false),end=+parseKyiv(next.toISOString().slice(0,10)+"T00:00",false)-1;
+    const query=rangeQuery({start,end});
+    api("/bms/history?"+query).then(data=>{
+      if(!current(cycle)||token!==rangeToken)return;
+      best=data.peak;peak.disabled=!best;
+      peakInfo.textContent=best?"Модуль "+best.module+" · "+pretty(Number(best.spread),2)+" мВ":"За добу немає одночасних показів для розрахунку.";
+    }).catch(()=>{if(current(cycle)&&token===rangeToken)peakInfo.textContent="Розрахунок розкиду недоступний.";});
+    const all=await Promise.allSettled(["battery_soc","battery_power"].map(key=>api("/history/range?key="+key+"&device="+encodeURIComponent(device.device_key)+"&resolution=auto&"+query)));
+    if(!current(cycle)||token!==rangeToken)return;
+    let newest=null;
+    all.forEach((result,i)=>{
+      const points=result.value?.points||[],key=i?"battery_power":"battery_soc";
+      plots.appendChild(element("h3","",i?"Потужність АКБ · розряд (+), заряд (−)":"Рівень заряду"));
+      if(result.status==="rejected"){plots.appendChild(element("p","subtle","Історія недоступна."));return;}
+      const limit=Math.max(.1,...points.map(p=>Math.abs(Number(p.value_decimal))||0));
+      const graph=svgChart(points,i?"кВт":"%",{key,start,end,bounds:i?[-limit,limit]:[0,100],batteryFlow:!!i,onSelect:(_,stamp)=>select(stamp)});
+      graph.dataset.signal=key;charts.push(graph);plots.appendChild(graph);
+      for(const p of points)if(p.value_decimal!=null&&(!newest||Date.parse(p.observed_at_utc)>Date.parse(newest)))newest=p.observed_at_utc;
+    });
+    if(newest)select(newest);
+  }
+  peak.onclick=()=>{if(best)select(best.stamp,String(best.module));};
+  day.addEventListener("change",refresh);
+  await refresh();
+}
+
 function renderBatteryEstimate(box,values){
   const model=window.RakursV7Model;if(!model?.batteryEstimate)return;
   const section=element("details","product-analytics product-battery-estimate");
@@ -1243,20 +1327,20 @@ function renderTechnicalSummary(groups,values){
   renderBatteryEstimate(box,values);
   main.appendChild(box);
 }
-function renderEquipmentHistory(groups,items,known,cycle){
+function renderEquipmentHistory(groups,items,known,cycle,sharedDevice){
   const preferred={pv:["pv_power","pv1_power","pv2_power","pv1_voltage","pv2_voltage","pv1_current","pv2_current"],battery:["battery_soc","battery_soh","battery_power","battery_temperature","bms_max_charge_current","bms_max_discharge_current"],grid:["grid_power","grid_frequency","grid_l1_voltage","grid_l2_voltage","grid_l3_voltage"],load:["load_power","load_l1_power","load_l2_power","load_l3_power"],inverter:["inverter_temperature","output_power","output_l1_current","output_l2_current","output_l3_current"]};
   const options=(preferred[groups[0]]||[]).map(key=>items.find(i=>i.key===key)).filter(i=>i&&known.has(i.key));if(!options.length)return;
   const panel=element("details","product-analytics product-equipment-history");panel.appendChild(element("summary","","Динаміка параметрів"));
   const select=element("select","");select.setAttribute("aria-label","Показник обладнання");for(const i of options){const opt=element("option","",i.label);opt.value=i.key;select.appendChild(opt);}select.value=options[0].key;
   const period=element("select","");period.setAttribute("aria-label","Період обладнання");for(const [v,label] of [[24,"24 години"],[72,"3 доби"],[168,"7 діб"]]){const opt=element("option","",label);opt.value=String(v);period.appendChild(opt);}period.value="24";
   const controls=element("div","product-analytics-controls"),body=element("div","");add(controls,select,period);add(panel,controls,body);main.appendChild(panel);let revision=0;
-  async function refresh(){if(!panel.open)return;const token=++revision;body.replaceChildren(element("p","subtle","Читання історії…"));try{const r=await api("/history?key="+encodeURIComponent(select.value)+"&hours="+period.value+"&anchor=latest&resolution=auto");if(current(cycle)&&token===revision)body.replaceChildren(interactiveChart(r.points||[],r.signal?.unit||options.find(x=>x.key===select.value)?.unit||""));}catch(_error){if(current(cycle)&&token===revision)body.replaceChildren(createEmpty("Історія недоступна","Повторіть запит."));}}
+  async function refresh(){if(!panel.open)return;const token=++revision;body.replaceChildren(element("p","subtle","Читання історії…"));try{const r=await api("/history?key="+encodeURIComponent(select.value)+"&hours="+period.value+"&anchor=latest&resolution=auto"+(sharedDevice?"&device="+encodeURIComponent(sharedDevice):""));if(current(cycle)&&token===revision)body.replaceChildren(interactiveChart(r.points||[],r.signal?.unit||options.find(x=>x.key===select.value)?.unit||""));}catch(_error){if(current(cycle)&&token===revision)body.replaceChildren(createEmpty("Історія недоступна","Повторіть запит."));}}
   panel.addEventListener("toggle",refresh);select.addEventListener("change",refresh);period.addEventListener("change",refresh);
 }
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(title + " · Deye №" + state.selectedSlotNo,
+  section(groups[0]==="battery"?"Акумулятор":title + " · Deye №" + state.selectedSlotNo,
     items.length + " параметрів · останні збережені показники");
   if (!items.length) {
     main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр."));
@@ -1267,6 +1351,15 @@ async function renderGroup(groups, title, cycle) {
     main.appendChild(host);
     renderSolarAnalysis(cycle,host).catch(()=>{if(current(cycle))host.textContent="Сонячна аналітика недоступна.";});
   }
+  let sharedDevice=null;
+  if(groups[0]==="battery"){
+    const host=element("section","product-analytics battery-history");
+    main.appendChild(host);
+    const devices=await fetchParallelDevices(cycle).catch(()=>[]);
+    if(!current(cycle))return;
+    sharedDevice=devices?.[0]?.device_key;
+    renderBatteryHistory(host,cycle,devices).catch(()=>{if(current(cycle))host.textContent="Історія АКБ недоступна.";});
+  }
   const known = verifiedKeys();
   const keys = items.filter(i => known.has(i.key)).map(i => i.key);
   // Cell values are retrieved separately, without the generic 500-signal list limit.
@@ -1274,7 +1367,7 @@ async function renderGroup(groups, title, cycle) {
   for (let i = 0; i < keys.length; i += 24) {
     try {
       const chunk = keys.slice(i, i + 24);
-      Object.assign(values, (await api("/latest?keys=" + chunk.join(","))).values || {});
+      Object.assign(values, (await api("/latest?keys=" + chunk.join(",")+(sharedDevice?"&device="+encodeURIComponent(sharedDevice):""))).values || {});
     } catch (_error) {
       if (current(cycle)) message("Частина показників недоступна",
         "Останні значення з MySQL не вдалося отримати повністю.", true);
@@ -1282,7 +1375,7 @@ async function renderGroup(groups, title, cycle) {
     }
   }
   if(groups[0]==="battery"){
-    try{Object.assign(values,(await api("/bms/cells")).values||{});}
+    try{Object.assign(values,(await api("/bms/cells"+(sharedDevice?"?device="+encodeURIComponent(sharedDevice):""))).values||{});}
     catch(_error){if(current(cycle))message("Комірки АКБ","Покоміркові записи недоступні.",true);}
   }
   if (!current(cycle)) return;
@@ -1312,7 +1405,7 @@ async function renderGroup(groups, title, cycle) {
   }
   renderTechnicalSummary(groups,values);
   if(groups[0]==="pv")renderSolarForecast(cycle);
-  renderEquipmentHistory(groups,items,known,cycle);
+  renderEquipmentHistory(groups,items,known,cycle,sharedDevice);
   main.appendChild(controls);
   const list = element("div", "metric-list product-metric-catalog");
   const entries = [];
@@ -1388,6 +1481,14 @@ function svgChart(points, unit, domain={}) {
   gradient.appendChild(node("stop",{offset:"0%","stop-color":"currentColor","stop-opacity":".20"}));
   gradient.appendChild(node("stop",{offset:"100%","stop-color":"currentColor","stop-opacity":".025"}));
   defs.appendChild(gradient);svg.appendChild(defs);
+  if(domain.batteryFlow){
+    const split=100*y(0)/(bottom-top)-100*top/(bottom-top);
+    gradient.replaceChildren();
+    gradient.setAttribute("gradientUnits","userSpaceOnUse");gradient.setAttribute("y1",top);gradient.setAttribute("y2",bottom);
+    for(const [offset,color] of [[0,"#39ad92"],[split,"#39ad92"],[split,"#4185d7"],[100,"#4185d7"]])
+      gradient.appendChild(node("stop",{offset:offset+"%","stop-color":color,"stop-opacity":".48"}));
+    svg.appendChild(node("line",{x1:left,x2:right,y1:y(0),y2:y(0),stroke:"currentColor",opacity:".65"}));
+  }
   for(const s of segments){
     if(s.length===1)svg.appendChild(node("circle",{cx:x(s[0].t),cy:y(s[0].v),r:3.5,class:"product-sample-dot"}));
     else {
@@ -1408,7 +1509,7 @@ function svgChart(points, unit, domain={}) {
   let selected=real.length-1;
   function choose(i,notify=true){selected=Math.max(0,Math.min(real.length-1,i));const p=real[selected],xx=x(p.t),yy=y(p.v);
     svg.dataset.stamp=p.stamp;
-    if(notify)domain.onSelect?.(p.t);
+    if(notify)domain.onSelect?.(p.t,p.stamp);
     cursor.setAttribute("x1",xx);cursor.setAttribute("x2",xx);dot.setAttribute("cx",xx);dot.setAttribute("cy",yy);
     label.textContent=pretty(p.v,2)+(unit?" "+unit:"")+" · "+time(new Date(p.t).toISOString()).slice(0,-3);
     tip.textContent=time(new Date(p.t).toISOString())+" — "+pretty(p.v,3)+" "+(unit||"");
