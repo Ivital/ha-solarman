@@ -1,0 +1,826 @@
+/* Rakurs main-first energy map. Read-only, keyboard accessible, archive != realtime. */
+body[data-theme] .energy-board-host{margin:0 0 13px}
+body[data-theme] .energy-board{--board-panel:var(--ux-surface);--board-muted:var(--ux-muted);
+  border:1px solid var(--ux-line);background:var(--ux-surface);box-shadow:var(--ux-shadow);
+  border-radius:23px;padding:clamp(17px,2vw,27px);color:var(--ux-ink)}
+body[data-theme] .energy-board-header{display:flex;align-items:flex-start;justify-content:space-between;
+  flex-wrap:wrap;gap:16px;margin:0 0 12px}
+body[data-theme] .energy-board-kicker{color:var(--ux-accent);font-size:10px;letter-spacing:.12em;font-weight:850}
+body[data-theme] .energy-board-heading h2{font-size:clamp(23px,2.3vw,32px);
+  margin:4px 0 5px;letter-spacing:-.04em;color:var(--ux-title)}
+body[data-theme] .energy-board-heading p{font-size:12px;line-height:1.5;color:var(--ux-muted);margin:0}
+body[data-theme] .energy-board-flags{display:flex;flex-direction:column;align-items:flex-end;gap:7px}
+body[data-theme] .energy-board-flag{padding:8px 11px;border-radius:999px;font-size:11px;font-weight:750}
+body[data-theme] .energy-board-flag.is-stale{background:var(--ux-warn-bg);color:var(--ux-warn);
+  border:1px solid var(--ux-solar-line)}
+body[data-theme] .energy-board-flag.is-online{background:var(--ux-good-bg);color:var(--ux-good);
+  border:1px solid var(--ux-battery-line)}
+body[data-theme] .energy-board-date{font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-modes{display:flex;align-items:center;flex-wrap:wrap;gap:6px;
+  padding:5px;border:1px solid var(--ux-line);background:var(--ux-subtle);
+  border-radius:13px;width:fit-content;margin:13px 0 9px}
+body[data-theme] .energy-board-mode{min-height:36px;border:0;border-radius:9px;padding:8px 14px;
+  color:var(--ux-muted);background:transparent;font:inherit;font-size:12px;font-weight:740;cursor:pointer}
+body[data-theme] .energy-board-mode:hover{background:var(--ux-raised)}
+body[data-theme] .energy-board-mode.active{background:var(--ux-accent);color:#fff;
+  box-shadow:0 5px 13px rgba(60,85,175,.16)}
+body[data-theme] .energy-board-context{font-size:11px;color:var(--ux-muted);
+  padding:0 2px 15px;line-height:1.5}
+body[data-theme] .energy-board-map{display:grid;grid-template-columns:minmax(195px,1.15fr)
+  minmax(48px,.24fr) minmax(155px,.85fr) minmax(48px,.24fr) minmax(195px,1.13fr);
+  align-items:center;gap:10px;min-height:270px}
+body[data-theme] .energy-board-sources,body[data-theme] .source-wires{display:grid;
+  grid-template-rows:repeat(2,minmax(0,1fr));gap:13px;height:100%;align-content:center}
+body[data-theme] .energy-board-sinks,body[data-theme] .sink-wires{display:grid;
+  grid-template-rows:repeat(3,minmax(0,1fr));gap:10px;height:100%;align-content:center}
+body[data-theme] .energy-board-source,body[data-theme] .energy-board-node{min-width:0;
+  border:1px solid var(--ux-line);background:var(--ux-subtle);color:var(--ux-title);
+  border-radius:16px;padding:13px 14px;display:flex;align-items:center;gap:11px;
+  text-align:left;font:inherit;cursor:pointer;transition:transform .17s ease,box-shadow .17s ease}
+body[data-theme] .energy-board-source{background:linear-gradient(115deg,var(--ux-solar-bg),var(--ux-surface));
+  border-color:var(--ux-solar-line)}
+body[data-theme] .energy-board-source.is-dimmed{opacity:.54}
+body[data-theme] .energy-board-source-icon{font-size:28px;color:var(--ux-solar);
+  width:40px;text-align:center;flex:none}
+body[data-theme] .energy-board-source-text{display:flex;flex-direction:column;gap:4px;min-width:0}
+body[data-theme] .energy-board-source-text small{font-size:11px;color:var(--ux-muted)}
+body[data-theme] .energy-board-source-text strong{font-size:20px;color:var(--ux-title)}
+body[data-theme] .energy-board-source-text span{font-size:10px;line-height:1.4;color:var(--ux-muted)}
+body[data-theme] .energy-board-node{display:grid;grid-template-columns:34px 1fr auto;
+  grid-template-rows:auto auto;gap:2px 9px;background:var(--ux-subtle)}
+body[data-theme] .energy-board-node-icon{grid-row:1/3;font-size:25px;color:var(--ux-accent)}
+body[data-theme] .energy-board-node-name{grid-column:2;font-weight:750;font-size:12px}
+body[data-theme] .energy-board-node-value{grid-column:3;grid-row:1/3;font-size:18px;white-space:nowrap}
+body[data-theme] .energy-board-node-detail{grid-column:2;font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-node-note{grid-column:2/4;color:var(--ux-muted);
+  font-size:10px;line-height:1.4}
+body[data-theme] .energy-board-house{border-color:var(--ux-load-line);background:var(--ux-load-bg)}
+body[data-theme] .energy-board-battery{border-color:var(--ux-battery-line);background:var(--ux-battery-bg)}
+body[data-theme] .energy-board-grid{border-color:var(--ux-grid-line);background:var(--ux-grid-bg)}
+body[data-theme] .energy-board-house .energy-board-node-icon{color:var(--ux-load)}
+body[data-theme] .energy-board-battery .energy-board-node-icon{color:var(--ux-battery)}
+body[data-theme] .energy-board-grid .energy-board-node-icon{color:var(--ux-grid)}
+body[data-theme] .energy-board-source:hover,body[data-theme] .energy-board-node:hover{
+  transform:translateY(-2px);box-shadow:0 8px 18px rgba(50,90,155,.12)}
+body[data-theme] .energy-board-source.is-focused,body[data-theme] .energy-board-node.is-focused{
+  outline:2px solid var(--ux-accent);outline-offset:2px;box-shadow:0 0 0 4px var(--ux-raised)}
+body[data-theme] .energy-board-hub{display:flex;flex-direction:column;align-items:center;
+  text-align:center;justify-content:center;gap:9px;border-radius:25px;padding:20px 11px;
+  min-height:175px;background:linear-gradient(152deg,var(--ux-battery-bg),var(--ux-raised));
+  border:2px solid var(--ux-battery-line);box-shadow:0 12px 32px rgba(24,150,117,.08)}
+body[data-theme] .energy-board-hub-icon{width:62px;height:62px;display:grid;place-items:center;
+  font-size:33px;border-radius:50%;color:var(--ux-battery);
+  background:var(--ux-surface);box-shadow:0 0 0 9px rgba(45,185,135,.1)}
+body[data-theme] .energy-board-hub strong{color:var(--ux-title);font-size:12px;letter-spacing:.04em}
+body[data-theme] .energy-board-hub small{color:var(--ux-battery);font-size:11px;font-weight:800}
+body[data-theme] .energy-board-hub-note{color:var(--ux-muted);font-size:10px;line-height:1.4}
+body[data-theme] .energy-board-wire{position:relative;min-height:55px;display:flex;
+  align-items:center;justify-content:center;flex-direction:column;gap:4px;color:var(--ux-muted)}
+body[data-theme] .energy-board-wire:before{content:"";position:absolute;left:0;right:0;top:53%;
+  border-top:3px solid var(--ux-line);border-radius:3px}
+body[data-theme] .energy-board-wire.has-flow:before{border-color:var(--ux-accent)}
+body[data-theme] .energy-board-wire.wire-solar1.has-flow:before,
+body[data-theme] .energy-board-wire.wire-solar2.has-flow:before{border-color:var(--ux-solar)}
+body[data-theme] .energy-board-wire.wire-battery.has-flow:before{border-color:var(--ux-battery)}
+body[data-theme] .energy-board-wire.wire-house.has-flow:before{border-color:var(--ux-load)}
+body[data-theme] .energy-board-wire.wire-grid.has-flow:before{border-color:var(--ux-grid)}
+body[data-theme] .energy-board-wire-title{font-size:10px;text-align:center;color:var(--ux-muted);
+  padding:3px 5px;background:var(--ux-surface);z-index:1;border-radius:6px;white-space:nowrap}
+body[data-theme] .energy-board-direction{font-size:24px;line-height:1;color:var(--ux-accent);
+  background:var(--ux-surface);z-index:1;padding:0 5px;font-weight:900}
+body[data-theme] .energy-board-wire.no-flow .energy-board-direction{color:var(--ux-muted)}
+body[data-theme] .energy-board-wire.is-highlight:before{border-width:5px;
+  box-shadow:0 0 12px rgba(75,140,225,.27)}
+body[data-theme] .energy-board-foot{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+  gap:14px;margin-top:17px}
+body[data-theme] .energy-board-inspector{background:var(--ux-subtle);border:1px solid var(--ux-line);
+  border-radius:14px;padding:13px 16px;min-height:66px;display:flex;flex-direction:column;gap:6px}
+body[data-theme] .energy-board-inspector-title{color:var(--ux-title);font-size:13px}
+body[data-theme] .energy-board-inspector-description{color:var(--ux-muted);font-size:11px;
+  line-height:1.45;margin:0}
+body[data-theme] .energy-board-inspector-timestamp{color:var(--ux-muted);font-size:10px}
+body[data-theme] .energy-board-disclaimer{font-size:10px;line-height:1.55;color:var(--ux-muted);
+  margin:0;align-self:center}
+body[data-theme] .energy-board.is-live .energy-board-wire.has-flow:after{
+  content:"";position:absolute;top:calc(53% - 3px);left:0;width:7px;height:7px;
+  border-radius:50%;background:var(--ux-accent);animation:energy-dot 1.8s linear infinite}
+@keyframes energy-dot{from{left:0}to{left:calc(100% - 7px)}}
+/* The SSR board has no invented arrows or battery power: only real initial MySQL values. */
+body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:minmax(0,1fr) minmax(0,.75fr) minmax(0,1fr)}
+body[data-theme] .energy-board-ssr .energy-board-sources,body[data-theme] .energy-board-ssr .energy-board-sinks{
+  display:flex;flex-direction:column;gap:9px}
+body[data-theme] .energy-board-ssr .energy-board-source,
+body[data-theme] .energy-board-ssr .energy-board-node{cursor:default}
+body[data-theme] .energy-board-ssr .energy-board-node{display:flex;justify-content:space-between;min-height:50px}
+body[data-theme] .energy-board-ssr .energy-board-node small{font-size:11px;color:var(--ux-muted)}
+@media(max-width:1180px){
+ body[data-theme] .energy-board-map{grid-template-columns:minmax(165px,1fr) minmax(33px,.16fr)
+  minmax(125px,.7fr) minmax(33px,.16fr) minmax(165px,1fr);gap:6px}
+ body[data-theme] .energy-board-node{padding:10px 9px;grid-template-columns:25px 1fr auto}
+ body[data-theme] .energy-board-source{padding:10px}
+ body[data-theme] .energy-board-hub{min-height:150px}
+ body[data-theme] .energy-board-direction{font-size:19px}
+}
+@media(max-width:960px){
+ body[data-theme] .energy-board-map{display:grid;grid-template-columns:minmax(0,1fr) minmax(35px,.16fr) minmax(0,1fr);
+  gap:8px}
+ body[data-theme] .energy-board-sources{grid-column:1;grid-row:1}
+ body[data-theme] .source-wires{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board-hub{grid-column:3;grid-row:1}
+ body[data-theme] .sink-wires{grid-column:2;grid-row:2;transform:rotate(180deg)}
+ body[data-theme] .energy-board-sinks{grid-column:1;grid-row:2}
+ body[data-theme] .energy-board-foot{grid-template-columns:1fr}
+ body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:1fr 1fr}
+ body[data-theme] .energy-board-ssr .energy-board-hub{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-column:1/3;grid-row:2;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board{padding:16px 13px}
+ body[data-theme] .energy-board-header{gap:9px}
+ body[data-theme] .energy-board-flags{align-items:flex-start}
+ body[data-theme] .energy-board-map{grid-template-columns:1fr;gap:9px}
+ body[data-theme] .energy-board-sources,body[data-theme] .energy-board-hub,
+ body[data-theme] .energy-board-sinks,body[data-theme] .source-wires,body[data-theme] .sink-wires{
+   grid-column:1;grid-row:auto;transform:none}
+ body[data-theme] .energy-board-wires{display:none}
+ body[data-theme] .energy-board-sources{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+ body[data-theme] .energy-board-source{min-height:92px;align-items:flex-start}
+ body[data-theme] .energy-board-source-icon{font-size:22px;width:27px}
+ body[data-theme] .energy-board-source-text strong{font-size:16px}
+ body[data-theme] .energy-board-source-text span{font-size:9px}
+ body[data-theme] .energy-board-hub{min-height:86px;gap:3px;padding:8px}
+ body[data-theme] .energy-board-hub-icon{width:35px;height:35px;font-size:19px}
+ body[data-theme] .energy-board-hub-note{display:none}
+ body[data-theme] .energy-board-sinks{display:grid;grid-template-columns:1fr;gap:7px}
+ body[data-theme] .energy-board-node{padding:11px}
+ body[data-theme] .energy-board-modes{width:100%;justify-content:center}
+ body[data-theme] .energy-board-mode{flex:1;padding:8px 5px}
+ body[data-theme] .energy-board-ssr .energy-board-map{grid-template-columns:1fr}
+ body[data-theme] .energy-board-ssr .energy-board-hub,
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-column:1;grid-row:auto}
+ body[data-theme] .energy-board-ssr .energy-board-sinks{grid-template-columns:1fr}
+}
+@media(prefers-reduced-motion:reduce){body[data-theme] .energy-board-wire:after{animation:none!important}
+ body[data-theme] .energy-board-source,body[data-theme] .energy-board-node{transition:none!important;transform:none!important}}
+
+
+/* UX6: two independent PV inputs and exactly one common load/grid/battery. */
+body[data-theme] .energy-board-context{
+ font-size:12px;line-height:1.6;font-weight:600;color:var(--ux-muted);
+ background:var(--ux-subtle);border:1px solid var(--ux-line);
+ border-radius:12px;padding:10px 13px;margin-bottom:13px}
+body[data-theme] .energy-board-node.is-shared{
+ position:relative;min-height:79px;padding:13px 13px 12px}
+body[data-theme] .energy-board-shared-tag{
+ grid-column:2/4;color:var(--ux-accent);font-size:9px;
+ font-weight:800;letter-spacing:.055em;line-height:1.3}
+body[data-theme] .energy-board-node-note{
+ grid-column:2/4;color:var(--ux-muted);font-size:10px;line-height:1.35}
+body[data-theme] .energy-board-node-name{font-size:13px}
+body[data-theme] .energy-board-node-value{font-size:19px}
+body[data-theme] .energy-board-direction{min-width:28px;text-align:center;
+ border-radius:999px;padding:2px 5px;background:var(--ux-surface);font-size:26px}
+body[data-theme] .energy-board-wire-title{font-size:11px;font-weight:750}
+body[data-theme] .energy-board-legend{display:flex;flex-wrap:wrap;
+ gap:7px 15px;margin:14px 0 0;padding:12px 14px;
+ border:1px solid var(--ux-line);border-radius:12px;
+ background:var(--ux-subtle)}
+body[data-theme] .energy-board-legend-key{font-size:11px;
+ font-weight:650;color:var(--ux-muted)}
+body[data-theme] .energy-board-foot{margin-top:12px}
+body[data-theme] .energy-board-source:focus-visible,
+body[data-theme] .energy-board-node:focus-visible,
+body[data-theme] .energy-board-mode:focus-visible{
+ outline:3px solid var(--ux-accent);outline-offset:3px}
+@media(max-width:1180px){
+ body[data-theme] .energy-board-node.is-shared{padding:10px}
+ body[data-theme] .energy-board-node-value{font-size:16px}
+}
+@media(max-width:960px){
+ body[data-theme] .energy-board-node.is-shared{padding:12px}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board-wires{
+  display:flex!important;flex-direction:row;align-items:center;
+  justify-content:space-evenly;gap:10px;grid-column:1;
+  grid-row:auto;min-height:44px;height:auto;transform:none}
+ body[data-theme] .energy-board-wire{
+  flex:1;min-width:0;min-height:43px;max-height:none}
+ body[data-theme] .energy-board-wire::before{display:none}
+ body[data-theme] .energy-board-sources{grid-template-rows:none}
+ body[data-theme] .energy-board-source,
+ body[data-theme] .energy-board-node{min-width:0}
+ body[data-theme] .energy-board-legend{gap:8px;margin-top:10px}
+ body[data-theme] .energy-board-legend-key{font-size:10px}
+}
+
+/* Motion is permitted ONLY by the existing is-live gate and follows EACH arrow's direction. */
+@keyframes energy-dot-reverse{from{left:calc(100% - 8px)}to{left:0}}
+body[data-theme] .energy-board.is-live .energy-board-wire.has-flow.is-reverse::after{
+ animation-name:energy-dot-reverse}
+@media(max-width:600px){
+ body[data-theme] .energy-board-sources{grid-template-rows:none}
+ body[data-theme] .energy-board.is-live .energy-board-wire::after{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board.is-live .energy-board-wire::after{animation:none!important;display:none!important}
+}
+
+
+/* RAKURS STREAM UX: continuous directions, accessible interaction, illustrative archive motion.
+   The archive label stays visible while particles move; animation never means real-time. */
+body[data-theme] .energy-board{
+ --flow-duration:2s;
+ background:radial-gradient(circle at 49% 51%,rgba(89,207,177,.055),transparent 35%),
+   var(--ux-surface);
+ overflow:hidden}
+body[data-theme] .energy-board.speed-slow{--flow-duration:3.7s}
+body[data-theme] .energy-board.speed-fast{--flow-duration:1.1s}
+body[data-theme] .energy-board-heading p{font-size:13px;line-height:1.55}
+body[data-theme] .energy-board-toolbar{
+ display:flex;align-items:center;justify-content:flex-end;flex-wrap:wrap;
+ gap:8px 10px;margin:-1px 0 11px}
+body[data-theme] .energy-board-visual-label{
+ color:var(--ux-muted);font-weight:650;font-size:11px;margin-right:auto}
+body[data-theme] .energy-board-motion,
+body[data-theme] .energy-board-speed{
+ appearance:none;min-height:37px;padding:8px 12px;
+ border-radius:11px;border:1px solid var(--ux-line);
+ background:var(--ux-subtle);color:var(--ux-title);
+ font:inherit;font-size:11px;font-weight:760;cursor:pointer;
+ transition:background .2s ease,transform .2s ease,border-color .2s ease}
+body[data-theme] .energy-board-motion:hover,
+body[data-theme] .energy-board-speed:hover{
+ border-color:var(--ux-accent);background:var(--ux-raised);transform:translateY(-1px)}
+body[data-theme] .energy-board-motion[aria-pressed=true]{
+ border-color:var(--ux-battery-line);background:var(--ux-battery-bg);color:var(--ux-battery)}
+body[data-theme] .energy-board-context{
+ font-size:11px;font-weight:600;line-height:1.5;padding:10px 13px;
+ margin:0 0 11px;background:var(--ux-subtle);border-radius:12px}
+body[data-theme] .energy-board-map{
+ grid-template-columns:minmax(180px,1.18fr) minmax(77px,.31fr)
+ minmax(156px,.83fr) minmax(77px,.31fr) minmax(190px,1.16fr);
+ gap:10px;min-height:265px}
+body[data-theme] .energy-board .energy-board-wire{
+ --stream-color:var(--ux-accent);
+ position:relative;width:100%;height:100%;min-height:74px;
+ padding:0 1px;border:0;background:transparent;
+ display:block;cursor:pointer;font:inherit;color:var(--ux-ink);
+ isolation:isolate;overflow:visible}
+body[data-theme] .energy-board .energy-board-wire.wire-solar1,
+body[data-theme] .energy-board .energy-board-wire.wire-solar2{--stream-color:var(--ux-solar)}
+body[data-theme] .energy-board .energy-board-wire.wire-house{--stream-color:var(--ux-load)}
+body[data-theme] .energy-board .energy-board-wire.wire-battery{--stream-color:var(--ux-battery)}
+body[data-theme] .energy-board .energy-board-wire.wire-grid{--stream-color:var(--ux-grid)}
+body[data-theme] .energy-board .energy-board-wire::before,
+body[data-theme] .energy-board .energy-board-wire::after{
+ content:none!important;border:0!important;animation:none!important}
+body[data-theme] .energy-board .energy-board-wire-title{
+ position:absolute;left:50%;top:14%;transform:translateX(-50%);
+ width:max-content;max-width:150px;
+ display:block;text-align:center;white-space:normal;font-size:11px;
+ font-weight:740;line-height:1.3;padding:2px 5px;
+ background:var(--ux-surface);color:var(--ux-muted);
+ border-radius:7px;z-index:3}
+body[data-theme] .energy-board-flow-track{
+ position:absolute;left:0;right:0;top:58%;height:7px;
+ border-radius:999px;display:block;z-index:1;
+ background:var(--stream-color);
+ box-shadow:0 0 0 3px color-mix(in srgb,var(--stream-color) 12%,transparent),
+   0 0 15px color-mix(in srgb,var(--stream-color) 20%,transparent);
+ pointer-events:none;transition:height .2s ease,box-shadow .2s ease}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-track{
+ height:4px;background:repeating-linear-gradient(90deg,var(--ux-line) 0 9px,transparent 9px 16px);
+ box-shadow:none}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-wire-title{
+ color:var(--ux-muted)}
+body[data-theme] .energy-board-flow-head{
+ position:absolute;top:50%;width:19px;height:19px;
+ background:var(--stream-color);clip-path:polygon(0 0,100% 50%,0 100%);
+ transform:translateY(-50%);
+ filter:drop-shadow(0 0 5px var(--stream-color));
+ right:-2px}
+body[data-theme] .energy-board-wire.is-reverse .energy-board-flow-head{
+ right:auto;left:-2px;transform:translateY(-50%) rotate(180deg)}
+body[data-theme] .energy-board .energy-board-direction{
+ font-size:0;position:absolute;top:58%;left:50%;
+ transform:translate(-50%,-50%);z-index:2;
+ width:1px;height:1px;padding:0;background:transparent;line-height:0}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-direction{
+ font-size:18px;line-height:1;color:var(--ux-muted);
+ width:26px;height:25px;display:grid;place-items:center;
+ border-radius:50%;background:var(--ux-surface)}
+body[data-theme] .energy-board-flow-particle{
+ --particle-delay:0s;
+ position:absolute;top:50%;left:0;width:9px;height:9px;
+ border:2px solid var(--ux-surface);border-radius:50%;
+ transform:translateY(-50%);background:var(--stream-color);
+ box-shadow:0 0 9px 2px var(--stream-color);
+ opacity:0;pointer-events:none}
+body[data-theme] .energy-board-flow-particle:nth-child(2){--particle-delay:-.66s}
+body[data-theme] .energy-board-flow-particle:nth-child(3){--particle-delay:-1.33s}
+body[data-theme] .energy-board-flow-particle:nth-child(4){--particle-delay:-.33s}
+body[data-theme] .energy-board.is-animated .energy-board-wire.has-flow .energy-board-flow-particle{
+ animation:rakurs-stream var(--flow-duration) linear var(--particle-delay) infinite}
+body[data-theme] .energy-board.is-animated .energy-board-wire.has-flow.is-reverse .energy-board-flow-particle{
+ animation-name:rakurs-stream-reverse}
+body[data-theme] .energy-board.is-paused .energy-board-flow-particle{display:none}
+@keyframes rakurs-stream{
+ 0%{left:0;opacity:0;transform:translateY(-50%) scale(.55)}
+ 12%{opacity:1}88%{opacity:1}
+ 100%{left:calc(100% - 8px);opacity:0;transform:translateY(-50%) scale(1)}
+}
+@keyframes rakurs-stream-reverse{
+ 0%{left:calc(100% - 8px);opacity:0;transform:translateY(-50%) scale(.55)}
+ 12%{opacity:1}88%{opacity:1}
+ 100%{left:0;opacity:0;transform:translateY(-50%) scale(1)}
+}
+body[data-theme] .energy-board .energy-board-wire.has-flow:hover .energy-board-flow-track,
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-flow-track{
+ height:10px;box-shadow:0 0 0 4px color-mix(in srgb,var(--stream-color) 19%,transparent),
+  0 0 20px color-mix(in srgb,var(--stream-color) 38%,transparent)}
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-wire-title{
+ color:var(--ux-title);font-weight:830}
+body[data-theme] .energy-board .energy-board-wire:focus-visible{
+ outline:3px solid var(--ux-accent);outline-offset:4px;border-radius:12px}
+body[data-theme] .energy-board-node{
+ min-height:83px;padding:13px;gap:3px 8px;
+ transition:transform .2s ease,box-shadow .2s ease,border-color .2s ease}
+body[data-theme] .energy-board-node-name{font-size:14px}
+body[data-theme] .energy-board-node-value{font-size:21px}
+body[data-theme] .energy-board-node-note{font-size:10px;color:var(--ux-muted)}
+body[data-theme] .energy-board-node-detail{font-size:11px}
+body[data-theme] .energy-board-node:active,
+body[data-theme] .energy-board-source:active{transform:scale(.985)}
+body[data-theme] .energy-board.is-animated .energy-board-hub-icon{
+ animation:rakurs-hub-glow 3s ease-in-out infinite}
+@keyframes rakurs-hub-glow{
+ 0%,100%{box-shadow:0 0 0 8px rgba(45,185,135,.1)}
+ 50%{box-shadow:0 0 0 14px rgba(45,185,135,.18)}
+}
+body[data-theme] .energy-board.is-animated .energy-board-source-icon{
+ animation:rakurs-solar-breathe 3.2s ease-in-out infinite}
+@keyframes rakurs-solar-breathe{
+ 0%,100%{transform:scale(1);opacity:.85}
+ 50%{transform:scale(1.13);opacity:1}
+}
+body[data-theme] .energy-board-legend{
+ display:flex;align-items:center;justify-content:space-evenly;
+ gap:12px;flex-wrap:wrap;background:var(--ux-subtle);
+ padding:10px 14px;margin:13px 0 0;border:1px solid var(--ux-line)}
+body[data-theme] .energy-board-legend-key{font-size:11px;color:var(--ux-muted);font-weight:750}
+body[data-theme] .energy-board-inspector{transition:box-shadow .2s ease}
+body[data-theme] .energy-board-foot{gap:9px;margin-top:10px}
+body[data-theme] .energy-board-disclaimer{font-size:10px;line-height:1.45}
+@media(max-width:1180px){
+ body[data-theme] .energy-board-map{
+   grid-template-columns:minmax(165px,1fr) minmax(70px,.27fr)
+   minmax(135px,.72fr) minmax(70px,.27fr) minmax(165px,1fr)}
+ body[data-theme] .energy-board-wire-title{font-size:10px}
+}
+@media(max-width:960px){
+ body[data-theme] .energy-board-map{
+  grid-template-columns:minmax(0,1fr) minmax(50px,.18fr) minmax(0,1fr);
+  gap:8px}
+ body[data-theme] .energy-board-flow-track{top:58%}
+ body[data-theme] .sink-wires{transform:none}
+ body[data-theme] .energy-board-source,
+ body[data-theme] .energy-board-node{padding:11px}
+ body[data-theme] .energy-board-toolbar{justify-content:flex-start}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board-map{display:flex;flex-direction:column;align-items:stretch;gap:10px}
+ body[data-theme] .energy-board-sources{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;height:auto}
+ body[data-theme] .energy-board-hub{min-height:90px}
+ body[data-theme] .energy-board-sinks{display:grid;grid-template-columns:1fr;gap:8px;height:auto}
+ body[data-theme] .energy-board-wires{display:grid!important;
+   grid-template-columns:repeat(2,minmax(0,1fr));
+   gap:10px;width:100%;height:auto;min-height:40px;transform:none}
+ body[data-theme] .energy-board-wires.sink-wires{grid-template-columns:repeat(3,minmax(0,1fr))}
+ body[data-theme] .energy-board .energy-board-wire{
+   min-height:53px;max-height:none;height:53px;transform:none}
+ body[data-theme] .energy-board .energy-board-wire-title{
+   font-size:10px;top:5%;max-width:100%;white-space:nowrap}
+ body[data-theme] .energy-board .energy-board-flow-track{top:71%}
+ body[data-theme] .energy-board .energy-board-direction{top:71%}
+ body[data-theme] .energy-board-visual-label{flex-basis:100%;font-size:11px}
+ body[data-theme] .energy-board-motion,body[data-theme] .energy-board-speed{flex:1}
+ body[data-theme] .energy-board-node-name{font-size:13px}
+ body[data-theme] .energy-board-node-value{font-size:18px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-flow-particle{animation:none!important;display:none!important}
+ body[data-theme] .energy-board .energy-board-hub-icon,
+ body[data-theme] .energy-board .energy-board-source-icon{animation:none!important}
+ body[data-theme] .energy-board .energy-board-wire,
+ body[data-theme] .energy-board .energy-board-node,
+ body[data-theme] .energy-board .energy-board-source{transition:none!important}
+}
+
+
+/* MOBILE V5: each output branch keeps its wire physically attached to its node.
+   Layout is responsive topology, not five unrelated flex blocks. */
+
+/* Desktop: preserve the original five-column bus with three aligned outputs. */
+body[data-theme] .energy-board-map{
+  grid-template-rows:repeat(3,minmax(76px,auto));align-items:stretch}
+body[data-theme] .energy-board-sources{
+  grid-column:1;grid-row:1/4;min-height:0}
+body[data-theme] .source-wires{
+  grid-column:2;grid-row:1/4;min-height:0}
+body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  grid-column:3;grid-row:1/4}
+body[data-theme] .energy-board-outputs,
+body[data-theme] .energy-board-output-row{display:contents}
+body[data-theme] .energy-board-output-row.output-house>.energy-board-wire{
+  grid-column:4;grid-row:1}
+body[data-theme] .energy-board-output-row.output-house>.energy-board-node{
+  grid-column:5;grid-row:1}
+body[data-theme] .energy-board-output-row.output-battery>.energy-board-wire{
+  grid-column:4;grid-row:2}
+body[data-theme] .energy-board-output-row.output-battery>.energy-board-node{
+  grid-column:5;grid-row:2}
+body[data-theme] .energy-board-output-row.output-grid>.energy-board-wire{
+  grid-column:4;grid-row:3}
+body[data-theme] .energy-board-output-row.output-grid>.energy-board-node{
+  grid-column:5;grid-row:3}
+body[data-theme] .energy-board-ssr .energy-board-map{
+  grid-template-rows:auto}
+@media(min-width:601px) and (max-width:960px){
+ body[data-theme] .energy-board-map{
+   grid-template-rows:repeat(4,minmax(78px,auto));align-items:stretch}
+ body[data-theme] .energy-board-sources{grid-column:1;grid-row:1}
+ body[data-theme] .source-wires{grid-column:2;grid-row:1}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+   grid-column:3;grid-row:1}
+ body[data-theme] .energy-board-output-row.output-house>.energy-board-wire{
+   grid-column:2;grid-row:2}
+ body[data-theme] .energy-board-output-row.output-house>.energy-board-node{
+   grid-column:1;grid-row:2}
+ body[data-theme] .energy-board-output-row.output-battery>.energy-board-wire{
+   grid-column:2;grid-row:3}
+ body[data-theme] .energy-board-output-row.output-battery>.energy-board-node{
+   grid-column:1;grid-row:3}
+ body[data-theme] .energy-board-output-row.output-grid>.energy-board-wire{
+   grid-column:2;grid-row:4}
+ body[data-theme] .energy-board-output-row.output-grid>.energy-board-node{
+   grid-column:1;grid-row:4}
+}
+@media(max-width:600px){
+ /* Reset inherited 100% heights and implicit multi-row wire grids,
+    the cause of the large empty spaces on a 360px Android viewport. */
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-map{
+   display:flex!important;flex-direction:column!important;
+   align-items:stretch!important;justify-content:flex-start!important;
+   grid-template-columns:none!important;grid-template-rows:none!important;
+   gap:0!important;min-height:0!important;height:auto!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-sources{
+   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+   grid-template-rows:minmax(0,1fr)!important;
+   gap:8px!important;width:100%;height:auto!important;min-height:0!important;
+   flex:none!important;align-content:stretch!important}
+ body[data-theme] .energy-board .energy-board-source{
+   height:auto;min-height:94px;padding:10px 8px;gap:7px;
+   border-radius:14px;align-items:flex-start}
+ body[data-theme] .energy-board .energy-board-source-icon{
+   width:24px;flex:none;font-size:22px}
+ body[data-theme] .energy-board .energy-board-source-text small{
+   font-size:10px;line-height:1.35}
+ body[data-theme] .energy-board .energy-board-source-text strong{
+   font-size:clamp(15px,4.5vw,18px);line-height:1.3}
+ body[data-theme] .energy-board .energy-board-source-text span{
+   font-size:9px;line-height:1.35}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .source-wires{
+   display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;
+   grid-template-rows:48px!important;align-content:start!important;
+   gap:8px!important;width:100%;height:48px!important;
+   min-height:0!important;max-height:48px!important;
+   flex:none!important;padding:0!important;margin:0!important;
+   transform:none!important}
+ body[data-theme] .energy-board .source-wires .energy-board-wire{
+   min-height:0!important;max-height:48px!important;
+   height:48px!important;width:100%!important;min-width:0!important;
+   margin:0!important;padding:0!important}
+ body[data-theme] .energy-board .source-wires .energy-board-wire-title{
+   display:none!important}
+ /* Turn only the two PV connections vertically toward the inverter bus. */
+ body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+   position:absolute!important;top:6px!important;left:50%!important;
+   right:auto!important;bottom:auto!important;
+   width:6px!important;height:34px!important;transform:translateX(-50%)!important;
+   border-radius:999px}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-head{
+   position:absolute!important;left:50%!important;right:auto!important;
+   top:auto!important;bottom:-3px!important;
+   width:17px;height:15px;
+   transform:translateX(-50%)!important;
+   clip-path:polygon(0 0,100% 0,50% 100%)}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-particle{
+   position:absolute;top:0;left:50%;
+   transform:translate(-50%,-50%);width:9px;height:9px}
+ body[data-theme] .energy-board.is-animated .source-wires
+   .energy-board-wire.has-flow .energy-board-flow-particle{
+   animation-name:rakurs-stream-down!important}
+ @keyframes rakurs-stream-down{
+   0%{top:0;opacity:0;transform:translate(-50%,-50%) scale(.55)}
+   12%{opacity:1}88%{opacity:1}
+   100%{top:calc(100% - 7px);opacity:0;transform:translate(-50%,-50%) scale(1)}
+ }
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+   position:relative;width:100%;min-height:78px!important;
+   height:auto!important;max-height:none!important;
+   padding:12px!important;gap:5px!important;
+   border-radius:17px;margin:0 0 13px!important;flex:none!important;
+   box-sizing:border-box}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub::after{
+   content:"";position:absolute;left:50%;bottom:-14px;
+   width:3px;height:14px;background:var(--ux-line);transform:translateX(-50%)}
+ body[data-theme] .energy-board-hub-icon{
+   width:38px!important;height:38px!important;font-size:20px!important}
+ body[data-theme] .energy-board-hub strong{
+   font-size:12px;line-height:1.3}
+ body[data-theme] .energy-board-hub small{font-size:10px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs{
+   position:relative;display:flex!important;flex-direction:column!important;
+   gap:9px;width:100%;min-width:0;
+   box-sizing:border-box;padding:13px 0 0 27px!important;
+   margin:0!important;flex:none!important}
+ /* One trunk fed by the inverter bus, three independent horizontal branches. */
+ body[data-theme] .energy-board-outputs::before{
+   content:"";position:absolute;left:10px;top:0;bottom:40px;
+   width:3px;border-radius:4px;background:var(--ux-line)}
+ body[data-theme] .energy-board-outputs::after{
+   content:"";position:absolute;left:10px;top:0;
+   width:calc(50% - 10px);height:3px;background:var(--ux-line)}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+   position:relative;display:grid!important;
+   grid-template-columns:clamp(53px,19vw,68px) minmax(0,1fr)!important;
+   gap:7px;align-items:center;width:100%;min-width:0;min-height:76px}
+ body[data-theme] .energy-board-output-row::before{
+   content:"";position:absolute;left:-17px;top:50%;
+   width:17px;height:3px;background:var(--ux-line);border-radius:4px}
+ body[data-theme] .energy-board-output-row.output-house::before{background:var(--ux-load)}
+ body[data-theme] .energy-board-output-row.output-battery::before{background:var(--ux-battery)}
+ body[data-theme] .energy-board-output-row.output-grid::before{background:var(--ux-grid)}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+   position:relative;grid-column:1!important;grid-row:1!important;
+   min-height:70px!important;height:70px!important;max-height:70px!important;
+   width:100%!important;margin:0!important;padding:0!important;transform:none!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+   grid-column:2!important;grid-row:1!important;
+   min-width:0;min-height:76px;padding:10px;
+   border-radius:14px;gap:3px 7px;
+   grid-template-columns:24px minmax(0,1fr) auto}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-icon{
+   font-size:20px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-name{
+   font-size:13px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+   font-size:clamp(15px,4vw,18px)}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-detail{
+   font-size:10px}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-note{
+   font-size:9px;line-height:1.3;overflow-wrap:anywhere}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-wire-title{
+   top:8px!important;left:50%!important;transform:translateX(-50%)!important;
+   font-size:9px!important;line-height:1.2!important;
+   white-space:normal!important;max-width:100%!important;
+   padding:1px 2px!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-track{
+   top:61%!important;left:0!important;right:0!important;
+   height:6px!important;width:auto!important;transform:none!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-direction{
+   top:61%!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-wire.no-flow
+   .energy-board-flow-track{height:4px!important}
+ body[data-theme] .energy-board-legend{margin-top:9px}
+ body[data-theme] .energy-board-foot{margin-top:9px}
+}
+@media(max-width:390px){
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-note{
+   display:none}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+   font-size:15px}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board.is-animated .source-wires
+  .energy-board-flow-particle{display:none!important;animation:none!important}
+}
+
+/* CLEAN V6: no explanatory paragraphs, legends, flow captions or repeated data notes. */
+body[data-theme] .energy-board-topbar{
+ display:flex;align-items:center;justify-content:space-between;
+ flex-wrap:wrap;gap:9px 14px;margin:0 0 11px}
+body[data-theme] .energy-board-topbar .energy-board-modes{
+ margin:0;order:0}
+body[data-theme] .energy-board-topbar .energy-board-flags{
+ display:flex;align-items:center;justify-content:flex-end;
+ flex-direction:row;gap:8px;order:1;margin:0}
+body[data-theme] .energy-board-topbar .energy-board-date{
+ color:var(--ux-muted);font-size:10px}
+body[data-theme] .energy-board-topbar .energy-board-toolbar{
+ order:2;display:flex;align-items:center;justify-content:flex-end;
+ flex-wrap:nowrap;gap:7px;margin:0;padding:0}
+body[data-theme] .energy-board-topbar .energy-board-motion,
+body[data-theme] .energy-board-topbar .energy-board-speed{
+ width:38px;min-width:38px;height:37px;min-height:37px;
+ display:grid;place-items:center;padding:5px 7px;
+ font-size:13px;border-radius:10px;flex:none}
+body[data-theme] .energy-board-topbar .energy-board-speed{width:48px;min-width:48px}
+body[data-theme] .energy-board .energy-board-wire-title,
+body[data-theme] .energy-board .energy-board-hub-note,
+body[data-theme] .energy-board .energy-board-legend,
+body[data-theme] .energy-board .energy-board-context,
+body[data-theme] .energy-board .energy-board-disclaimer{display:none!important}
+body[data-theme] .energy-board .energy-board-source-text{gap:5px}
+body[data-theme] .energy-board .energy-board-source-text span{display:none!important}
+body[data-theme] .energy-board .energy-board-node-detail:empty{display:none!important}
+body[data-theme] .energy-board .energy-board-node-note{display:none!important}
+body[data-theme] .energy-board .energy-board-inspector[hidden]{display:none!important}
+body[data-theme] .energy-board .energy-board-inspector{
+ position:relative;margin-top:11px;padding:14px 44px 14px 15px;
+ border-radius:14px;border:1px solid var(--ux-line);background:var(--ux-subtle);
+ box-shadow:none;max-width:100%;min-height:0}
+body[data-theme] .energy-board .energy-board-inspector-close{
+ appearance:none;position:absolute;right:11px;top:11px;
+ display:grid;place-items:center;width:29px;height:29px;
+ border:1px solid var(--ux-line);border-radius:8px;
+ background:var(--ux-surface);color:var(--ux-title);
+ font-size:14px;cursor:pointer}
+body[data-theme] .energy-board .energy-board-inspector-close:focus-visible{
+ outline:2px solid var(--ux-accent);outline-offset:2px}
+body[data-theme] .energy-board .energy-board-inspector-description{
+ font-size:11px;line-height:1.5}
+body[data-theme] .energy-board .energy-board-map{margin:0}
+body[data-theme] .energy-board .energy-board-hub{gap:8px}
+@media(max-width:850px){
+ body[data-theme] .energy-board-topbar{justify-content:space-between;gap:9px}
+ body[data-theme] .energy-board-topbar .energy-board-modes{width:100%;order:0}
+ body[data-theme] .energy-board-topbar .energy-board-flags{order:1}
+ body[data-theme] .energy-board-topbar .energy-board-toolbar{order:2}
+}
+@media(max-width:600px){
+ body[data-theme] .energy-board-topbar{gap:7px 9px;margin-bottom:9px}
+ body[data-theme] .energy-board-topbar .energy-board-modes{
+  display:flex;justify-content:stretch;margin:0;width:100%}
+ body[data-theme] .energy-board-topbar .energy-board-flags{
+  gap:6px;flex-wrap:wrap;justify-content:flex-start}
+ body[data-theme] .energy-board-topbar .energy-board-date{font-size:9px}
+ body[data-theme] .energy-board-topbar .energy-board-toolbar{margin-left:auto;gap:5px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+  min-height:69px;gap:6px}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+  min-height:62px!important;height:62px!important;max-height:62px!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+  min-height:69px;padding:9px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  gap:6px!important;margin-bottom:11px!important}
+}
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-inspector-close{transition:none!important}
+}
+
+/* Mobile V2: reduce empty space in the two PV cards without shrinking values. */
+@media(max-width:600px){
+  body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-sources{
+    grid-template-rows:min-content!important;grid-auto-rows:min-content!important;
+    align-items:start!important}
+  body[data-theme] .energy-board .energy-board-source{
+    height:auto!important;min-height:74px!important;max-height:none!important;
+    padding:8px 7px!important;gap:5px!important;
+    align-items:center!important}
+  body[data-theme] .energy-board .energy-board-source-icon{
+    width:22px!important;font-size:19px!important}
+  body[data-theme] .energy-board .energy-board-source-text{
+    gap:4px!important;min-width:0}
+  body[data-theme] .energy-board .energy-board-source-text small{
+    font-size:10px!important;line-height:1.28!important}
+  body[data-theme] .energy-board .energy-board-source-text strong{
+    font-size:clamp(15px,4.2vw,18px)!important;line-height:1.25!important}
+  body[data-theme] .energy-board:not(.energy-board-ssr) .source-wires{
+    grid-template-rows:37px!important;height:37px!important;
+    max-height:37px!important;min-height:0!important}
+  body[data-theme] .energy-board .source-wires .energy-board-wire{
+    height:37px!important;max-height:37px!important;min-height:0!important}
+  body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+    height:26px!important}
+}
+
+
+/* PREMIUM FLOW V3 — continuous physical connections, no disconnected color ticks.
+   Shared bus and branch lanes are deliberately quieter than data cards.
+   Read-only archival flow: animation does not imply live telemetry. */
+
+/* Improve the visual hierarchy while keeping both light/dark color tokens. */
+body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+ border-width:1px;
+ box-shadow:0 7px 22px rgba(24,150,117,.07)}
+body[data-theme] .energy-board .energy-board-source,
+body[data-theme] .energy-board .energy-board-node{
+ box-shadow:0 2px 9px rgba(18,45,76,.035);
+ transition:border-color .2s ease,box-shadow .2s ease,transform .2s ease}
+body[data-theme] .energy-board .energy-board-source:focus-visible,
+body[data-theme] .energy-board .energy-board-node:focus-visible,
+body[data-theme] .energy-board .energy-board-wire:focus-visible{
+ outline:2px solid var(--ux-accent);outline-offset:3px}
+body[data-theme] .energy-board .energy-board-flow-track{
+ height:4px;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 10%,transparent);
+ border-radius:999px}
+body[data-theme] .energy-board .energy-board-flow-head{
+ width:12px;height:12px;filter:none}
+body[data-theme] .energy-board .energy-board-flow-particle{
+ width:7px;height:7px;border:0;
+ background:var(--ux-surface);opacity:0;
+ box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 45%,transparent);
+}
+body[data-theme] .energy-board .energy-board-flow-particle:nth-child(3),
+body[data-theme] .energy-board .energy-board-flow-particle:nth-child(4){
+ display:none!important}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-track{
+ background:var(--ux-line);box-shadow:none;height:2px;opacity:.92}
+body[data-theme] .energy-board .energy-board-wire.no-flow .energy-board-flow-head{
+ display:none!important}
+body[data-theme] .energy-board .energy-board-direction{
+ display:none!important}
+body[data-theme] .energy-board .energy-board-wire.has-flow:hover .energy-board-flow-track,
+body[data-theme] .energy-board .energy-board-wire.is-highlight .energy-board-flow-track{
+ height:6px;box-shadow:0 0 0 3px color-mix(in srgb,var(--stream-color) 17%,transparent)}
+
+/* Mobile: one continuous common rail, with full-length branches ending at cards.
+   NO ::before short color stubs, NO dashed gray grid marks. */
+@media(max-width:600px){
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs{
+  --rail-left:12px;
+  --row-left:25px;
+  padding:12px 0 0 var(--row-left)!important;gap:9px!important;
+  margin:0!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs::before{
+  content:"";left:var(--rail-left);top:0;bottom:35px;
+  width:2px;border-radius:8px;
+  background:var(--ux-line);opacity:.8}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-outputs::after{
+  content:"";left:var(--rail-left);top:0;
+  width:calc(50% - var(--rail-left));height:2px;
+  background:var(--ux-line);opacity:.8}
+ body[data-theme] .energy-board .energy-board-output-row::before{
+  content:none!important;display:none!important}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-output-row{
+  grid-template-columns:clamp(40px,12vw,48px) minmax(0,1fr)!important;
+  gap:0!important;align-items:center;min-height:72px!important}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-node{
+  min-height:72px!important;
+  padding:11px 12px!important;
+  border-radius:15px;
+  grid-template-columns:24px minmax(0,1fr) auto}
+ body[data-theme] .energy-board .energy-board-output-row>.energy-board-wire{
+  height:72px!important;max-height:72px!important;min-height:72px!important;
+  overflow:visible!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-track{
+  left:calc(var(--rail-left) - var(--row-left))!important;
+  right:0!important;top:50%!important;
+  height:4px!important;width:auto!important;
+  transform:translateY(-50%)!important;
+  box-shadow:0 0 0 2px color-mix(in srgb,var(--stream-color) 10%,transparent)!important;
+  background:var(--stream-color);
+  border-radius:999px;opacity:1;pointer-events:none}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.no-flow .energy-board-flow-track{
+  background:var(--ux-line)!important;
+  height:2px!important;box-shadow:none!important;opacity:.84}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-flow-head{
+  width:12px!important;height:12px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.is-forward .energy-board-flow-head{right:-1px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-wire.is-reverse .energy-board-flow-head{left:-1px!important}
+ body[data-theme] .energy-board .energy-board-output-row
+  .energy-board-flow-particle{
+  width:7px;height:7px;border:0;box-shadow:0 0 0 2px
+    color-mix(in srgb,var(--stream-color) 42%,transparent)}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-direction{
+  display:none!important}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-name{
+  font-size:13px;line-height:1.3}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-value{
+  font-size:clamp(16px,4.1vw,19px);font-variant-numeric:tabular-nums}
+ body[data-theme] .energy-board .energy-board-output-row .energy-board-node-detail{
+  font-size:11px}
+ body[data-theme] .energy-board:not(.energy-board-ssr) .energy-board-hub{
+  border-radius:16px;margin-bottom:12px!important;
+  box-shadow:0 6px 19px rgba(24,150,117,.06)}
+ /* Thinner, calmer vertical PV links with a single light pulse. */
+ body[data-theme] .energy-board .source-wires .energy-board-flow-track{
+  width:4px!important;box-shadow:0 0 0 2px
+   color-mix(in srgb,var(--stream-color) 10%,transparent)!important}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-head{
+  width:13px!important;height:12px!important}
+ body[data-theme] .energy-board .source-wires .energy-board-flow-particle{
+  width:6px;height:6px;border:0}
+}
+/* Keep the entire path still when motion has been paused or reduced. */
+@media(prefers-reduced-motion:reduce){
+ body[data-theme] .energy-board .energy-board-flow-particle{
+  display:none!important;animation:none!important}
+}

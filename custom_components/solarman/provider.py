@@ -84,26 +84,14 @@ class EndPointProvider:
         return self
 
     async def discover(self):
-        try:
-            if "modbus" not in self.transport and self.ip.is_private and (d := await anext((v async for v in await discover(self.hass, str(self.ip)) if v["ip"] == str(self.ip)))):
-                self.serial = d["serial"]
-                self.host = d["ip"]
-                self.mac = d["mac"]
-                self.info = await request(self.host, LOGGER_SET)
-                if next(iter(LOGGER_REGEX["setting_protocol"].finditer(self.info))).group(1) != "TCP" if "tcp" in self.transport else "UDP" or next(iter(LOGGER_REGEX["setting_cs"].finditer(self.info))).group(1) != "SERVER" if "tcp" in self.transport else "" or next(iter(LOGGER_REGEX["setting_port"].finditer(self.info))).group(1) != self.port or next(iter(LOGGER_REGEX["setting_ip"].finditer(self.info))).group(1) != IP_ANY or next(iter(LOGGER_REGEX["setting_timeout"].finditer(self.info))).group(1) != "300":
-                    await request(self.host, LOGGER_CMD, LOGGER_SET,
-                        {
-                            "net_setting_pro": "TCP" if "tcp" in self.transport else "UDP",
-                            "net_setting_cs": "SERVER" if "tcp" in self.transport else "",
-                            "net_setting_pro_sel": "TCPSERVER" if "tcp" in self.transport else "UDP",
-                            "net_setting_port": self.port,
-                            "net_setting_ip": "0.0.0.0",
-                            "net_setting_to": "300"
-                        }
-                    )
-                    await request(self.host, LOGGER_SUCCESS, LOGGER_CMD, LOGGER_RESTART_DATA)
-        except Exception as e:
-            _LOGGER.debug(f"[{self.host}] Error", exc_info = True)
+        """Read-only fork: prohibit legacy logger reconfiguration/restart.
+
+        Physical topology must be verified out-of-band.  Never send vendor
+        LOGGER_SET/LOGGER_CMD or change the logger from this monitoring app.
+        """
+        if self.transport != "modbus_tcp":
+            raise PermissionError("Only Modbus TCP is allowed for monitoring")
+        return None
 
     async def load(self):
         try:

@@ -1,0 +1,20 @@
+{
+  "id": "/",
+  "name": "RAKURS — Енергомоніторинг",
+  "short_name": "RAKURS",
+  "description": "Диспетчерська енергомоніторингу Deye",
+  "lang": "uk",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0b1728",
+  "theme_color": "#14293e",
+  "icons": [
+    {
+      "src": "/static/rakurs-app-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

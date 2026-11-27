@@ -1,0 +1,39 @@
+[Unit]
+Description=RAKURS verified read-only Modbus polling agent
+After=network-online.target
+Wants=network-online.target
+ConditionPathExists=/etc/rakurs/poller-commissioned
+
+[Service]
+Type=simple
+User=rakurs-poller
+Group=rakurs-poller
+WorkingDirectory=/opt/rakurs
+Environment=PYTHONPATH=/opt/rakurs
+Environment=RAKURS_POLL_COMMISSIONED=YES
+Environment=RAKURS_INGEST_DB_USER=rakurs_ingest
+Environment=RAKURS_INGEST_PASSWORD_FILE=/etc/rakurs/poller_mysql_password
+Environment=RAKURS_MYSQL_CA_FILE=/etc/rakurs/mysql-ca.pem
+# Must be overridden at commissioning with the EXACT private IP address(es).
+Environment=RAKURS_ALLOWED_GATEWAY_IPS=
+ExecStart=/var/lib/rakurs/.venv/bin/python -m standalone.poll_worker --run
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=10
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=256M
+TasksMax=24
+UMask=0077
+
+[Install]
+WantedBy=multi-user.target

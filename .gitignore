@@ -5,3 +5,11 @@ __pycache__/
 
 # HACS
 custom_components/solarman/inverter_definitions/custom/
+
+# Deye monitor: local state and secrets are never versioned
+deploy/.env
+deploy/data/
+.venv-stage1/
+__pycache__/
+*.pyc
+.pytest_cache/

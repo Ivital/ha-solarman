@@ -1,0 +1,499 @@
+#!/usr/bin/env python3
+"""Add TWO independent simulated Deye-20K archives, never pretend to poll hardware.
+
+Each synthetic device gets every 815 source-catalog register word, all 624
+decoded-field placeholders, 316 dashboard aliases and full SQL provenance.
+No Modbus network commands. Existing telemetry is never updated or deleted.
+Run offline --check first; --execute requires explicit phrase and a compressed
+logical backup before any CREATE TABLE or INSERT.
+"""
+from __future__ import annotations
+
+import argparse
+from datetime import datetime, timezone
+from decimal import Decimal
+import getpass
+import gzip
+import hashlib
+import json
+import os
+import re
+import selectors
+import time
+from pathlib import Path
+import shutil
+import subprocess
+import sys
+import tempfile
+
+from modbus_archive import persist
+from simulate_deye_once import _demo_value, prepare
+
+HOST = "192.168.5.30"
+DATABASE = "rakurs"
+ADMIN_USER = "Ivital"
+MODEL = "SUN-20K-SG05LP3-EU-SM2"
+GROUP_KEY = "deye_sun20k_parallel_shared_battery"
+SOURCE = "rakurs_parallel_sim_seed_v1"
+DEVICE_KEYS = ("sim_deye20k_parallel_1", "sim_deye20k_parallel_2")
+POLL_UIDS = ("simdeye20k_parallel_1_v1", "simdeye20k_parallel_2_v1")
+SCHEMA = Path(__file__).with_name("parallel_raw_modbus_schema.sql")
+EXPECTED = {"register_words": 815, "fields": 624, "signals": 316}
+SCHEMA_TABLES = (
+    "rakurs_parallel_groups",
+    "rakurs_parallel_members",
+    "rakurs_modbus_poll_runs",
+    "rakurs_modbus_frames",
+    "rakurs_modbus_register_samples",
+    "rakurs_modbus_bit_samples",
+)
+
+
+def rawword(slot: int, address: int) -> int:
+    """Invented testing value; NEVER a captured wire register."""
+    digest = hashlib.sha256(f"SIMULATED-DEYE20K:{slot}:{address}".encode()).digest()
+    return int.from_bytes(digest[:2], "big")
+
+
+def build_payload(slot: int, fields, metrics, addresses, observed: datetime):
+    if slot not in (1, 2):
+        raise ValueError("Only two test slots exist")
+    raw = {int(addr): rawword(slot, int(addr)) for addr in addresses}
+    # Contiguous runs only: a frame never crosses an unknown register gap.
+    frames = []
+    group = []
+    last_addr = None
+    for address in sorted(raw):
+        if group and (address != last_addr + 1 or len(group) == 125):
+            frames.append({
+                "function_code": 3, "start_address": group[0],
+                "requested_count": len(group), "words": [raw[a] for a in group],
+                "status": "simulated",
+            })
+            group = []
+        group.append(address)
+        last_addr = address
+    if group:
+        frames.append({
+            "function_code": 3, "start_address": group[0],
+            "requested_count": len(group), "words": [raw[a] for a in group],
+            "status": "simulated",
+        })
+    decoded = []
+    for idx, field in enumerate(fields, 1):
+        number, txt = _demo_value(
+            field["key"], field["name"], field["unit"], idx + (slot - 1) * 3
+        )
+        decoded.append({
+            "field_key": field["key"],
+            "value_decimal": str(number) if number is not None else None,
+            "value_text": (txt + f"-UNIT{slot}") if txt else None,
+            "raw_registers": {str(a): raw[int(a)] for a in field["registers"]},
+        })
+    dashboard = []
+    for idx, signal in enumerate(metrics, 1):
+        number, _ = _demo_value(
+            signal["key"], signal["label"], signal.get("unit"), idx + slot
+        )
+        dashboard.append({
+            "signal_key": signal["key"],
+            "value_decimal": str(number) if number is not None else None,
+            "raw_value": None,
+        })
+    stamp = observed.isoformat().replace("+00:00", "Z")
+    return {
+        "device_key": DEVICE_KEYS[slot - 1],
+        "poll_uid": POLL_UIDS[slot - 1],
+        "observed_at_utc": stamp,
+        "transport": "simulation",
+        "slave_id": None,  # NO assumed Modbus address!
+        "quality": "simulated",
+        "ingest_source": SOURCE,
+        "frames": frames,
+        "fields": decoded,
+        "signals": dashboard,
+    }
+
+
+def check_source():
+    fields, metrics, addresses = prepare()
+    if len(addresses) != EXPECTED["register_words"]:
+        raise RuntimeError("Incomplete raw source register inventory")
+    if len(fields) != EXPECTED["fields"] or len(metrics) != EXPECTED["signals"]:
+        raise RuntimeError("Unexpected decoded catalog")
+    # Validate the entire SQL migration during --check, before any backup/write.
+    parse_schema_ddl(SCHEMA.read_text(encoding="utf-8"))
+    observed = datetime.now(timezone.utc)
+    for slot in (1, 2):
+        p = build_payload(slot, fields, metrics, addresses, observed)
+        all_registers = [(f["start_address"] + i) for f in p["frames"]
+                         for i in range(len(f["words"]))]
+        if len(all_registers) != 815 or set(all_registers) != set(addresses):
+            raise RuntimeError("Raw address coverage mismatch")
+        if len(p["fields"]) != 624 or len(p["signals"]) != 316:
+            raise RuntimeError("Decoded/demo count mismatch")
+    return fields, metrics, addresses
+
+
+def mysql_dump_tls_flags(tool: str, mode: str, ca_file: str | None = None) -> list[str]:
+    """Select secure TLS or explicitly acknowledged LAN-only plaintext.
+
+    The existing Rakurs PyMySQL client already has ssl_disabled=True, but
+    mysqldump uses its own TLS defaults. Do not silently downgrade transport
+    on a certificate error. Fail on unknown client family/option support.
+    """
+    if mode not in {"VERIFY_TLS", "LAN_PLAINTEXT_ACK"}:
+        raise RuntimeError("STOP: unknown RAKURS_MYSQL_BACKUP_TRANSPORT")
+    result = subprocess.run([tool, "--version"], capture_output=True, timeout=10,
+                            check=False)
+    version = (result.stdout + b" " + result.stderr).decode(
+        "utf-8", errors="replace").lower()
+    if result.returncode != 0:
+        raise RuntimeError("STOP: cannot identify MySQL backup client")
+    is_mariadb = "mariadb" in version
+    is_mysql = not is_mariadb and ("mysql" in version or "mysqldump" in version)
+    if not (is_mariadb or is_mysql):
+        raise RuntimeError("STOP: unsupported database dump client")
+    if mode == "LAN_PLAINTEXT_ACK":
+        # Scope exception to this pre-existing private-LAN MySQL endpoint.
+        if HOST != "192.168.5.30":
+            raise RuntimeError("STOP: LAN plaintext exception not valid for host")
+        return ["--skip-ssl"] if is_mariadb else ["--ssl-mode=DISABLED"]
+    if ca_file is not None:
+        ca = Path(ca_file)
+        if not ca.is_file() or ca.stat().st_mode & 0o022:
+            raise RuntimeError("STOP: trusted MySQL CA file missing or writable")
+        return (["--ssl", "--ssl-ca=" + str(ca), "--ssl-verify-server-cert"]
+                if is_mariadb else
+                ["--ssl-mode=VERIFY_IDENTITY", "--ssl-ca=" + str(ca)])
+    # Strict verification is never replaced by a silent --ssl-mode=PREFERRED.
+    return (["--ssl", "--ssl-verify-server-cert"] if is_mariadb
+            else ["--ssl-mode=VERIFY_IDENTITY"])
+
+
+def stream_dump_to_gzip(args: list[str], destination: Path,
+                        timeout_seconds: int = 1800) -> tuple[int, str]:
+    """Actually gzip a subprocess stdout stream, with bounded wait and no RAM dump.
+
+    subprocess.run(stdout=gzip.GzipFile) does NOT work: Popen uses fileno()
+    and skips GzipFile.write(), producing a corrupt mixed gzip/plain file.
+    """
+    errors = destination.with_name(destination.name + ".stderr")
+    deadline = time.monotonic() + timeout_seconds
+    process = None
+    try:
+        with errors.open("wb") as stderr_file, gzip.open(
+            destination, "wb", compresslevel=6
+        ) as archive:
+            process = subprocess.Popen(
+                args, stdout=subprocess.PIPE, stderr=stderr_file
+            )
+            try:
+                if process.stdout is None:
+                    raise RuntimeError("STOP: cannot capture mysqldump output")
+                with selectors.DefaultSelector() as reader:
+                    reader.register(process.stdout, selectors.EVENT_READ)
+                    while True:
+                        remaining = deadline - time.monotonic()
+                        if remaining <= 0:
+                            raise subprocess.TimeoutExpired(args, timeout_seconds)
+                        if not reader.select(remaining):
+                            raise subprocess.TimeoutExpired(args, timeout_seconds)
+                        chunk = os.read(process.stdout.fileno(), 1024 * 1024)
+                        if not chunk:
+                            break
+                        archive.write(chunk)
+                rc = process.wait(timeout=max(0.01, deadline - time.monotonic()))
+            except Exception:
+                process.kill()
+                process.wait(timeout=10)
+                raise
+            finally:
+                if process.stdout is not None:
+                    process.stdout.close()
+        stderr_text = errors.read_text(encoding="utf-8", errors="replace")[-500:]
+        return rc, stderr_text
+    finally:
+        errors.unlink(missing_ok=True)
+
+
+def backup_database(password: str) -> Path:
+    tool = shutil.which("mysqldump") or shutil.which("mariadb-dump")
+    if not tool:
+        raise RuntimeError(
+            "STOP: mysqldump/mariadb-dump unavailable. Install client and retry; "
+            "no database writes attempted."
+        )
+    transport = os.environ.get("RAKURS_MYSQL_BACKUP_TRANSPORT", "VERIFY_TLS")
+    ca_file = os.environ.get("RAKURS_MYSQL_BACKUP_CA_FILE") or None
+    tls_flags = mysql_dump_tls_flags(tool, transport, ca_file)
+    if transport == "LAN_PLAINTEXT_ACK":
+        print("MYSQL_BACKUP_TRANSPORT=LAN_PLAINTEXT_EXPLICITLY_ACKNOWLEDGED")
+        print("WARNING: MySQL credentials and database traverse the trusted LAN "
+              "without TLS, matching the existing PyMySQL connection mode.")
+    else:
+        print("MYSQL_BACKUP_TRANSPORT=TLS_VERIFIED")
+    home = Path("/var/backups")
+    if not home.is_dir() or not os.access(home, os.W_OK):
+        raise RuntimeError("STOP: /var/backups must be writable by administrator")
+    folder = Path(tempfile.mkdtemp(prefix="rakurs-two-deye-", dir=str(home)))
+    folder.chmod(0o700)
+    conf = folder / "mysql.cnf"
+    if "\n" in password or "\r" in password:
+        raise RuntimeError("STOP: newline in MySQL password is unsupported")
+    secret = password.replace("\\", "\\\\").replace('"', '\\"')
+    conf.write_text(
+        "[client]\nuser=" + ADMIN_USER + '\npassword="' + secret +
+        '"\nhost=' + HOST + "\n", encoding="utf-8")
+    conf.chmod(0o600)
+    dump = folder / "rakurs-before-two-deye.sql.gz"
+    temporary = folder / "rakurs-before-two-deye.sql.gz.partial"
+    try:
+        args = [tool, "--defaults-extra-file=" + str(conf),
+                "--single-transaction", "--quick", "--skip-lock-tables",
+                "--no-tablespaces", "--hex-blob", *tls_flags, DATABASE]
+        # A partial gzip is NEVER presented as a successful backup.
+        exit_code, dump_error = stream_dump_to_gzip(args, temporary)
+        if exit_code != 0 or not temporary.is_file() or temporary.stat().st_size < 100:
+            raise RuntimeError("STOP: backup failed BEFORE any MySQL writes: " +
+                               dump_error)
+        # Verify that the entire compressed stream can be read.
+        decompressed_bytes = 0
+        with gzip.open(temporary, "rb") as source:
+            while True:
+                block = source.read(1024 * 1024)
+                if not block:
+                    break
+                decompressed_bytes += len(block)
+        if decompressed_bytes < 100:
+            raise RuntimeError("STOP: MySQL dump is empty or incomplete")
+        temporary.rename(dump)
+        dump.chmod(0o600)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
+    finally:
+        conf.unlink(missing_ok=True)
+    print("MYSQL_BACKUP_PATH=" + str(dump))
+    digest = hashlib.sha256()
+    with dump.open("rb") as source:
+        for block in iter(lambda: source.read(1024 * 1024), b""):
+            digest.update(block)
+    print("MYSQL_BACKUP_SHA256=" + digest.hexdigest())
+    print("MYSQL_BACKUP_GZIP_VERIFIED=PASS")
+    return dump
+
+def parse_schema_ddl(sql: str) -> list[str]:
+    """Parse only the six explicitly expected CREATE TABLE statements.
+
+    Comments must be removed BEFORE splitting on semicolons: a comment in
+    this schema contains a semicolon, which previously triggered unsafe DDL.
+    Fail the entire migration before running ANY SQL if content differs.
+    """
+    uncommented = "\n".join(
+        line for line in sql.splitlines()
+        if line.strip() and not line.lstrip().startswith("--")
+    )
+    statements = [part.strip() for part in uncommented.split(";") if part.strip()]
+    actual = []
+    for statement in statements:
+        match = re.fullmatch(
+            r"CREATE\s+TABLE\s+IF\s+NOT\s+EXISTS\s+"
+            r"(rakurs_[a-z0-9_]+)\s*\([\s\S]+\)\s+"
+            r"ENGINE=InnoDB\s+DEFAULT\s+CHARSET=utf8mb4\s+"
+            r"COLLATE=utf8mb4_unicode_ci",
+            statement,
+            flags=re.IGNORECASE,
+        )
+        if match is None:
+            raise RuntimeError("STOP: unsafe DDL: unexpected SQL statement")
+        actual.append(match.group(1).lower())
+    if tuple(actual) != SCHEMA_TABLES:
+        raise RuntimeError(
+            "STOP: unsafe DDL: expected exactly six known tables in order; "
+            f"found {actual}"
+        )
+    return statements
+
+
+def apply_schema(db):
+    # Evaluate and validate EVERY statement before executing even the first.
+    statements = parse_schema_ddl(SCHEMA.read_text(encoding="utf-8"))
+    with db.cursor() as cur:
+        for statement in statements:
+            cur.execute(statement)
+    print("PARALLEL_SCHEMA_TABLES=6")
+    print("PARALLEL_SCHEMA_DDL=PASS")
+
+
+
+def preexisting_devices(db):
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT device_key,kind FROM rakurs_devices "
+            "WHERE device_key IN (%s,%s)", DEVICE_KEYS
+        )
+        return cur.fetchall()
+
+
+def seed(db, fields, metrics, addresses):
+    # All device records and poll/field/raw/UI values commit together.
+    # CREATE TABLE happened beforehand because MySQL DDL commits implicitly.
+    db.begin()
+    try:
+        with db.cursor() as cur:
+            cur.execute(
+                "SELECT id, model, expected_inverters, battery_mode, "
+                "topology_status FROM rakurs_parallel_groups "
+                "WHERE group_key=%s FOR UPDATE", (GROUP_KEY,)
+            )
+            group = cur.fetchone()
+            if group:
+                group_id, model, expected, battery, topology = group
+                if model != MODEL or expected != 2 or battery != "shared" or topology != "unverified":
+                    raise RuntimeError("STOP: conflicting parallel group configuration")
+            else:
+                cur.execute(
+                    "INSERT INTO rakurs_parallel_groups "
+                    "(group_key,model,expected_inverters,nominal_ac_w_each,"
+                    "battery_mode,battery_nominal_v,topology_status,"
+                    "bms_soc_source,created_at_utc) "
+                    "VALUES (%s,%s,2,20000,'shared',48.00,'unverified',NULL,%s)",
+                    (GROUP_KEY, MODEL, datetime.now(timezone.utc).replace(tzinfo=None)),
+                )
+                group_id = cur.lastrowid
+            stamp = datetime.now(timezone.utc)
+            receipts = []
+            for slot, key in enumerate(DEVICE_KEYS, 1):
+                cur.execute(
+                    "INSERT INTO rakurs_devices "
+                    "(device_key,kind,model,serial_number,commissioned_at_utc,created_at_utc) "
+                    "VALUES (%s,'simulation',%s,NULL,NULL,%s)",
+                    (key, MODEL, stamp.replace(tzinfo=None)),
+                )
+                device_id = cur.lastrowid
+                cur.execute(
+                    "INSERT INTO rakurs_parallel_members "
+                    "(group_id,device_id,slot_no,member_kind,parallel_role,"
+                    "modbus_address,transport_verified,member_verified) "
+                    "VALUES (%s,%s,%s,'simulation','unverified',NULL,0,0)",
+                    (group_id, device_id, slot),
+                )
+                payload = build_payload(slot, fields, metrics, addresses, stamp)
+                receipt = persist(db, payload, manage_transaction=False)
+                if receipt["status"] != "saved" or (
+                    receipt["raw_registers"],receipt["decoded_fields"],
+                    receipt["dashboard_signals"]
+                ) != (815, 624, 316):
+                    raise RuntimeError("STOP: incomplete synthetic Modbus snapshot")
+                receipts.append(receipt)
+            cur.execute("SELECT COUNT(*) FROM rakurs_parallel_members "
+                        "WHERE group_id=%s AND member_kind='simulation'", (group_id,))
+            if cur.fetchone()[0] != 2:
+                raise RuntimeError("STOP: expected exactly two synthetic member slots")
+            cur.execute("SELECT COUNT(*) FROM rakurs_modbus_register_samples "
+                        "WHERE device_id IN ("
+                        "SELECT device_id FROM rakurs_parallel_members "
+                        "WHERE group_id=%s AND member_kind='simulation')",
+                        (group_id,))
+            if cur.fetchone()[0] != 2 * 815:
+                raise RuntimeError("STOP: failed to save every synthetic raw register")
+        db.commit()
+        return receipts
+    except Exception:
+        db.rollback()
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--execute", action="store_true",
+                        help="backup, create additive schema and seed test data")
+    args = parser.parse_args()
+    fields, metrics, addresses = check_source()
+    print(f"PARALLEL_TEST_DEVICES={len(DEVICE_KEYS)}")
+    print(f"REGISTER_WORDS_PER_DEVICE={len(addresses)}")
+    print(f"DECODED_FIELDS_PER_DEVICE={len(fields)}")
+    print(f"UI_FIELDS_PER_DEVICE={len(metrics)}")
+    print("PHYSICAL_DEVICES_CREATED=0 REAL_MODBUS_READS=0")
+    if not args.execute:
+        print("TWO_DEYE_SEED_PREFLIGHT=PASS")
+        print("DRY_RUN=PASS MYSQL_CHANGED=NO")
+        return 0
+    if not sys.stdin.isatty():
+        raise RuntimeError("STOP: execute only from interactive terminal")
+    if input("Type exactly SEED-TWO-SIMULATED-DEYE: ").strip() != (
+        "SEED-TWO-SIMULATED-DEYE"
+    ):
+        raise RuntimeError("Aborted: no DB mutations")
+    password = getpass.getpass("MySQL Ivital password (hidden): ")
+    try:
+        import pymysql
+        db = pymysql.connect(
+            host=HOST, port=3306, database=DATABASE, user=ADMIN_USER,
+            password=password, ssl_disabled=True, charset="utf8mb4",
+            autocommit=False, connect_timeout=6, read_timeout=60,
+            write_timeout=60,
+        )
+        try:
+            with db.cursor() as cur:
+                cur.execute("SELECT device_key FROM rakurs_devices WHERE "
+                            "device_key IN (%s,%s)", DEVICE_KEYS)
+                existing = cur.fetchall()
+            if existing:
+                if len(existing) != 2 or {row[0] for row in existing} != set(DEVICE_KEYS):
+                    raise RuntimeError(
+                        "STOP: partial twin seed exists; inspect DB before retry."
+                    )
+                with db.cursor() as cur:
+                    for key in DEVICE_KEYS:
+                        cur.execute(
+                            "SELECT id,kind FROM rakurs_devices WHERE device_key=%s",
+                            (key,),
+                        )
+                        d = cur.fetchone()
+                        if not d or d[1] != "simulation":
+                            raise RuntimeError("STOP: reserved demo key belongs to real device")
+                        device_id = d[0]
+                        for table, expected in (
+                            ("rakurs_modbus_register_samples", 815),
+                            ("rakurs_modbus_field_samples", 624),
+                            ("rakurs_samples", 316),
+                            ("rakurs_modbus_poll_runs", 1),
+                        ):
+                            cur.execute("SELECT COUNT(*) FROM " + table +
+                                        " WHERE device_id=%s", (device_id,))
+                            if cur.fetchone()[0] != expected:
+                                raise RuntimeError(
+                                    "STOP: incomplete earlier twin seed for " + key
+                                )
+                    cur.execute(
+                        "SELECT COUNT(*) FROM rakurs_parallel_members "
+                        "WHERE member_kind='simulation' AND device_id IN "
+                        "(SELECT id FROM rakurs_devices WHERE device_key IN (%s,%s))",
+                        DEVICE_KEYS,
+                    )
+                    if cur.fetchone()[0] != 2:
+                        raise RuntimeError("STOP: simulation group membership incomplete")
+                print("TWO_DEYE_SEED_ALREADY_APPLIED=PASS")
+                print("MYSQL_CHANGED=NO")
+                return 0
+            backup_database(password)
+            apply_schema(db)
+            receipts = seed(db, fields, metrics, addresses)
+            print("SIMULATED_TWIN_SEED_COMMITTED=PASS")
+            for n, rec in enumerate(receipts, 1):
+                print(f"SIM_INVERTER_{n}_RAW_REGISTERS={rec['raw_registers']}")
+                print(f"SIM_INVERTER_{n}_MODBUS_FIELDS={rec['decoded_fields']}")
+                print(f"SIM_INVERTER_{n}_UI_FIELDS={rec['dashboard_signals']}")
+                print(f"SIM_INVERTER_{n}_POLL_ID={rec['poll_id']}")
+            print("BOTH_INVERTERS_SIMULATED=PASS MYSQL_REAL_ROWS_UNCHANGED=YES")
+        finally:
+            db.close()
+    finally:
+        del password
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

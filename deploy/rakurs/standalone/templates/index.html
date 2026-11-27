@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="uk">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Rakurs — Енергомоніторинг</title>
+  <meta name="theme-color" content="#14293e">
+  <link rel="manifest" href="/static/rakurs.webmanifest">
+  <link rel="icon" href="/static/rakurs-app-icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/style.css?v=rakurs-history-72h-v1">
+  <link rel="stylesheet" href="/static/clarity-ui-20261124.css">
+  <link rel="stylesheet" href="/static/events-ui-20261124.css">
+  <link rel="stylesheet" href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1">
+  <link rel="stylesheet" href="/static/rakurs-color-20261125.css?v=rakurs-flow-v4-20261126">
+  <link rel="stylesheet" href="/static/rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2">
+
+  <link rel="stylesheet" href="/static/rakurs-v7.css?v=rakurs-v7-20261127-44">
+  <script defer src="/static/rakurs-v7-model.js?v=rakurs-v7-20261127-44"></script>
+  <script defer src="/static/rakurs-v7.js?v=rakurs-v7-20261127-44"></script>
+  <script defer src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product31"></script>
+  <script defer src="/static/rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2"></script>
+</head>
+<body data-theme="light" data-interface="rakurs">
+  <div class="layout">
+    <aside class="sidebar" aria-label="Навігація Rakurs">
+      <div class="brand">
+        <img src="/static/rakurs-logo.png" width="54" height="44" alt="НВО Ракурс">
+        <div><strong>RAKURS</strong><small>ЕНЕРГОМОНІТОРИНГ</small></div>
+      </div>
+      <p class="side-label">РОЗДІЛИ</p>
+      <nav id="nav" class="nav"></nav>
+      <div class="side-bottom">
+        <div class="backend-icon" aria-hidden="true">◎</div>
+        <strong>Джерело показників — MySQL</strong>
+        <small>База Rakurs · захищений доступ</small>
+        <small>Усі збережені показники відображаються з MySQL</small>
+      </div>
+    </aside>
+    <div class="workarea">
+      <header class="topbar">
+        <div class="mobile-heading-row">
+          <button id="mobile-route-back" class="mobile-route-back" type="button"
+            aria-label="Назад до попереднього розділу" hidden>←</button>
+          <div>
+            <div class="eyebrow">СИСТЕМА ЕНЕРГОМОНІТОРИНГУ</div>
+            <h1 id="view-title">Огляд</h1>
+          </div>
+        </div>
+        <div class="top-actions">
+          <button id="theme-toggle" class="theme-toggle" type="button" aria-pressed="false" title="Перемкнути світлу або темну тему">☾ Темна тема</button>
+          <button id="refresh-data" class="refresh-data" type="button"
+            title="Повторно прочитати збережені показники MySQL. Не запускає опитування інвертора">↻ Оновити</button>
+          <label class="device-select-wrap">Deye <select id="device-select" aria-label="Обраний інвертор" hidden></select></label>
+          <span id="updated" class="updated">Оновлення даних…</span>
+          <span id="mode-indicator" class="mode-indicator mode-archive" title="Збережені дані MySQL, не статус з’єднання з Deye">Архів MySQL</span>
+          <span id="connection" class="connection pending"><i></i> Перевірка MySQL</span>
+        </div>
+      </header>
+      <main id="content" class="content" data-initial-mode="real">
+        <section class="rakurs-startup" aria-label="Завантаження RAKURS">
+          <div class="rakurs-startup-heading">
+            <h2>Енергосистема</h2>
+            <span role="status" class="rakurs-startup-status">Завантаження показників…</span>
+          </div>
+          <div class="rakurs-startup-placeholder" aria-hidden="true"></div>
+          <p>Якщо огляд не завантажився, <a href="/deye">відкрийте збережені показники</a>.</p>
+        </section>
+        <section class="rakurs-server-fallback" hidden aria-label="Останні збережені показники">
+          <h2>Енергосистема · Deye №1</h2>
+          <p>◷ Архів · останні збережені показники</p>
+        <div class="cards cards-main" aria-label="Показники Deye з бази даних">
+          {% for idx in [0, 1, 3, 2] %}
+          {% set item = initial_cards[idx] %}
+          <article class="card kpi kpi-{{ ['solar', 'load', 'grid', 'battery'][idx] }}">
+            <div class="kpi-head">
+              <span class="kpi-icon">{{ item.icon }}</span>
+              <span class="kpi-state">{{ 'Є запис' if item.quality else 'Немає даних' }}</span>
+            </div>
+            <h3>{{ item.label }}</h3>
+            <div class="kpi-reading">
+              <strong>{{ item.value }}</strong>
+              <span class="unit">{{ item.unit if item.value != '—' else '' }}</span>
+            </div>
+            {% if idx == 3 and item.value != '—' %}
+            <progress class="soc-meter" max="100" value="{{ item.value }}"
+                     aria-label="Рівень заряду акумулятора"></progress>
+            {% endif %}
+            <p class="kpi-caption">{{ 'Останній запис MySQL' if item.quality else 'Значення ще немає' }}</p>
+          </article>
+          {% endfor %}
+        </div>
+        </section>
+
+      </main>
+      <footer class="footer">RAKURS · DEYE · Єдине джерело телеметрії — MySQL <strong>rakurs</strong></footer>
+    </div>
+  </div>
+
+  <!-- Mobile only. Links use the same hash routes as the desktop sidebar. -->
+  <nav id="mobile-tabs" class="mobile-tabs" aria-label="Мобільна навігація">
+    <a data-route="overview" href="#/overview"><span class="mobile-tab-symbol" aria-hidden="true">⌂</span><span class="mobile-tab-caption">Огляд</span></a>
+    <a data-route="parallel" href="#/parallel"><span class="mobile-tab-symbol" aria-hidden="true">⧉</span><span class="mobile-tab-caption">Інвертори</span></a>
+    <a data-route="pv" href="#/pv"><span class="mobile-tab-symbol" aria-hidden="true">☀</span><span class="mobile-tab-caption">Сонце</span></a>
+    <a data-route="history" href="#/history"><span class="mobile-tab-symbol" aria-hidden="true">◷</span><span class="mobile-tab-caption">Історія</span></a>
+    <button id="mobile-more" type="button" aria-expanded="false" aria-controls="mobile-pages"
+      aria-label="Усі розділи"><span class="mobile-tab-symbol" aria-hidden="true">☷</span><span class="mobile-tab-caption">Розділи</span></button>
+  </nav>
+  <div id="mobile-pages-backdrop" class="mobile-pages-backdrop" hidden></div>
+  <section id="mobile-pages" class="mobile-pages" role="dialog" aria-modal="true"
+    aria-labelledby="mobile-pages-title" hidden>
+    <div class="mobile-pages-head">
+      <h2 id="mobile-pages-title">Усі розділи</h2>
+      <button id="mobile-pages-close" class="mobile-pages-close" type="button"
+        aria-label="Закрити список розділів">✕</button>
+    </div>
+    <input id="mobile-pages-search" class="mobile-pages-search" type="search"
+      placeholder="Знайти розділ…" aria-label="Пошук розділу">
+    <nav id="mobile-page-list" class="mobile-pages-list" aria-label="Повний список розділів"></nav>
+  </section>
+</body>
+</html>

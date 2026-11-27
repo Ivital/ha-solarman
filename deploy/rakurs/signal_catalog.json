@@ -1,0 +1,2596 @@
+{
+  "version": "rakurs-interface-v4",
+  "date": "2026-11-24",
+  "source_profile": "custom_components/solarman/inverter_definitions/deye_p3.yaml",
+  "profile_compatibility": "UNVERIFIED for Deye SG05LP3; no Modbus requests issued",
+  "read_only": true,
+  "entity_id_status": "PLANNED aliases, not current HA entity registry",
+  "note": "Register scaling, signs, supported channels and entities require device-specific verification; source profile has writable controls, deliberately omitted here.",
+  "groups": {
+    "pv": [
+      {
+        "key": "pv_power",
+        "label": "Сумарна потужність PV",
+        "unit": "кВт",
+        "source_profile": "PV Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv_power"
+      },
+      {
+        "key": "pv1_power",
+        "label": "PV1 — потужність",
+        "unit": "кВт",
+        "source_profile": "PV1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv1_power"
+      },
+      {
+        "key": "pv1_voltage",
+        "label": "PV1 — напруга",
+        "unit": "В",
+        "source_profile": "PV1 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv1_voltage"
+      },
+      {
+        "key": "pv1_current",
+        "label": "PV1 — струм",
+        "unit": "А",
+        "source_profile": "PV1 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv1_current"
+      },
+      {
+        "key": "pv2_power",
+        "label": "PV2 — потужність",
+        "unit": "кВт",
+        "source_profile": "PV2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv2_power"
+      },
+      {
+        "key": "pv2_voltage",
+        "label": "PV2 — напруга",
+        "unit": "В",
+        "source_profile": "PV2 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv2_voltage"
+      },
+      {
+        "key": "pv2_current",
+        "label": "PV2 — струм",
+        "unit": "А",
+        "source_profile": "PV2 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv2_current"
+      },
+      {
+        "key": "pv_energy_today",
+        "label": "Виробіток за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Production",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv_energy_today"
+      },
+      {
+        "key": "pv_energy_total",
+        "label": "Виробіток за весь час",
+        "unit": "кВт·год",
+        "source_profile": "Total Production",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_pv_energy_total"
+      },
+      {
+        "key": "dc_temperature",
+        "label": "Температура DC",
+        "unit": "°C",
+        "source_profile": "DC Temperature",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_dc_temperature"
+      }
+    ],
+    "battery": [
+      {
+        "key": "battery_soc",
+        "label": "Заряд АКБ (SOC)",
+        "unit": "%",
+        "source_profile": "Battery",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_soc"
+      },
+      {
+        "key": "battery_soh",
+        "label": "Стан здоров’я АКБ (SOH)",
+        "unit": "%",
+        "source_profile": "Battery SOH",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_soh"
+      },
+      {
+        "key": "battery_voltage",
+        "label": "Напруга АКБ",
+        "unit": "В",
+        "source_profile": "Battery Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_voltage"
+      },
+      {
+        "key": "battery_current",
+        "label": "Струм АКБ",
+        "unit": "А",
+        "source_profile": "Battery Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_current"
+      },
+      {
+        "key": "battery_power",
+        "label": "Потужність АКБ",
+        "unit": "кВт",
+        "source_profile": "Battery Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_power"
+      },
+      {
+        "key": "battery_temperature",
+        "label": "Температура АКБ",
+        "unit": "°C",
+        "source_profile": "Battery Temperature",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_temperature"
+      },
+      {
+        "key": "battery_capacity",
+        "label": "Ємність АКБ",
+        "unit": "А·год",
+        "source_profile": "Battery Capacity",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_capacity"
+      },
+      {
+        "key": "battery_state",
+        "label": "Стан АКБ",
+        "unit": "",
+        "source_profile": "Battery State",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_state"
+      },
+      {
+        "key": "battery_corrected_capacity",
+        "label": "Уточнена ємність АКБ",
+        "unit": "А·год",
+        "source_profile": "Battery Corrected Capacity",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_corrected_capacity"
+      },
+      {
+        "key": "battery_charge_today",
+        "label": "Заряд за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Battery Charge",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_charge_today"
+      },
+      {
+        "key": "battery_discharge_today",
+        "label": "Розряд за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Battery Discharge",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_discharge_today"
+      },
+      {
+        "key": "battery_charge_total",
+        "label": "Сумарний заряд",
+        "unit": "кВт·год",
+        "source_profile": "Total Battery Charge",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_charge_total"
+      },
+      {
+        "key": "battery_discharge_total",
+        "label": "Сумарний розряд",
+        "unit": "кВт·год",
+        "source_profile": "Total Battery Discharge",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_discharge_total"
+      },
+      {
+        "key": "battery_cycles_today",
+        "label": "Цикли за добу",
+        "unit": "",
+        "source_profile": "Today Battery Life Cycles",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_cycles_today"
+      },
+      {
+        "key": "battery_cycles_total",
+        "label": "Загальна кількість циклів",
+        "unit": "",
+        "source_profile": "Total Battery Life Cycles",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_battery_cycles_total"
+      }
+    ],
+    "bms": [
+      {
+        "key": "bms_soc",
+        "label": "BMS — SOC",
+        "unit": "%",
+        "source_profile": "Battery BMS SOC",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_soc"
+      },
+      {
+        "key": "bms_voltage",
+        "label": "BMS — напруга",
+        "unit": "В",
+        "source_profile": "Battery BMS Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_voltage"
+      },
+      {
+        "key": "bms_current",
+        "label": "BMS — струм",
+        "unit": "А",
+        "source_profile": "Battery BMS Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_current"
+      },
+      {
+        "key": "bms_charge_voltage",
+        "label": "Допустима напруга заряду",
+        "unit": "В",
+        "source_profile": "Battery BMS Charging Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_charge_voltage"
+      },
+      {
+        "key": "bms_discharge_voltage",
+        "label": "Допустима напруга розряду",
+        "unit": "В",
+        "source_profile": "Battery BMS Discharging Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_discharge_voltage"
+      },
+      {
+        "key": "bms_charge_current",
+        "label": "BMS — поточний струм заряду",
+        "unit": "А",
+        "source_profile": "Battery BMS Charging Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_charge_current"
+      },
+      {
+        "key": "bms_discharge_current",
+        "label": "BMS — поточний струм розряду",
+        "unit": "А",
+        "source_profile": "Battery BMS Discharging Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_discharge_current"
+      },
+      {
+        "key": "bms_max_charge_current",
+        "label": "BMS — макс. струм заряду",
+        "unit": "А",
+        "source_profile": "Battery BMS Max Charging Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_max_charge_current"
+      },
+      {
+        "key": "bms_max_discharge_current",
+        "label": "BMS — макс. струм розряду",
+        "unit": "А",
+        "source_profile": "Battery BMS Max Discharging Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_max_discharge_current"
+      },
+      {
+        "key": "battery_alarm",
+        "label": "Тривога АКБ",
+        "unit": "",
+        "source_profile": "Battery Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_battery_alarm"
+      },
+      {
+        "key": "battery_fault",
+        "label": "Помилка АКБ",
+        "unit": "",
+        "source_profile": "Battery Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_battery_fault"
+      },
+      {
+        "key": "battery_bms_type",
+        "label": "Тип BMS",
+        "unit": "",
+        "source_profile": "Battery BMS Type",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_battery_bms_type"
+      }
+    ],
+    "grid": [
+      {
+        "key": "grid_power",
+        "label": "Потужність мережі",
+        "unit": "кВт",
+        "source_profile": "Grid Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_power"
+      },
+      {
+        "key": "grid_frequency",
+        "label": "Частота мережі",
+        "unit": "Гц",
+        "source_profile": "Grid Frequency",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_frequency"
+      },
+      {
+        "key": "grid_power_factor",
+        "label": "Коефіцієнт потужності",
+        "unit": "",
+        "source_profile": "Grid Power Factor",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_power_factor"
+      },
+      {
+        "key": "grid_l1_voltage",
+        "label": "Мережа L1 — напруга",
+        "unit": "В",
+        "source_profile": "Grid L1 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l1_voltage"
+      },
+      {
+        "key": "grid_l2_voltage",
+        "label": "Мережа L2 — напруга",
+        "unit": "В",
+        "source_profile": "Grid L2 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l2_voltage"
+      },
+      {
+        "key": "grid_l3_voltage",
+        "label": "Мережа L3 — напруга",
+        "unit": "В",
+        "source_profile": "Grid L3 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l3_voltage"
+      },
+      {
+        "key": "grid_l1_power",
+        "label": "Мережа L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Grid L1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l1_power"
+      },
+      {
+        "key": "grid_l2_power",
+        "label": "Мережа L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Grid L2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l2_power"
+      },
+      {
+        "key": "grid_l3_power",
+        "label": "Мережа L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Grid L3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_l3_power"
+      },
+      {
+        "key": "ct1_current",
+        "label": "Внутрішній CT1 — струм",
+        "unit": "А",
+        "source_profile": "Internal CT1 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct1_current"
+      },
+      {
+        "key": "ct2_current",
+        "label": "Внутрішній CT2 — струм",
+        "unit": "А",
+        "source_profile": "Internal CT2 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct2_current"
+      },
+      {
+        "key": "ct3_current",
+        "label": "Внутрішній CT3 — струм",
+        "unit": "А",
+        "source_profile": "Internal CT3 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct3_current"
+      },
+      {
+        "key": "ct1_power",
+        "label": "Внутрішній CT1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Internal CT1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct1_power"
+      },
+      {
+        "key": "ct2_power",
+        "label": "Внутрішній CT2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Internal CT2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct2_power"
+      },
+      {
+        "key": "ct3_power",
+        "label": "Внутрішній CT3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Internal CT3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ct3_power"
+      },
+      {
+        "key": "external_ct1_power",
+        "label": "Зовнішній CT1 — потужність",
+        "unit": "кВт",
+        "source_profile": "External CT1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_external_ct1_power"
+      },
+      {
+        "key": "external_ct2_power",
+        "label": "Зовнішній CT2 — потужність",
+        "unit": "кВт",
+        "source_profile": "External CT2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_external_ct2_power"
+      },
+      {
+        "key": "external_ct3_power",
+        "label": "Зовнішній CT3 — потужність",
+        "unit": "кВт",
+        "source_profile": "External CT3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_external_ct3_power"
+      },
+      {
+        "key": "grid_import_today",
+        "label": "Імпорт із мережі за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Energy Import",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_import_today"
+      },
+      {
+        "key": "grid_export_today",
+        "label": "Експорт у мережу за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Energy Export",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_export_today"
+      },
+      {
+        "key": "grid_import_total",
+        "label": "Імпорт із мережі, сумарний",
+        "unit": "кВт·год",
+        "source_profile": "Total Energy Import",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_import_total"
+      },
+      {
+        "key": "grid_export_total",
+        "label": "Експорт у мережу, сумарний",
+        "unit": "кВт·год",
+        "source_profile": "Total Energy Export",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_export_total"
+      },
+      {
+        "key": "grid_status",
+        "label": "Стан мережі",
+        "unit": "",
+        "source_profile": "Grid",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_grid_status"
+      }
+    ],
+    "load": [
+      {
+        "key": "load_power",
+        "label": "Навантаження — сумарна потужність",
+        "unit": "кВт",
+        "source_profile": "Load Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_power"
+      },
+      {
+        "key": "load_l1_voltage",
+        "label": "Навантаження L1 — напруга",
+        "unit": "В",
+        "source_profile": "Load L1 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l1_voltage"
+      },
+      {
+        "key": "load_l2_voltage",
+        "label": "Навантаження L2 — напруга",
+        "unit": "В",
+        "source_profile": "Load L2 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l2_voltage"
+      },
+      {
+        "key": "load_l3_voltage",
+        "label": "Навантаження L3 — напруга",
+        "unit": "В",
+        "source_profile": "Load L3 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l3_voltage"
+      },
+      {
+        "key": "load_l1_power",
+        "label": "Навантаження L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load L1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l1_power"
+      },
+      {
+        "key": "load_l2_power",
+        "label": "Навантаження L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load L2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l2_power"
+      },
+      {
+        "key": "load_l3_power",
+        "label": "Навантаження L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load L3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_l3_power"
+      },
+      {
+        "key": "load_consumption_l1_power",
+        "label": "Споживання L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load Consumption L1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_consumption_l1_power"
+      },
+      {
+        "key": "load_consumption_l2_power",
+        "label": "Споживання L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load Consumption L2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_consumption_l2_power"
+      },
+      {
+        "key": "load_consumption_l3_power",
+        "label": "Споживання L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load Consumption L3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_consumption_l3_power"
+      },
+      {
+        "key": "load_consumption_power",
+        "label": "Споживання — розрахункова потужність",
+        "unit": "кВт",
+        "source_profile": "Load Consumption Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_consumption_power"
+      },
+      {
+        "key": "load_frequency",
+        "label": "Частота навантаження",
+        "unit": "Гц",
+        "source_profile": "Load Frequency",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_frequency"
+      },
+      {
+        "key": "load_energy_today",
+        "label": "Споживання за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Load Consumption",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_energy_today"
+      },
+      {
+        "key": "load_energy_total",
+        "label": "Споживання за весь час",
+        "unit": "кВт·год",
+        "source_profile": "Total Load Consumption",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_load_energy_total"
+      },
+      {
+        "key": "ups_l1_power",
+        "label": "UPS L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load UPS L1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ups_l1_power"
+      },
+      {
+        "key": "ups_l2_power",
+        "label": "UPS L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load UPS L2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ups_l2_power"
+      },
+      {
+        "key": "ups_l3_power",
+        "label": "UPS L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Load UPS L3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ups_l3_power"
+      },
+      {
+        "key": "ups_power",
+        "label": "UPS — сумарна потужність",
+        "unit": "кВт",
+        "source_profile": "Load UPS Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_ups_power"
+      }
+    ],
+    "output": [
+      {
+        "key": "output_l1_voltage",
+        "label": "Вихід L1 — напруга",
+        "unit": "В",
+        "source_profile": "Output L1 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l1_voltage"
+      },
+      {
+        "key": "output_l2_voltage",
+        "label": "Вихід L2 — напруга",
+        "unit": "В",
+        "source_profile": "Output L2 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l2_voltage"
+      },
+      {
+        "key": "output_l3_voltage",
+        "label": "Вихід L3 — напруга",
+        "unit": "В",
+        "source_profile": "Output L3 Voltage",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l3_voltage"
+      },
+      {
+        "key": "output_l1_current",
+        "label": "Вихід L1 — струм",
+        "unit": "А",
+        "source_profile": "Output L1 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l1_current"
+      },
+      {
+        "key": "output_l2_current",
+        "label": "Вихід L2 — струм",
+        "unit": "А",
+        "source_profile": "Output L2 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l2_current"
+      },
+      {
+        "key": "output_l3_current",
+        "label": "Вихід L3 — струм",
+        "unit": "А",
+        "source_profile": "Output L3 Current",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l3_current"
+      },
+      {
+        "key": "output_l1_power",
+        "label": "Вихід L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Output L1 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l1_power"
+      },
+      {
+        "key": "output_l2_power",
+        "label": "Вихід L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Output L2 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l2_power"
+      },
+      {
+        "key": "output_l3_power",
+        "label": "Вихід L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Output L3 Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_l3_power"
+      },
+      {
+        "key": "output_power",
+        "label": "Вихідна потужність інвертора",
+        "unit": "кВт",
+        "source_profile": "Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_power"
+      },
+      {
+        "key": "output_frequency",
+        "label": "Вихідна частота",
+        "unit": "Гц",
+        "source_profile": "Output Frequency",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_output_frequency"
+      },
+      {
+        "key": "power_losses",
+        "label": "Втрати потужності",
+        "unit": "кВт",
+        "source_profile": "Power losses",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_power_losses"
+      },
+      {
+        "key": "total_losses_today",
+        "label": "Втрати за добу",
+        "unit": "кВт·год",
+        "source_profile": "Today Losses",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_total_losses_today"
+      },
+      {
+        "key": "total_losses",
+        "label": "Загальні втрати",
+        "unit": "кВт·год",
+        "source_profile": "Total Losses",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_total_losses"
+      }
+    ],
+    "inverter": [
+      {
+        "key": "inverter_status",
+        "label": "Стан інвертора",
+        "unit": "",
+        "source_profile": "Device State",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_status"
+      },
+      {
+        "key": "inverter_alarm",
+        "label": "Тривога інвертора",
+        "unit": "",
+        "source_profile": "Device Alarm",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_alarm"
+      },
+      {
+        "key": "inverter_fault",
+        "label": "Помилка інвертора",
+        "unit": "",
+        "source_profile": "Device Fault",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_fault"
+      },
+      {
+        "key": "inverter_temperature",
+        "label": "Температура інвертора",
+        "unit": "°C",
+        "source_profile": "Temperature",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_temperature"
+      },
+      {
+        "key": "inverter_serial",
+        "label": "Серійний номер",
+        "unit": "",
+        "source_profile": "Device Serial Number",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_serial"
+      },
+      {
+        "key": "inverter_type",
+        "label": "Тип інвертора",
+        "unit": "",
+        "source_profile": "Device",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_type"
+      },
+      {
+        "key": "inverter_address",
+        "label": "Адреса Modbus",
+        "unit": "",
+        "source_profile": "Device Modbus Address",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_address"
+      },
+      {
+        "key": "inverter_protocol",
+        "label": "Версія протоколу",
+        "unit": "",
+        "source_profile": "Device Protocol Version",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_protocol"
+      },
+      {
+        "key": "inverter_control_fw",
+        "label": "Прошивка плати керування",
+        "unit": "",
+        "source_profile": "Device Control Board Firmware Version",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_control_fw"
+      },
+      {
+        "key": "inverter_comm_fw",
+        "label": "Прошивка плати зв'язку",
+        "unit": "",
+        "source_profile": "Device Communication Board Firmware Version",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_comm_fw"
+      },
+      {
+        "key": "inverter_power_rated",
+        "label": "Номінальна потужність",
+        "unit": "кВт",
+        "source_profile": "Device Rated Power",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_power_rated"
+      },
+      {
+        "key": "inverter_mppts",
+        "label": "Кількість MPPT",
+        "unit": "",
+        "source_profile": "Device MPPTs",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_mppts"
+      },
+      {
+        "key": "inverter_phases",
+        "label": "Кількість фаз",
+        "unit": "",
+        "source_profile": "Device Phases",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_phases"
+      },
+      {
+        "key": "inverter_relay",
+        "label": "Стан реле",
+        "unit": "",
+        "source_profile": "Device Relay",
+        "status": "planned_unverified",
+        "entity_id": "sensor.rakurs_inverter_relay"
+      }
+    ],
+    "generator": [
+      {
+        "key": "generator_status",
+        "label": "Стан генератора",
+        "unit": "",
+        "source_profile": "Generator",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_status"
+      },
+      {
+        "key": "generator_l1_voltage",
+        "label": "Генератор L1 — напруга",
+        "unit": "В",
+        "source_profile": "Generator L1 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l1_voltage"
+      },
+      {
+        "key": "generator_l2_voltage",
+        "label": "Генератор L2 — напруга",
+        "unit": "В",
+        "source_profile": "Generator L2 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l2_voltage"
+      },
+      {
+        "key": "generator_l3_voltage",
+        "label": "Генератор L3 — напруга",
+        "unit": "В",
+        "source_profile": "Generator L3 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l3_voltage"
+      },
+      {
+        "key": "generator_l1_power",
+        "label": "Генератор L1 — потужність",
+        "unit": "кВт",
+        "source_profile": "Generator L1 Power",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l1_power"
+      },
+      {
+        "key": "generator_l2_power",
+        "label": "Генератор L2 — потужність",
+        "unit": "кВт",
+        "source_profile": "Generator L2 Power",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l2_power"
+      },
+      {
+        "key": "generator_l3_power",
+        "label": "Генератор L3 — потужність",
+        "unit": "кВт",
+        "source_profile": "Generator L3 Power",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_l3_power"
+      },
+      {
+        "key": "generator_power",
+        "label": "Генератор — загальна потужність",
+        "unit": "кВт",
+        "source_profile": "Generator Power",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_power"
+      },
+      {
+        "key": "generator_energy_today",
+        "label": "Генератор — енергія за добу",
+        "unit": "кВт·год",
+        "source_profile": "Generator Energy - today",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_energy_today"
+      },
+      {
+        "key": "generator_energy_total",
+        "label": "Генератор — накопичена енергія",
+        "unit": "кВт·год",
+        "source_profile": "Generator Energy",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_generator_energy_total"
+      }
+    ],
+    "bms_module_1": [
+      {
+        "key": "bms_1_voltage",
+        "label": "Модуль 1: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 1 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_voltage"
+      },
+      {
+        "key": "bms_1_current",
+        "label": "Модуль 1: Струм",
+        "unit": "А",
+        "source_profile": "Battery 1 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_current"
+      },
+      {
+        "key": "bms_1_temperature",
+        "label": "Модуль 1: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 1 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_temperature"
+      },
+      {
+        "key": "bms_1_soh",
+        "label": "Модуль 1: SOH",
+        "unit": "%",
+        "source_profile": "Battery 1 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_soh"
+      },
+      {
+        "key": "bms_1_capacity",
+        "label": "Модуль 1: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 1 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_capacity"
+      },
+      {
+        "key": "bms_1_alarm",
+        "label": "Модуль 1: Тривога",
+        "unit": "",
+        "source_profile": "Battery 1 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_alarm"
+      },
+      {
+        "key": "bms_1_fault",
+        "label": "Модуль 1: Помилка",
+        "unit": "",
+        "source_profile": "Battery 1 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_fault"
+      },
+      {
+        "key": "bms_1_max_cell_voltage",
+        "label": "Модуль 1: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 1 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_max_cell_voltage"
+      },
+      {
+        "key": "bms_1_min_cell_voltage",
+        "label": "Модуль 1: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 1 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_min_cell_voltage"
+      },
+      {
+        "key": "bms_1_cycles",
+        "label": "Модуль 1: Цикли",
+        "unit": "",
+        "source_profile": "Battery 1 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_1_cycles"
+      }
+    ],
+    "bms_module_2": [
+      {
+        "key": "bms_2_voltage",
+        "label": "Модуль 2: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 2 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_voltage"
+      },
+      {
+        "key": "bms_2_current",
+        "label": "Модуль 2: Струм",
+        "unit": "А",
+        "source_profile": "Battery 2 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_current"
+      },
+      {
+        "key": "bms_2_temperature",
+        "label": "Модуль 2: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 2 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_temperature"
+      },
+      {
+        "key": "bms_2_soh",
+        "label": "Модуль 2: SOH",
+        "unit": "%",
+        "source_profile": "Battery 2 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_soh"
+      },
+      {
+        "key": "bms_2_capacity",
+        "label": "Модуль 2: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 2 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_capacity"
+      },
+      {
+        "key": "bms_2_alarm",
+        "label": "Модуль 2: Тривога",
+        "unit": "",
+        "source_profile": "Battery 2 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_alarm"
+      },
+      {
+        "key": "bms_2_fault",
+        "label": "Модуль 2: Помилка",
+        "unit": "",
+        "source_profile": "Battery 2 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_fault"
+      },
+      {
+        "key": "bms_2_max_cell_voltage",
+        "label": "Модуль 2: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 2 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_max_cell_voltage"
+      },
+      {
+        "key": "bms_2_min_cell_voltage",
+        "label": "Модуль 2: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 2 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_min_cell_voltage"
+      },
+      {
+        "key": "bms_2_cycles",
+        "label": "Модуль 2: Цикли",
+        "unit": "",
+        "source_profile": "Battery 2 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_2_cycles"
+      }
+    ],
+    "bms_module_3": [
+      {
+        "key": "bms_3_voltage",
+        "label": "Модуль 3: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 3 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_voltage"
+      },
+      {
+        "key": "bms_3_current",
+        "label": "Модуль 3: Струм",
+        "unit": "А",
+        "source_profile": "Battery 3 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_current"
+      },
+      {
+        "key": "bms_3_temperature",
+        "label": "Модуль 3: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 3 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_temperature"
+      },
+      {
+        "key": "bms_3_soh",
+        "label": "Модуль 3: SOH",
+        "unit": "%",
+        "source_profile": "Battery 3 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_soh"
+      },
+      {
+        "key": "bms_3_capacity",
+        "label": "Модуль 3: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 3 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_capacity"
+      },
+      {
+        "key": "bms_3_alarm",
+        "label": "Модуль 3: Тривога",
+        "unit": "",
+        "source_profile": "Battery 3 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_alarm"
+      },
+      {
+        "key": "bms_3_fault",
+        "label": "Модуль 3: Помилка",
+        "unit": "",
+        "source_profile": "Battery 3 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_fault"
+      },
+      {
+        "key": "bms_3_max_cell_voltage",
+        "label": "Модуль 3: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 3 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_max_cell_voltage"
+      },
+      {
+        "key": "bms_3_min_cell_voltage",
+        "label": "Модуль 3: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 3 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_min_cell_voltage"
+      },
+      {
+        "key": "bms_3_cycles",
+        "label": "Модуль 3: Цикли",
+        "unit": "",
+        "source_profile": "Battery 3 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_3_cycles"
+      }
+    ],
+    "bms_module_4": [
+      {
+        "key": "bms_4_voltage",
+        "label": "Модуль 4: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 4 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_voltage"
+      },
+      {
+        "key": "bms_4_current",
+        "label": "Модуль 4: Струм",
+        "unit": "А",
+        "source_profile": "Battery 4 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_current"
+      },
+      {
+        "key": "bms_4_temperature",
+        "label": "Модуль 4: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 4 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_temperature"
+      },
+      {
+        "key": "bms_4_soh",
+        "label": "Модуль 4: SOH",
+        "unit": "%",
+        "source_profile": "Battery 4 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_soh"
+      },
+      {
+        "key": "bms_4_capacity",
+        "label": "Модуль 4: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 4 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_capacity"
+      },
+      {
+        "key": "bms_4_alarm",
+        "label": "Модуль 4: Тривога",
+        "unit": "",
+        "source_profile": "Battery 4 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_alarm"
+      },
+      {
+        "key": "bms_4_fault",
+        "label": "Модуль 4: Помилка",
+        "unit": "",
+        "source_profile": "Battery 4 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_fault"
+      },
+      {
+        "key": "bms_4_max_cell_voltage",
+        "label": "Модуль 4: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 4 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_max_cell_voltage"
+      },
+      {
+        "key": "bms_4_min_cell_voltage",
+        "label": "Модуль 4: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 4 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_min_cell_voltage"
+      },
+      {
+        "key": "bms_4_cycles",
+        "label": "Модуль 4: Цикли",
+        "unit": "",
+        "source_profile": "Battery 4 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_4_cycles"
+      }
+    ],
+    "bms_module_5": [
+      {
+        "key": "bms_5_voltage",
+        "label": "Модуль 5: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 5 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_voltage"
+      },
+      {
+        "key": "bms_5_current",
+        "label": "Модуль 5: Струм",
+        "unit": "А",
+        "source_profile": "Battery 5 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_current"
+      },
+      {
+        "key": "bms_5_temperature",
+        "label": "Модуль 5: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 5 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_temperature"
+      },
+      {
+        "key": "bms_5_soh",
+        "label": "Модуль 5: SOH",
+        "unit": "%",
+        "source_profile": "Battery 5 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_soh"
+      },
+      {
+        "key": "bms_5_capacity",
+        "label": "Модуль 5: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 5 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_capacity"
+      },
+      {
+        "key": "bms_5_alarm",
+        "label": "Модуль 5: Тривога",
+        "unit": "",
+        "source_profile": "Battery 5 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_alarm"
+      },
+      {
+        "key": "bms_5_fault",
+        "label": "Модуль 5: Помилка",
+        "unit": "",
+        "source_profile": "Battery 5 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_fault"
+      },
+      {
+        "key": "bms_5_max_cell_voltage",
+        "label": "Модуль 5: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 5 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_max_cell_voltage"
+      },
+      {
+        "key": "bms_5_min_cell_voltage",
+        "label": "Модуль 5: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 5 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_min_cell_voltage"
+      },
+      {
+        "key": "bms_5_cycles",
+        "label": "Модуль 5: Цикли",
+        "unit": "",
+        "source_profile": "Battery 5 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_5_cycles"
+      }
+    ],
+    "bms_module_6": [
+      {
+        "key": "bms_6_voltage",
+        "label": "Модуль 6: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 6 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_voltage"
+      },
+      {
+        "key": "bms_6_current",
+        "label": "Модуль 6: Струм",
+        "unit": "А",
+        "source_profile": "Battery 6 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_current"
+      },
+      {
+        "key": "bms_6_temperature",
+        "label": "Модуль 6: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 6 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_temperature"
+      },
+      {
+        "key": "bms_6_soh",
+        "label": "Модуль 6: SOH",
+        "unit": "%",
+        "source_profile": "Battery 6 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_soh"
+      },
+      {
+        "key": "bms_6_capacity",
+        "label": "Модуль 6: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 6 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_capacity"
+      },
+      {
+        "key": "bms_6_alarm",
+        "label": "Модуль 6: Тривога",
+        "unit": "",
+        "source_profile": "Battery 6 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_alarm"
+      },
+      {
+        "key": "bms_6_fault",
+        "label": "Модуль 6: Помилка",
+        "unit": "",
+        "source_profile": "Battery 6 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_fault"
+      },
+      {
+        "key": "bms_6_max_cell_voltage",
+        "label": "Модуль 6: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 6 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_max_cell_voltage"
+      },
+      {
+        "key": "bms_6_min_cell_voltage",
+        "label": "Модуль 6: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 6 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_min_cell_voltage"
+      },
+      {
+        "key": "bms_6_cycles",
+        "label": "Модуль 6: Цикли",
+        "unit": "",
+        "source_profile": "Battery 6 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_6_cycles"
+      }
+    ],
+    "bms_module_7": [
+      {
+        "key": "bms_7_voltage",
+        "label": "Модуль 7: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 7 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_voltage"
+      },
+      {
+        "key": "bms_7_current",
+        "label": "Модуль 7: Струм",
+        "unit": "А",
+        "source_profile": "Battery 7 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_current"
+      },
+      {
+        "key": "bms_7_temperature",
+        "label": "Модуль 7: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 7 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_temperature"
+      },
+      {
+        "key": "bms_7_soh",
+        "label": "Модуль 7: SOH",
+        "unit": "%",
+        "source_profile": "Battery 7 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_soh"
+      },
+      {
+        "key": "bms_7_capacity",
+        "label": "Модуль 7: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 7 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_capacity"
+      },
+      {
+        "key": "bms_7_alarm",
+        "label": "Модуль 7: Тривога",
+        "unit": "",
+        "source_profile": "Battery 7 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_alarm"
+      },
+      {
+        "key": "bms_7_fault",
+        "label": "Модуль 7: Помилка",
+        "unit": "",
+        "source_profile": "Battery 7 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_fault"
+      },
+      {
+        "key": "bms_7_max_cell_voltage",
+        "label": "Модуль 7: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 7 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_max_cell_voltage"
+      },
+      {
+        "key": "bms_7_min_cell_voltage",
+        "label": "Модуль 7: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 7 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_min_cell_voltage"
+      },
+      {
+        "key": "bms_7_cycles",
+        "label": "Модуль 7: Цикли",
+        "unit": "",
+        "source_profile": "Battery 7 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_7_cycles"
+      }
+    ],
+    "bms_module_8": [
+      {
+        "key": "bms_8_voltage",
+        "label": "Модуль 8: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 8 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_voltage"
+      },
+      {
+        "key": "bms_8_current",
+        "label": "Модуль 8: Струм",
+        "unit": "А",
+        "source_profile": "Battery 8 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_current"
+      },
+      {
+        "key": "bms_8_temperature",
+        "label": "Модуль 8: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 8 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_temperature"
+      },
+      {
+        "key": "bms_8_soh",
+        "label": "Модуль 8: SOH",
+        "unit": "%",
+        "source_profile": "Battery 8 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_soh"
+      },
+      {
+        "key": "bms_8_capacity",
+        "label": "Модуль 8: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 8 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_capacity"
+      },
+      {
+        "key": "bms_8_alarm",
+        "label": "Модуль 8: Тривога",
+        "unit": "",
+        "source_profile": "Battery 8 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_alarm"
+      },
+      {
+        "key": "bms_8_fault",
+        "label": "Модуль 8: Помилка",
+        "unit": "",
+        "source_profile": "Battery 8 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_fault"
+      },
+      {
+        "key": "bms_8_max_cell_voltage",
+        "label": "Модуль 8: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 8 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_max_cell_voltage"
+      },
+      {
+        "key": "bms_8_min_cell_voltage",
+        "label": "Модуль 8: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 8 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_min_cell_voltage"
+      },
+      {
+        "key": "bms_8_cycles",
+        "label": "Модуль 8: Цикли",
+        "unit": "",
+        "source_profile": "Battery 8 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_8_cycles"
+      }
+    ],
+    "bms_module_9": [
+      {
+        "key": "bms_9_voltage",
+        "label": "Модуль 9: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 9 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_voltage"
+      },
+      {
+        "key": "bms_9_current",
+        "label": "Модуль 9: Струм",
+        "unit": "А",
+        "source_profile": "Battery 9 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_current"
+      },
+      {
+        "key": "bms_9_temperature",
+        "label": "Модуль 9: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 9 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_temperature"
+      },
+      {
+        "key": "bms_9_soh",
+        "label": "Модуль 9: SOH",
+        "unit": "%",
+        "source_profile": "Battery 9 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_soh"
+      },
+      {
+        "key": "bms_9_capacity",
+        "label": "Модуль 9: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 9 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_capacity"
+      },
+      {
+        "key": "bms_9_alarm",
+        "label": "Модуль 9: Тривога",
+        "unit": "",
+        "source_profile": "Battery 9 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_alarm"
+      },
+      {
+        "key": "bms_9_fault",
+        "label": "Модуль 9: Помилка",
+        "unit": "",
+        "source_profile": "Battery 9 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_fault"
+      },
+      {
+        "key": "bms_9_max_cell_voltage",
+        "label": "Модуль 9: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 9 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_max_cell_voltage"
+      },
+      {
+        "key": "bms_9_min_cell_voltage",
+        "label": "Модуль 9: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 9 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_min_cell_voltage"
+      },
+      {
+        "key": "bms_9_cycles",
+        "label": "Модуль 9: Цикли",
+        "unit": "",
+        "source_profile": "Battery 9 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_9_cycles"
+      }
+    ],
+    "bms_module_10": [
+      {
+        "key": "bms_10_voltage",
+        "label": "Модуль 10: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 10 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_voltage"
+      },
+      {
+        "key": "bms_10_current",
+        "label": "Модуль 10: Струм",
+        "unit": "А",
+        "source_profile": "Battery 10 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_current"
+      },
+      {
+        "key": "bms_10_temperature",
+        "label": "Модуль 10: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 10 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_temperature"
+      },
+      {
+        "key": "bms_10_soh",
+        "label": "Модуль 10: SOH",
+        "unit": "%",
+        "source_profile": "Battery 10 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_soh"
+      },
+      {
+        "key": "bms_10_capacity",
+        "label": "Модуль 10: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 10 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_capacity"
+      },
+      {
+        "key": "bms_10_alarm",
+        "label": "Модуль 10: Тривога",
+        "unit": "",
+        "source_profile": "Battery 10 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_alarm"
+      },
+      {
+        "key": "bms_10_fault",
+        "label": "Модуль 10: Помилка",
+        "unit": "",
+        "source_profile": "Battery 10 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_fault"
+      },
+      {
+        "key": "bms_10_max_cell_voltage",
+        "label": "Модуль 10: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 10 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_max_cell_voltage"
+      },
+      {
+        "key": "bms_10_min_cell_voltage",
+        "label": "Модуль 10: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 10 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_min_cell_voltage"
+      },
+      {
+        "key": "bms_10_cycles",
+        "label": "Модуль 10: Цикли",
+        "unit": "",
+        "source_profile": "Battery 10 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_10_cycles"
+      }
+    ],
+    "bms_module_11": [
+      {
+        "key": "bms_11_voltage",
+        "label": "Модуль 11: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 11 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_voltage"
+      },
+      {
+        "key": "bms_11_current",
+        "label": "Модуль 11: Струм",
+        "unit": "А",
+        "source_profile": "Battery 11 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_current"
+      },
+      {
+        "key": "bms_11_temperature",
+        "label": "Модуль 11: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 11 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_temperature"
+      },
+      {
+        "key": "bms_11_soh",
+        "label": "Модуль 11: SOH",
+        "unit": "%",
+        "source_profile": "Battery 11 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_soh"
+      },
+      {
+        "key": "bms_11_capacity",
+        "label": "Модуль 11: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 11 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_capacity"
+      },
+      {
+        "key": "bms_11_alarm",
+        "label": "Модуль 11: Тривога",
+        "unit": "",
+        "source_profile": "Battery 11 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_alarm"
+      },
+      {
+        "key": "bms_11_fault",
+        "label": "Модуль 11: Помилка",
+        "unit": "",
+        "source_profile": "Battery 11 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_fault"
+      },
+      {
+        "key": "bms_11_max_cell_voltage",
+        "label": "Модуль 11: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 11 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_max_cell_voltage"
+      },
+      {
+        "key": "bms_11_min_cell_voltage",
+        "label": "Модуль 11: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 11 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_min_cell_voltage"
+      },
+      {
+        "key": "bms_11_cycles",
+        "label": "Модуль 11: Цикли",
+        "unit": "",
+        "source_profile": "Battery 11 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_11_cycles"
+      }
+    ],
+    "bms_module_12": [
+      {
+        "key": "bms_12_voltage",
+        "label": "Модуль 12: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 12 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_voltage"
+      },
+      {
+        "key": "bms_12_current",
+        "label": "Модуль 12: Струм",
+        "unit": "А",
+        "source_profile": "Battery 12 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_current"
+      },
+      {
+        "key": "bms_12_temperature",
+        "label": "Модуль 12: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 12 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_temperature"
+      },
+      {
+        "key": "bms_12_soh",
+        "label": "Модуль 12: SOH",
+        "unit": "%",
+        "source_profile": "Battery 12 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_soh"
+      },
+      {
+        "key": "bms_12_capacity",
+        "label": "Модуль 12: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 12 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_capacity"
+      },
+      {
+        "key": "bms_12_alarm",
+        "label": "Модуль 12: Тривога",
+        "unit": "",
+        "source_profile": "Battery 12 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_alarm"
+      },
+      {
+        "key": "bms_12_fault",
+        "label": "Модуль 12: Помилка",
+        "unit": "",
+        "source_profile": "Battery 12 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_fault"
+      },
+      {
+        "key": "bms_12_max_cell_voltage",
+        "label": "Модуль 12: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 12 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_max_cell_voltage"
+      },
+      {
+        "key": "bms_12_min_cell_voltage",
+        "label": "Модуль 12: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 12 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_min_cell_voltage"
+      },
+      {
+        "key": "bms_12_cycles",
+        "label": "Модуль 12: Цикли",
+        "unit": "",
+        "source_profile": "Battery 12 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_12_cycles"
+      }
+    ],
+    "bms_module_13": [
+      {
+        "key": "bms_13_voltage",
+        "label": "Модуль 13: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 13 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_voltage"
+      },
+      {
+        "key": "bms_13_current",
+        "label": "Модуль 13: Струм",
+        "unit": "А",
+        "source_profile": "Battery 13 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_current"
+      },
+      {
+        "key": "bms_13_temperature",
+        "label": "Модуль 13: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 13 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_temperature"
+      },
+      {
+        "key": "bms_13_soh",
+        "label": "Модуль 13: SOH",
+        "unit": "%",
+        "source_profile": "Battery 13 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_soh"
+      },
+      {
+        "key": "bms_13_capacity",
+        "label": "Модуль 13: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 13 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_capacity"
+      },
+      {
+        "key": "bms_13_alarm",
+        "label": "Модуль 13: Тривога",
+        "unit": "",
+        "source_profile": "Battery 13 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_alarm"
+      },
+      {
+        "key": "bms_13_fault",
+        "label": "Модуль 13: Помилка",
+        "unit": "",
+        "source_profile": "Battery 13 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_fault"
+      },
+      {
+        "key": "bms_13_max_cell_voltage",
+        "label": "Модуль 13: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 13 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_max_cell_voltage"
+      },
+      {
+        "key": "bms_13_min_cell_voltage",
+        "label": "Модуль 13: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 13 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_min_cell_voltage"
+      },
+      {
+        "key": "bms_13_cycles",
+        "label": "Модуль 13: Цикли",
+        "unit": "",
+        "source_profile": "Battery 13 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_13_cycles"
+      }
+    ],
+    "bms_module_14": [
+      {
+        "key": "bms_14_voltage",
+        "label": "Модуль 14: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 14 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_voltage"
+      },
+      {
+        "key": "bms_14_current",
+        "label": "Модуль 14: Струм",
+        "unit": "А",
+        "source_profile": "Battery 14 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_current"
+      },
+      {
+        "key": "bms_14_temperature",
+        "label": "Модуль 14: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 14 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_temperature"
+      },
+      {
+        "key": "bms_14_soh",
+        "label": "Модуль 14: SOH",
+        "unit": "%",
+        "source_profile": "Battery 14 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_soh"
+      },
+      {
+        "key": "bms_14_capacity",
+        "label": "Модуль 14: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 14 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_capacity"
+      },
+      {
+        "key": "bms_14_alarm",
+        "label": "Модуль 14: Тривога",
+        "unit": "",
+        "source_profile": "Battery 14 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_alarm"
+      },
+      {
+        "key": "bms_14_fault",
+        "label": "Модуль 14: Помилка",
+        "unit": "",
+        "source_profile": "Battery 14 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_fault"
+      },
+      {
+        "key": "bms_14_max_cell_voltage",
+        "label": "Модуль 14: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 14 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_max_cell_voltage"
+      },
+      {
+        "key": "bms_14_min_cell_voltage",
+        "label": "Модуль 14: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 14 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_min_cell_voltage"
+      },
+      {
+        "key": "bms_14_cycles",
+        "label": "Модуль 14: Цикли",
+        "unit": "",
+        "source_profile": "Battery 14 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_14_cycles"
+      }
+    ],
+    "bms_module_15": [
+      {
+        "key": "bms_15_voltage",
+        "label": "Модуль 15: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 15 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_voltage"
+      },
+      {
+        "key": "bms_15_current",
+        "label": "Модуль 15: Струм",
+        "unit": "А",
+        "source_profile": "Battery 15 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_current"
+      },
+      {
+        "key": "bms_15_temperature",
+        "label": "Модуль 15: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 15 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_temperature"
+      },
+      {
+        "key": "bms_15_soh",
+        "label": "Модуль 15: SOH",
+        "unit": "%",
+        "source_profile": "Battery 15 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_soh"
+      },
+      {
+        "key": "bms_15_capacity",
+        "label": "Модуль 15: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 15 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_capacity"
+      },
+      {
+        "key": "bms_15_alarm",
+        "label": "Модуль 15: Тривога",
+        "unit": "",
+        "source_profile": "Battery 15 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_alarm"
+      },
+      {
+        "key": "bms_15_fault",
+        "label": "Модуль 15: Помилка",
+        "unit": "",
+        "source_profile": "Battery 15 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_fault"
+      },
+      {
+        "key": "bms_15_max_cell_voltage",
+        "label": "Модуль 15: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 15 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_max_cell_voltage"
+      },
+      {
+        "key": "bms_15_min_cell_voltage",
+        "label": "Модуль 15: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 15 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_min_cell_voltage"
+      },
+      {
+        "key": "bms_15_cycles",
+        "label": "Модуль 15: Цикли",
+        "unit": "",
+        "source_profile": "Battery 15 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_15_cycles"
+      }
+    ],
+    "bms_module_16": [
+      {
+        "key": "bms_16_voltage",
+        "label": "Модуль 16: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 16 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_voltage"
+      },
+      {
+        "key": "bms_16_current",
+        "label": "Модуль 16: Струм",
+        "unit": "А",
+        "source_profile": "Battery 16 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_current"
+      },
+      {
+        "key": "bms_16_temperature",
+        "label": "Модуль 16: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 16 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_temperature"
+      },
+      {
+        "key": "bms_16_soh",
+        "label": "Модуль 16: SOH",
+        "unit": "%",
+        "source_profile": "Battery 16 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_soh"
+      },
+      {
+        "key": "bms_16_capacity",
+        "label": "Модуль 16: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 16 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_capacity"
+      },
+      {
+        "key": "bms_16_alarm",
+        "label": "Модуль 16: Тривога",
+        "unit": "",
+        "source_profile": "Battery 16 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_alarm"
+      },
+      {
+        "key": "bms_16_fault",
+        "label": "Модуль 16: Помилка",
+        "unit": "",
+        "source_profile": "Battery 16 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_fault"
+      },
+      {
+        "key": "bms_16_max_cell_voltage",
+        "label": "Модуль 16: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 16 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_max_cell_voltage"
+      },
+      {
+        "key": "bms_16_min_cell_voltage",
+        "label": "Модуль 16: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 16 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_min_cell_voltage"
+      },
+      {
+        "key": "bms_16_cycles",
+        "label": "Модуль 16: Цикли",
+        "unit": "",
+        "source_profile": "Battery 16 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_16_cycles"
+      }
+    ],
+    "bms_module_17": [
+      {
+        "key": "bms_17_voltage",
+        "label": "Модуль 17: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 17 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_voltage"
+      },
+      {
+        "key": "bms_17_current",
+        "label": "Модуль 17: Струм",
+        "unit": "А",
+        "source_profile": "Battery 17 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_current"
+      },
+      {
+        "key": "bms_17_temperature",
+        "label": "Модуль 17: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 17 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_temperature"
+      },
+      {
+        "key": "bms_17_soh",
+        "label": "Модуль 17: SOH",
+        "unit": "%",
+        "source_profile": "Battery 17 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_soh"
+      },
+      {
+        "key": "bms_17_capacity",
+        "label": "Модуль 17: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 17 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_capacity"
+      },
+      {
+        "key": "bms_17_alarm",
+        "label": "Модуль 17: Тривога",
+        "unit": "",
+        "source_profile": "Battery 17 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_alarm"
+      },
+      {
+        "key": "bms_17_fault",
+        "label": "Модуль 17: Помилка",
+        "unit": "",
+        "source_profile": "Battery 17 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_fault"
+      },
+      {
+        "key": "bms_17_max_cell_voltage",
+        "label": "Модуль 17: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 17 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_max_cell_voltage"
+      },
+      {
+        "key": "bms_17_min_cell_voltage",
+        "label": "Модуль 17: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 17 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_min_cell_voltage"
+      },
+      {
+        "key": "bms_17_cycles",
+        "label": "Модуль 17: Цикли",
+        "unit": "",
+        "source_profile": "Battery 17 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_17_cycles"
+      }
+    ],
+    "bms_module_18": [
+      {
+        "key": "bms_18_voltage",
+        "label": "Модуль 18: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 18 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_voltage"
+      },
+      {
+        "key": "bms_18_current",
+        "label": "Модуль 18: Струм",
+        "unit": "А",
+        "source_profile": "Battery 18 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_current"
+      },
+      {
+        "key": "bms_18_temperature",
+        "label": "Модуль 18: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 18 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_temperature"
+      },
+      {
+        "key": "bms_18_soh",
+        "label": "Модуль 18: SOH",
+        "unit": "%",
+        "source_profile": "Battery 18 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_soh"
+      },
+      {
+        "key": "bms_18_capacity",
+        "label": "Модуль 18: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 18 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_capacity"
+      },
+      {
+        "key": "bms_18_alarm",
+        "label": "Модуль 18: Тривога",
+        "unit": "",
+        "source_profile": "Battery 18 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_alarm"
+      },
+      {
+        "key": "bms_18_fault",
+        "label": "Модуль 18: Помилка",
+        "unit": "",
+        "source_profile": "Battery 18 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_fault"
+      },
+      {
+        "key": "bms_18_max_cell_voltage",
+        "label": "Модуль 18: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 18 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_max_cell_voltage"
+      },
+      {
+        "key": "bms_18_min_cell_voltage",
+        "label": "Модуль 18: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 18 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_min_cell_voltage"
+      },
+      {
+        "key": "bms_18_cycles",
+        "label": "Модуль 18: Цикли",
+        "unit": "",
+        "source_profile": "Battery 18 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_18_cycles"
+      }
+    ],
+    "bms_module_19": [
+      {
+        "key": "bms_19_voltage",
+        "label": "Модуль 19: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 19 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_voltage"
+      },
+      {
+        "key": "bms_19_current",
+        "label": "Модуль 19: Струм",
+        "unit": "А",
+        "source_profile": "Battery 19 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_current"
+      },
+      {
+        "key": "bms_19_temperature",
+        "label": "Модуль 19: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 19 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_temperature"
+      },
+      {
+        "key": "bms_19_soh",
+        "label": "Модуль 19: SOH",
+        "unit": "%",
+        "source_profile": "Battery 19 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_soh"
+      },
+      {
+        "key": "bms_19_capacity",
+        "label": "Модуль 19: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 19 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_capacity"
+      },
+      {
+        "key": "bms_19_alarm",
+        "label": "Модуль 19: Тривога",
+        "unit": "",
+        "source_profile": "Battery 19 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_alarm"
+      },
+      {
+        "key": "bms_19_fault",
+        "label": "Модуль 19: Помилка",
+        "unit": "",
+        "source_profile": "Battery 19 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_fault"
+      },
+      {
+        "key": "bms_19_max_cell_voltage",
+        "label": "Модуль 19: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 19 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_max_cell_voltage"
+      },
+      {
+        "key": "bms_19_min_cell_voltage",
+        "label": "Модуль 19: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 19 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_min_cell_voltage"
+      },
+      {
+        "key": "bms_19_cycles",
+        "label": "Модуль 19: Цикли",
+        "unit": "",
+        "source_profile": "Battery 19 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_19_cycles"
+      }
+    ],
+    "bms_module_20": [
+      {
+        "key": "bms_20_voltage",
+        "label": "Модуль 20: Напруга",
+        "unit": "В",
+        "source_profile": "Battery 20 Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_voltage"
+      },
+      {
+        "key": "bms_20_current",
+        "label": "Модуль 20: Струм",
+        "unit": "А",
+        "source_profile": "Battery 20 Current",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_current"
+      },
+      {
+        "key": "bms_20_temperature",
+        "label": "Модуль 20: Температура",
+        "unit": "°C",
+        "source_profile": "Battery 20 Temperature",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_temperature"
+      },
+      {
+        "key": "bms_20_soh",
+        "label": "Модуль 20: SOH",
+        "unit": "%",
+        "source_profile": "Battery 20 SOH",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_soh"
+      },
+      {
+        "key": "bms_20_capacity",
+        "label": "Модуль 20: Ємність",
+        "unit": "А·год",
+        "source_profile": "Battery 20 Capacity",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_capacity"
+      },
+      {
+        "key": "bms_20_alarm",
+        "label": "Модуль 20: Тривога",
+        "unit": "",
+        "source_profile": "Battery 20 Alarm",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_alarm"
+      },
+      {
+        "key": "bms_20_fault",
+        "label": "Модуль 20: Помилка",
+        "unit": "",
+        "source_profile": "Battery 20 Fault",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_fault"
+      },
+      {
+        "key": "bms_20_max_cell_voltage",
+        "label": "Модуль 20: Макс. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 20 Max Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_max_cell_voltage"
+      },
+      {
+        "key": "bms_20_min_cell_voltage",
+        "label": "Модуль 20: Мін. напруга комірки",
+        "unit": "В",
+        "source_profile": "Battery 20 Min Cell Voltage",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_min_cell_voltage"
+      },
+      {
+        "key": "bms_20_cycles",
+        "label": "Модуль 20: Цикли",
+        "unit": "",
+        "source_profile": "Battery 20 Cycles",
+        "status": "optional_unverified",
+        "entity_id": "sensor.rakurs_bms_20_cycles"
+      }
+    ]
+  },
+  "all_metric_count": 316
+}

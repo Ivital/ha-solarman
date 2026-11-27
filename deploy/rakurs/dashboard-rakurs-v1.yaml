@@ -1,0 +1,325 @@
+# RAKURS — starter dashboard for a newly created EMPTY UI-managed dashboard.
+# Paste entire content into the Raw configuration editor of that dashboard ONLY.
+# Uses only built-in Sections / Heading / Markdown cards. No real Deye values claimed.
+# sensor.rakurs_* IDs are planned placeholders, not observed entities.
+views:
+  - title: "Огляд"
+    path: overview
+    icon: mdi:view-dashboard
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Головна панель"
+          icon: mdi:solar-power
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            ## RAKURS · Енергомоніторинг
+            
+            **Гібридна електростанція Deye — оперативна панель**
+            
+            Дата й час: {{ now().strftime('%d.%m.%Y %H:%M') }} · Київ
+            
+            _Панель підготовлена для підключення реальних показників. Порожні значення позначено «—»; тестові цифри не використовуються._
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Поточні потужності"
+          icon: mdi:flash
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ Сонячна генерація**
+            
+            {% set v = states('sensor.rakurs_pv_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Поточна потужність PV_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🏠 Споживання**
+            
+            {% set v = states('sensor.rakurs_load_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Поточне навантаження_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🌐 Електромережа**
+            
+            {% set v = states('sensor.rakurs_grid_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Знак обміну потребує перевірки_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🔋 Потужність батареї**
+            
+            {% set v = states('sensor.rakurs_battery_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Напрямок заряду/розряду потребує перевірки_{% endif %}
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Акумулятор і доба"
+          icon: mdi:battery-charging
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🔋 Заряд батареї (SOC)**
+            
+            {% set v = states('sensor.rakurs_battery_soc') %}
+            ## {{ (v ~ ' %') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Рівень заряду_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ Генерація за добу**
+            
+            {% set v = states('sensor.rakurs_pv_energy_today') %}
+            ## {{ (v ~ ' кВт·год') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Добовий виробіток_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🏠 Споживання за добу**
+            
+            {% set v = states('sensor.rakurs_load_energy_today') %}
+            ## {{ (v ~ ' кВт·год') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Добове споживання_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🌡️ Температура інвертора**
+            
+            {% set v = states('sensor.rakurs_inverter_temperature') %}
+            ## {{ (v ~ ' °C') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Температура обладнання_{% endif %}
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Енергетичні потоки"
+          icon: mdi:transmission-tower
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            ### ☀️ Сонце → ⚡ Інвертор → 🏠 Навантаження
+            
+            **🔋 Акумулятор ↔ Інвертор ↔ 🌐 Електромережа**
+            
+            Це **схема можливих напрямків**, не фактична телеметрія. Динамічні потоки будуть побудовані після перевірки регістрів Deye.
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Діагностика"
+          icon: mdi:lan-check
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Стан каналу Deye**
+            
+            {% set v = states('sensor.rakurs_inverter_status') %}
+            **{{ v if v not in ['unknown', 'unavailable', 'none', ''] else 'Дані інвертора ще не підключено' }}**
+            
+            З'єднання TCP із Teltonika перевірено; протокол і регістри Deye ще не підтверджені.
+  - title: "Інвертор"
+    path: inverter
+    icon: mdi:current-ac
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Трифазна мережа"
+          icon: mdi:sine-wave
+        - type: markdown
+          grid_options:
+            columns: 4
+          content: |-
+            **Фаза L1**
+            
+            {% set v = states('sensor.rakurs_voltage_l1') %}
+            Напруга: **{{ (v ~ ' В') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set c = states('sensor.rakurs_current_l1') %}
+            Струм: **{{ (c ~ ' А') if c not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set p = states('sensor.rakurs_power_l1') %}
+            Потужність: **{{ (p ~ ' кВт') if p not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+        - type: markdown
+          grid_options:
+            columns: 4
+          content: |-
+            **Фаза L2**
+            
+            {% set v = states('sensor.rakurs_voltage_l2') %}
+            Напруга: **{{ (v ~ ' В') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set c = states('sensor.rakurs_current_l2') %}
+            Струм: **{{ (c ~ ' А') if c not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set p = states('sensor.rakurs_power_l2') %}
+            Потужність: **{{ (p ~ ' кВт') if p not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+        - type: markdown
+          grid_options:
+            columns: 4
+          content: |-
+            **Фаза L3**
+            
+            {% set v = states('sensor.rakurs_voltage_l3') %}
+            Напруга: **{{ (v ~ ' В') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set c = states('sensor.rakurs_current_l3') %}
+            Струм: **{{ (c ~ ' А') if c not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+            
+            {% set p = states('sensor.rakurs_power_l3') %}
+            Потужність: **{{ (p ~ ' кВт') if p not in ['unknown', 'unavailable', 'none', ''] else '—' }}**
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Інвертор Deye"
+          icon: mdi:chip
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **⚡ Частота мережі**
+            
+            {% set v = states('sensor.rakurs_grid_frequency') %}
+            ## {{ (v ~ ' Гц') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Частота мережі_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **🔋 Напруга батареї**
+            
+            {% set v = states('sensor.rakurs_battery_voltage') %}
+            ## {{ (v ~ ' В') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Напруга АКБ_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ MPPT 1**
+            
+            {% set v = states('sensor.rakurs_mppt1_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Потужність MPPT 1_{% endif %}
+        - type: markdown
+          grid_options:
+            columns: 6
+          content: |-
+            **☀️ MPPT 2**
+            
+            {% set v = states('sensor.rakurs_mppt2_power') %}
+            ## {{ (v ~ ' кВт') if v not in ['unknown', 'unavailable', 'none', ''] else '—' }}
+            
+            {% if v in ['unknown', 'unavailable', 'none', ''] %}_Очікування підтверджених показників Deye_{% else %}_Потужність MPPT 2_{% endif %}
+  - title: "Історія"
+    path: history
+    icon: mdi:chart-line
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Графіки та облік"
+          icon: mdi:chart-areaspline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Історія та графіки**
+            
+            Після підтвердження регістрів будуть додані реальні часові ряди: PV, навантаження, заряд/розряд АКБ, імпорт/експорт мережі.
+            
+            _Наразі графіків немає — історичних вимірювань Deye ще не отримано._
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Планована аналітика"
+          icon: mdi:calendar-clock
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Добовий огляд**
+            
+            Погодинна генерація, навантаження, заряд АКБ та обмін з мережею.
+            
+            _Очікуємо надходження історичних значень._
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Місячні підсумки**
+            
+            КВт·год за періодами, самоспоживання та енергобаланс.
+            
+            _Розрахунки не виконуються без достовірних лічильників._
+  - title: "Система"
+    path: system
+    icon: mdi:cog-outline
+    type: sections
+    max_columns: 3
+    sections:
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Статус впровадження"
+          icon: mdi:shield-check
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **Вебінтерфейс Rakurs** — налаштований через HTTPS.
+            
+            **Home Assistant** — працює у Docker.
+            
+            **Зв'язок до Teltonika** — TCP CONNECT підтверджено.
+            
+            **Modbus Deye** — режим шлюзу, Slave ID і карта регістрів очікують перевірки.
+            
+            **Керування інвертором** — вимкнено; тільки читання.
+      - type: grid
+        cards:
+        - type: heading
+          heading: "Про систему"
+          icon: mdi:information-outline
+        - type: markdown
+          grid_options:
+            columns: 12
+          content: |-
+            **RAKURS · Диспетчеризація енергосистеми**
+            
+            Панель працює на Home Assistant. Призначена для інвертора Deye з 3 фазами та 2 MPPT.
+            
+            Тимчасові імена `sensor.rakurs_*` — **планові**, не підтверджені сутності Home Assistant. Після підключення інтеграції їх замінимо фактичними Entity ID.

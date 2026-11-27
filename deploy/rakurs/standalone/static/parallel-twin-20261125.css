@@ -1,0 +1,170 @@
+/* Verified-only parallel inverter overview. */
+.parallel-intro,.parallel-shared{margin:18px 0}
+.parallel-warning{background:#342817;border:1px solid #68533c;color:#f7ddb4!important;
+  border-radius:10px;padding:12px 14px;font-size:12px!important;line-height:1.5}
+.parallel-devices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;
+  margin:20px 0}
+.parallel-device{min-width:0;border:1px solid #35536b;background:#12283b;
+  border-radius:16px;padding:19px 18px}
+.parallel-device-head{display:flex;justify-content:space-between;align-items:center;
+  gap:12px;flex-wrap:wrap}
+.parallel-device-name{font-size:17px;font-weight:750}
+.parallel-state{border:1px solid #8d7451;color:#eed2a0;background:#362b223d;
+  font-size:10.5px;padding:6px 9px;border-radius:100px}
+.parallel-device-model{color:#97b6c8;font-size:11.5px;margin:5px 0 18px}
+.parallel-facts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+.parallel-fact{min-width:0;border:1px solid #30475a;border-radius:10px;
+  background:#182e42;padding:11px 12px;overflow-wrap:anywhere}
+.parallel-fact small{display:block;color:#91aabf;font-size:10px;margin-bottom:4px}
+.parallel-fact strong{font-size:11px;font-weight:600;line-height:1.4;color:#d5e8f1}
+.parallel-metric-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:15px}
+.parallel-reading{background:#17364b;border:1px solid #32546a;padding:10px;
+  border-radius:10px;display:flex;flex-direction:column;gap:5px}
+.parallel-reading small{font-size:10px;color:#a8c1d2}
+.parallel-reading strong{font-size:17px;color:#e3f5f5}
+.parallel-reading span{font-size:9px;color:#86a4b8}
+.parallel-device-events{font-size:11px;color:#abc8d5;margin:12px 0 0}
+.parallel-device-chart{border-top:1px solid #31526a;margin-top:17px;padding-top:14px}
+.parallel-device-chart h3{font-size:12px;margin:0 0 12px;color:#b4cfdd}
+.parallel-device-chart .chart{background:#122b40;border-color:#34516a}
+.shared-soc{font-size:26px;font-weight:780;color:#82d9e4;margin:10px 0}
+.parallel-aggregate{font-size:13px;border:1px dashed #416175;background:#173148;
+  padding:15px;border-radius:12px;color:#c2deea}
+.parallel-readonly-note{color:#a8c1d2;font-size:12px;line-height:1.5}
+@media(max-width:1100px){.parallel-devices{grid-template-columns:1fr}}
+@media(max-width:600px){.parallel-facts{grid-template-columns:1fr}
+  .parallel-metric-list{grid-template-columns:1fr}}
+
+.parallel-demo-panel{border-color:#68553b}
+.parallel-demo-counters{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:17px 0}
+.parallel-demo-counter{background:#183345;border:1px solid #375269;border-radius:11px;
+  min-width:0;padding:12px;display:flex;flex-direction:column;gap:5px}
+.parallel-demo-counter strong{font-size:21px;color:#dff0f3}
+.parallel-demo-counter small{font-size:10px;color:#a5bfd0}
+.parallel-raw-viewer{margin-top:18px;border-top:1px solid #355269;padding-top:14px}
+.parallel-raw-viewer h3{font-size:12px;color:#d5e9f1}
+.parallel-raw-table{max-height:390px;overflow-y:auto;display:flex;flex-direction:column}
+.parallel-raw-row{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;
+  border-bottom:1px solid #2a455b;padding:7px 9px;font-size:11px}
+.parallel-raw-row:nth-child(even){background:#213747}
+.parallel-raw-row code{font-size:11px;color:#91dcd6}
+.parallel-raw-row small{color:#e5c89f;text-align:right}
+@media(max-width:520px){.parallel-demo-counters{grid-template-columns:1fr 1fr 1fr}
+  .parallel-demo-counter{padding:9px}
+  .parallel-demo-counter strong{font-size:17px}
+  .parallel-raw-row{gap:4px}}
+
+/* Both registered Deye devices are visible on overview and parallel pages. */
+.parallel-home-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:15px;
+  margin:14px 0 12px}
+.parallel-home-device{border-color:#357c8a}
+.parallel-home-foot{display:flex;flex-wrap:wrap;justify-content:space-between;
+  align-items:center;gap:12px;margin-top:16px;color:#aac6d5;font-size:11px}
+.parallel-open-link{color:#7ce6e7;text-decoration:none;display:inline-flex;
+  margin:12px 8px 0 0;align-items:center;min-height:34px;padding:7px 12px;
+  border:1px solid #39798a;border-radius:9px;background:#183f50;font:inherit;
+  font-size:12px;cursor:pointer}
+.parallel-open-link:hover,.parallel-open-link:focus-visible{color:#fff;
+  background:#24596a;outline:2px solid #77dfde;outline-offset:2px}
+.parallel-open-link[aria-pressed="true"]{border-color:#77dfde;
+  box-shadow:inset 3px 0 0 #77dfde;background:#205565}
+.parallel-field-viewer{margin-top:16px}
+.parallel-field-row{display:grid;grid-template-columns:105px minmax(0,1fr) 145px 74px;
+  align-items:center;gap:9px;padding:8px 10px;border-bottom:1px solid #29445a;
+  font-size:11px}
+.parallel-field-row:nth-child(even){background:#203849}
+.parallel-field-row code{overflow-wrap:anywhere;color:#88dadd}
+.parallel-field-row span{min-width:0;overflow-wrap:anywhere;color:#c5d9e5}
+.parallel-field-row strong{font-weight:650;overflow-wrap:anywhere;color:#e5f2f6}
+.parallel-field-row small{color:#f0cd9c;text-align:right;font-size:9px}
+@media(max-width:1000px){.parallel-home-grid{grid-template-columns:1fr}}
+@media(max-width:620px){
+  .parallel-field-row{grid-template-columns:80px minmax(0,1fr);gap:4px}
+  .parallel-field-row strong,.parallel-field-row small{text-align:left}
+}
+
+/* Configuration plane: bounded, accessible controls and clear disabled state. */
+.settings-panel{margin:12px 0 20px}
+.settings-fields{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:13px;margin:15px 0}
+.settings-field{display:flex;flex-direction:column;gap:6px;min-width:0;
+  font-size:12px;color:#bcd6e4}
+.settings-field input,.settings-field select{min-width:0;width:100%;
+  padding:10px 11px;background:#162e43;border:1px solid #3b6079;
+  border-radius:9px;color:#e1f4f5;font-size:13px}
+.settings-field input[type="checkbox"]{height:20px;width:20px;accent-color:#73dcd0}
+.settings-field :focus-visible{outline:2px solid #86e0d5;outline-offset:2px}
+.settings-field :disabled{opacity:.66;cursor:not-allowed}
+.settings-save{border:1px solid #70cfc3;background:#1b645e;color:#f5ffff;
+  border-radius:10px;padding:10px 15px;font:inherit;font-weight:700;
+  cursor:pointer}
+.settings-save:disabled{opacity:.5;cursor:wait}
+.settings-state{font-size:13px;color:#9ce0d2}
+@media(max-width:900px){.settings-fields{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:550px){.settings-fields{grid-template-columns:1fr}}
+
+.device-select-wrap{display:inline-flex;align-items:center;gap:6px;color:#b5d2dc;
+  font-size:11px;white-space:nowrap}
+.device-select-wrap select{border:1px solid #3c7180;background:#163f4d;
+  padding:7px 9px;border-radius:8px;color:#dcfaf5;font:inherit;min-width:112px}
+.device-select-wrap select:focus-visible{outline:2px solid #80e1d6;outline-offset:2px}
+.device-select-wrap select[hidden]{display:none}
+
+/* Chart tiles: overview and dedicated charts both use a balanced 2×2
+   desktop layout. The network tile has its own distinct "trend-network"
+   class: do NOT use "trend-grid" for a tile (it is a grid container). */
+.trend-network .chart polyline {stroke:var(--grid,#bbb0f3)}
+.trend-card.trend-network {
+  display:block;
+  min-width:0;
+}
+.trend-section.full-trends,
+.trend-section.full-trends .trend-grid,
+.trend-content,
+.history-chart,
+.history-records,
+.parallel-device-chart {
+  min-width:0;
+  width:100%;
+  max-width:none;
+}
+.trend-section.full-trends .trend-grid {
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  align-items:stretch;
+}
+.trend-content .chart,
+.history-chart .chart,
+.history-records .chart,
+.parallel-device-chart .chart {
+  box-sizing:border-box;
+  display:block;
+  width:100%;
+  max-width:none;
+  height:auto;
+}
+@media(max-width:760px) {
+  .trend-section.full-trends .trend-grid {
+    grid-template-columns:minmax(0,1fr);
+  }
+}
+
+/* Read-only wiring map for one TRB145 and two Deye Modbus units. */
+.shared-bus-guide h3{font-size:13px;margin:16px 0 8px}
+.shared-bus-chain{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:16px 0}
+.shared-bus-node{background:#173a4b;border:1px solid #3c8190;color:#c9ebf1;
+  border-radius:10px;padding:13px 9px;text-align:center;font-size:11px;font-weight:650;line-height:1.45}
+.shared-bus-inverters{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.shared-bus-inverter{display:flex;flex-direction:column;gap:6px;padding:13px;
+  background:#152d41;border:1px solid #3a596e;border-radius:10px;
+  overflow-wrap:anywhere;font-size:12px}
+.shared-bus-inverter small,.shared-bus-result small{color:#f2d2a8}
+.shared-bus-result{display:flex;flex-direction:column;gap:6px;padding:13px;margin:10px 0;
+  background:#193649;border:1px solid #456479;border-radius:10px;
+  overflow-wrap:anywhere;font-size:12px}
+.shared-bus-result .shared-bus-valid{color:#9ce4c9}
+.shared-bus-result .shared-bus-alert{color:#f2c38f}
+.shared-bus-rules{padding-left:20px;line-height:1.7;font-size:12px;color:#bcd5e1}
+.shared-bus-rules li{margin:7px 0}
+@media(max-width:820px){.shared-bus-chain{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:520px){.shared-bus-inverters{grid-template-columns:1fr}
+  .shared-bus-chain{grid-template-columns:1fr}}

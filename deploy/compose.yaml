@@ -1,0 +1,36 @@
+name: deye-monitoring
+services:
+  homeassistant:
+    image: ${HA_IMAGE:-ghcr.io/home-assistant/home-assistant:stable}
+    container_name: deye-homeassistant
+    # Probe mode on the shared Odoo host. No automatic OOM restart loop.
+    restart: "no"
+    # Home Assistant uses s6-overlay as PID 1; Docker tini (--init) breaks startup.
+    init: false
+    # Hard cgroup constraints: HA may stop on OOM, but cannot consume all host RAM.
+    mem_limit: ${HA_MEMORY_LIMIT:-1536m}
+    memswap_limit: ${HA_MEMSWAP_LIMIT:-1536m}
+    cpus: ${HA_CPU_LIMIT:-1.0}
+    pids_limit: 160
+    stop_grace_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    environment:
+      TZ: ${TZ:-Europe/Kyiv}
+    ports:
+      - "127.0.0.1:${HA_PORT:-8123}:8123"
+    volumes:
+      - ./data:/config:rw
+      - ../custom_components/solarman:/config/custom_components/solarman:ro
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - monitoring
+networks:
+  monitoring:
+    driver: bridge

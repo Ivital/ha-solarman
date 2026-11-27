@@ -1,0 +1,50 @@
+name: Rakurs V7 Visual QA
+on:
+  push:
+    branches:
+      - 'feature/rakurs-v7-*'
+      - 'feature/deye-trb145-monitoring'
+  pull_request:
+    branches:
+      - 'feature/deye-trb145-monitoring'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-visual-acceptance:
+    name: Chromium visual and data-quality acceptance
+    runs-on: ubuntu-24.04
+    timeout-minutes: 22
+    steps:
+      - name: Checkout exact commit
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Check pure view model and frontend syntax
+        run: |
+          node --check deploy/rakurs/standalone/static/rakurs-v7-model.js
+          node --check deploy/rakurs/standalone/static/rakurs-v7.js
+          node tests/test_rakurs_v7_model.js
+          python -m py_compile tests/test_rakurs_v7_visual.py tests/test_rakurs_v7_app_e2e.py
+      - name: Install real browser testing dependencies
+        run: |
+          python -m pip install --disable-pip-version-check playwright==1.56.0 pillow==11.3.0 Jinja2==3.1.6
+          python -m playwright install --with-deps chromium
+      - name: Render and inspect real Chromium pages
+        env:
+          RAKURS_V7_SCREENSHOTS: artifacts/rakurs-v7
+        run: |
+          python tests/test_rakurs_v7_visual.py
+          python tests/test_rakurs_v7_app_e2e.py
+      - name: Upload mobile and desktop screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rakurs-v7-browser-screenshots
+          path: artifacts/rakurs-v7
+          if-no-files-found: warn
+          retention-days: 14

@@ -1,0 +1,171 @@
+#!/usr/bin/env bash
+# Validate NEW source against live MySQL without deploying or changing services.
+set -Eeuo pipefail
+umask 077
+[[ "${1:---check}" == "--check" ]] || { echo "Usage: $0 --check" >&2; exit 2; }
+HERE="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+ROOT="$(cd -- "$HERE/.." && pwd)"
+WORK="$(mktemp -d /tmp/rakurs-new-code-check-XXXXXXXX)"
+trap 'rm -rf "$WORK"' EXIT
+chmod 0755 "$WORK"
+install -d -m 0755 "$WORK/standalone" "$WORK/standalone/templates" "$WORK/standalone/static"
+for file in __init__.py app.py auth.py config_api.py poll_worker.py parallel_support.py modbus_archive.py modbus_wire.py mysql_transport.py; do
+  install -m 0644 "$HERE/$file" "$WORK/standalone/$file"
+done
+install -m 0644 "$ROOT/signal_catalog.json" "$WORK/signal_catalog.json"
+for file in templates/index.html templates/deye_server.html templates/login.html static/app-parallel-twin-20261125.js static/app.js static/app-stable-20261124.js; do
+  install -m 0644 "$HERE/$file" "$WORK/standalone/$file"
+done
+sudo -v
+sudo -u rakurs env \
+  PYTHONPATH="$WORK" PYTHONDONTWRITEBYTECODE=1 \
+  RAKURS_DB_USER=rakurs_web \
+  RAKURS_DB_PASSWORD_FILE=/etc/rakurs/mysql_password \
+  RAKURS_SESSION_SECRET_FILE=/etc/rakurs/session_secret \
+  /var/lib/rakurs/.venv/bin/python - <<'PY'
+from importlib import import_module
+from urllib.parse import quote
+import time
+import pymysql
+
+m=import_module("standalone.app")
+
+# Diagnostic wrappers are confined to this isolated process. They print a
+# MySQL errno and relevant table family, not credentials or SQL parameter data.
+def monitored(action, original):
+    def wrapper(sql, params=()):
+        started = time.monotonic()
+        table = next((name for name in (
+            "rakurs_modbus_field_samples", "rakurs_samples",
+            "rakurs_signals", "rakurs_modbus_fields",
+            "rakurs_parallel_members") if name in sql), "other")
+        try:
+            return original(sql, params)
+        except pymysql.MySQLError as error:
+            errno = error.args[0] if error.args and isinstance(error.args[0], int) else "unknown"
+            print("MYSQL_READ_ERROR", action, "TABLE", table, "ERRNO", errno,
+                  "MS", round((time.monotonic()-started)*1000), flush=True)
+            raise
+        finally:
+            elapsed = round((time.monotonic()-started)*1000)
+            if elapsed > 2500:
+                print("MYSQL_SLOW_READ", action, "TABLE", table, "MS", elapsed,
+                      flush=True)
+    return wrapper
+
+m.rows = monitored("rows", m.rows)
+m.one = monitored("one", m.one)
+with m.open_db() as db:
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT TABLE_NAME,COLUMN_NAME FROM information_schema.COLUMNS "
+            "WHERE TABLE_SCHEMA=DATABASE() "
+            "AND TABLE_NAME IN ('rakurs_samples','rakurs_modbus_field_samples')"
+        )
+        columns = {}
+        for row in cur.fetchall():
+            columns.setdefault(row["TABLE_NAME"], set()).add(row["COLUMN_NAME"])
+        expected = {
+            "rakurs_samples": {"device_id", "signal_id", "observed_at_utc"},
+            "rakurs_modbus_field_samples":
+                {"device_id", "field_id", "observed_at_utc"},
+        }
+        for table, keys in expected.items():
+            actual = columns.get(table, set())
+            if not keys <= actual or "id" in actual:
+                raise AssertionError(
+                    f"MYSQL_COMPOSITE_PK_MISMATCH={table} "
+                    f"missing={sorted(keys - actual)} unexpected_id={'id' in actual}"
+                )
+        print("MYSQL_COMPOSITE_KEY_COLUMNS=PASS")
+        cur.execute("SELECT id,session_version FROM rakurs_users "
+                    "WHERE is_active=1 ORDER BY id LIMIT 1")
+        user=cur.fetchone()
+if not user:
+    raise SystemExit("NEW_CODE_READONLY_FAIL=NO_ACTIVE_USER")
+guest=m.app.test_client()
+for path,expected in (("/login",200),("/api/v1/status",401),("/api/v1/parallel",401)):
+    r=guest.get(path,base_url="https://localhost")
+    assert r.status_code==expected,(path,r.status_code)
+c=m.app.test_client()
+with c.session_transaction(base_url="https://localhost") as session:
+    session.update(uid=user["id"],ver=user["session_version"],at=int(time.time()))
+def get(path):
+    started = time.monotonic()
+    r=c.get(path,base_url="https://localhost")
+    print("ROUTE",path.split("?")[0],"HTTP",r.status_code,
+          "MS",round((time.monotonic()-started)*1000),flush=True)
+    if r.status_code!=200:
+        raise AssertionError(f"NEW_CODE_ROUTE_FAIL={path} HTTP={r.status_code}")
+    return r.get_json() if r.is_json else r.get_data(as_text=True)
+for path in ("/","/deye","/deye/modbus",
+             "/api/v1/auth","/api/v1/catalog","/api/v1/signals",
+             "/api/v1/latest?keys=pv_power,load_power,battery_soc",
+             "/api/v1/history?key=pv_power&hours=24",
+             "/api/v1/events","/api/v1/batches",
+             "/api/v1/modbus-fields","/api/v1/parallel/health",
+             "/api/v1/config"):
+    get(path)
+status=get("/api/v1/status")
+devices=get("/api/v1/devices")
+assert status["mode"]=="real"
+assert status["registered_devices"]==len(devices["devices"]),(
+    status["registered_devices"],len(devices["devices"]))
+topology=get("/api/v1/parallel")
+listed=topology["devices"]
+assert topology["registered_inverters"]==len(listed)
+assert len(listed)==2, "Expected the two Deye group slots"
+assert [int(d["slot_no"]) for d in listed]==[1,2], (
+    "The public API must label the two physical slots Deye №1/№2", listed)
+print("DEYE_SLOT_LABELS=PASS")
+with m.open_db() as db:
+    with db.cursor() as cur:
+        cur.execute(
+            "SELECT d.id,d.device_key,pm.slot_no FROM rakurs_devices AS d "
+            "JOIN rakurs_parallel_members AS pm ON pm.device_id=d.id "
+            "JOIN rakurs_parallel_groups AS pg ON pg.id=pm.group_id "
+            "WHERE pg.group_key=%s AND pm.slot_no IN (1,2) "
+            "ORDER BY pm.slot_no",
+            ("deye_sun20k_parallel_shared_battery",),
+        )
+        slots = {x["slot_no"]:x for x in cur.fetchall()}
+        cur.execute(
+            "SELECT COUNT(*) AS n FROM rakurs_devices WHERE device_key=%s",
+            ("simulated_deye_sg05lp3",),
+        )
+        legacy = cur.fetchone()["n"]
+assert set(slots)=={1,2}
+assert slots[1]["device_key"]==listed[0]["device_key"]
+assert slots[2]["device_key"]==listed[1]["device_key"]
+default = get("/api/v1/latest?keys=pv_power")
+assert default["primary_device_id"]==slots[1]["id"]
+second = get("/api/v1/latest?keys=pv_power&device="+quote(slots[2]["device_key"]))
+assert second["primary_device_id"]==slots[2]["id"]
+for endpoint in (
+    "/api/v1/parallel/simulation",
+    "/api/v1/parallel/simulation/latest?device=sim_deye20k_parallel_1",
+    "/api/v1/parallel/simulation/raw?device=sim_deye20k_parallel_1",
+    "/api/v1/parallel/simulation/fields?device=sim_deye20k_parallel_1",
+):
+    assert c.get(endpoint,base_url="https://localhost").status_code==404
+assert c.get(
+    "/api/v1/latest?keys=pv_power&device=simulated_deye_sg05lp3",
+    base_url="https://localhost").status_code==404
+print("DEYE_1_PRIMARY_MATCH=PASS")
+print("DEYE_2_SCOPED_SELECTION=PASS")
+print("LEGACY_SIMULATION_APIS_RETIRED=PASS")
+print("LEGACY_SINGLE_DEYE_PRESENT=",legacy)
+for item in listed:
+    key=item["device_key"]
+    encoded=quote(key,safe="")
+    for path in (f"/api/v1/parallel/latest?device={encoded}",
+                 f"/api/v1/parallel/history?device={encoded}&key=pv_power&hours=24",
+                 f"/api/v1/parallel/raw?device={encoded}&limit=5",
+                 f"/api/v1/parallel/modbus-fields?device={encoded}"):
+        result=get(path)
+        assert result["device_key"]==key
+print("MYSQL_DEVICES=",len(devices["devices"]))
+print("DEYE_SLOTS=",len(listed))
+print("NEW_CODE_MYSQL_READONLY=PASS")
+print("MYSQL_WRITES=0 MODBUS_COMMANDS=0 SERVICES_RESTARTED=0")
+PY

@@ -5,6 +5,7 @@ from .const import *
 from .common import *
 from .provider import *
 from .pysolarman import Solarman
+from .read_only import require_read_function
 
 _LOGGER = getLogger(__name__)
 
@@ -43,6 +44,8 @@ class Device():
         self.info = {}
 
     async def setup(self):
+        if self.config.transport != "modbus_tcp":
+            raise ValueError("Monitoring instance permits only Modbus TCP over secured gateway")
         try:
             self.endpoint = await EndPointProvider(self.config).init()
             self.modbus = Solarman(*self.endpoint.connection)
@@ -62,6 +65,8 @@ class Device():
             await self.modbus.close()
 
     async def execute(self, code, address, **kwargs):
+        # Block every non-read function before the network I/O.
+        require_read_function(code)
         _LOGGER.debug(f"[{self.endpoint.host}] Request {code:02} ❘ 0x{code:02X} ~ {address:04} ❘ 0x{address:04X}: {kwargs}")
 
         try:

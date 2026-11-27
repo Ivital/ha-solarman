@@ -1,0 +1,31 @@
+[Unit]
+Description=RAKURS read-only operational alerts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=rakurs
+Group=rakurs
+WorkingDirectory=/opt/rakurs
+Environment=PYTHONPATH=/opt/rakurs
+Environment=RAKURS_DB_USER=rakurs_web
+Environment=RAKURS_DB_PASSWORD_FILE=/etc/rakurs/mysql_password
+Environment=RAKURS_SESSION_SECRET_FILE=/etc/rakurs/session_secret
+ExecStart=/var/lib/rakurs/.venv/bin/python -m standalone.alert_monitor
+StateDirectory=rakurs-alerts
+StateDirectoryMode=0750
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryMax=192M
+TimeoutStartSec=55
+UMask=0077

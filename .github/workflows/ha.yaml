@@ -13,6 +13,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: home-assistant/actions/hassfest@master
   hacs:
+    # A private-purpose fork is installed via Docker volume, not published in HACS.
+    # HACS public-repository checks require topics, Issues and brand assets.
+    if: github.repository == 'davidrapan/ha-solarman'
     name: with hacs
     runs-on: ubuntu-latest
     steps:

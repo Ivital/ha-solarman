@@ -141,6 +141,10 @@ class SolarmanWritableEntity(SolarmanEntity):
         return self._attr_native_value
 
     async def write(self, value, state = None) -> None:
+        # Safety: this monitoring-only fork must never change a register.
+        # Keep a second barrier even if writable HA platforms are enabled.
+        raise PermissionError("Deye register writes are permanently disabled")
+
         #self.coordinator.device.check(self._write_lock)
         data = value
         register = self.register

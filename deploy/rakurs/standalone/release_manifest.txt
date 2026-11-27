@@ -1,0 +1,33 @@
+# One source of truth for files copied into the fresh Flask service.
+# Paths are relative to deploy/rakurs/standalone.
+__init__.py
+app.py
+auth.py
+config_api.py
+poll_worker.py
+mysql_transport.py
+parallel_support.py
+modbus_wire.py
+modbus_archive.py
+requirements.txt
+templates/index.html
+templates/login.html
+templates/deye_server.html
+static/app.js
+static/app-stable-20261124.js
+static/style.css
+static/login.css
+static/clarity-ui-20261124.css
+static/events-ui-20261124.css
+static/parallel-twin-20261125.css
+static/app-parallel-twin-20261125.js
+static/deye-server.css
+static/rakurs-color-20261125.css
+static/register-reference-v1053.json
+static/rakurs-pages-20261126.css
+static/rakurs-page-theme-20261126.js
+static/rakurs-mobile-nav-20261126.js
+static/rakurs-mobile-nav-20261126.css
+static/rakurs-v7-model.js
+static/rakurs-v7.js
+static/rakurs-v7.css

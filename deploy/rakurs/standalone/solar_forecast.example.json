@@ -1,0 +1,26 @@
+{
+  "enabled": false,
+  "provider": "open_meteo_customer",
+  "external_location_sharing_approved": false,
+  "latitude": null,
+  "longitude": null,
+  "api_key": null,
+  "arrays": [
+    {
+      "slot": 1,
+      "kwp": null,
+      "tilt": null,
+      "azimuth": null,
+      "performance_ratio": null,
+      "ac_limit_kw": 20
+    },
+    {
+      "slot": 2,
+      "kwp": null,
+      "tilt": null,
+      "azimuth": null,
+      "performance_ratio": null,
+      "ac_limit_kw": 20
+    }
+  ]
+}

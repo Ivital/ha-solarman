@@ -18,7 +18,6 @@ from homeassistant.helpers.typing import DiscoveryInfoType
 
 from .const import *
 from .common import *
-from .discovery import discover
 
 _LOGGER = getLogger(__name__)
 
@@ -29,7 +28,7 @@ CREATION_SCHEMA = {
 CONFIGURATION_SCHEMA = {
     vol.Required(CONF_HOST, default = DEFAULT_[CONF_HOST], description = {SUGGESTED_VALUE: DEFAULT_[CONF_HOST]}): str,
     vol.Optional(CONF_PORT, default = DEFAULT_[CONF_PORT], description = {SUGGESTED_VALUE: DEFAULT_[CONF_PORT]}): cv.port,
-    vol.Optional(CONF_TRANSPORT, default = DEFAULT_[CONF_TRANSPORT], description = {SUGGESTED_VALUE: DEFAULT_[CONF_TRANSPORT]}): SelectSelector(SelectSelectorConfig(options = ["tcp", "modbus_tcp", "modbus_rtu"], mode = "dropdown", translation_key = "transport")),
+    vol.Optional(CONF_TRANSPORT, default = DEFAULT_[CONF_TRANSPORT], description = {SUGGESTED_VALUE: DEFAULT_[CONF_TRANSPORT]}): SelectSelector(SelectSelectorConfig(options = ["modbus_tcp"], mode = "dropdown", translation_key = "transport")),
     vol.Optional(CONF_LOOKUP_FILE, default = DEFAULT_[CONF_LOOKUP_FILE], description = {SUGGESTED_VALUE: DEFAULT_[CONF_LOOKUP_FILE]}): str,
     vol.Required(CONF_ADDITIONAL_OPTIONS): section(
         vol.Schema({
@@ -128,15 +127,7 @@ class ConfigFlowHandler(ConfigFlow, domain = DOMAIN):
                     continue
             else:
                 name = None
-            if not (ip := None if not user_input else user_input.get(CONF_HOST)):
-                async for v in await discover(self.hass):
-                    try:
-                        self._async_abort_entries_match({CONF_HOST: (ip := v["ip"])})
-                        break
-                    except:
-                        continue
-                else:
-                    ip = None
+            ip = None if not user_input else user_input.get(CONF_HOST)
             return self.async_show_form(step_id = "user", data_schema = self.add_suggested_values_to_schema(await data_schema(self.hass, CREATION_SCHEMA | CONFIGURATION_SCHEMA), {CONF_NAME: name, CONF_HOST: ip}))
         if errors := validate_connection(user_input):
             return self.async_show_form(step_id = "user", data_schema = self.add_suggested_values_to_schema(await data_schema(self.hass, CREATION_SCHEMA | CONFIGURATION_SCHEMA), user_input), errors = errors)
