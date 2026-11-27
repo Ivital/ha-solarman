@@ -73,7 +73,7 @@ function time(value) {
       day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit" });
 }
 function number(value) {
-  if (value === null || value === undefined) return "—";
+  if (value === null || value === undefined || value === "") return "—";
   const n = Number(value);
   return Number.isFinite(n) ? n.toLocaleString("uk-UA", {maximumFractionDigits: 4}) : "—";
 }
@@ -103,7 +103,10 @@ async function api(path, options = {}) {
     (path.includes("?") ? "&" : "?") +
     "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
   const url = base + path + suffix;
-  const response = await fetch(url, {cache:"no-store",credentials:"same-origin",
+  const controller=typeof AbortController==="function"?new AbortController():null;
+  const timer=controller&&typeof window.setTimeout==="function"?window.setTimeout(()=>controller.abort(),15000):null;
+  try {
+  const response = await fetch(url, {cache:"no-store",credentials:"same-origin",signal:controller?.signal,
     method:options.body ? "POST" : "GET",
     headers:options.body ? {"Content-Type":"application/json",
       "X-CSRF-Token":state.csrf || ""} : {},
@@ -112,7 +115,9 @@ async function api(path, options = {}) {
     const error = await response.json().catch(() => ({}));
     throw new Error(error.error || "Помилка API RAKURS (" + response.status + ")");
   }
-  return response.json();
+  return await response.json();
+  } catch(error){if(error.name==="AbortError")throw Error("Час очікування API вичерпано. Повторіть запит.");throw error;}
+  finally{if(timer!==null)window.clearTimeout(timer);}
 }
 function createLogout(auth) {
   const actions = document.querySelector(".top-actions");
@@ -224,7 +229,7 @@ function addStatusMessage() {
 }
 function reading(values, key) {
   const item = values[key];
-  return item && item.value_decimal !== null && item.value_decimal !== undefined ?
+  return item && item.value_decimal !== null && item.value_decimal !== undefined && item.value_decimal !== "" ?
     Number(item.value_decimal) : null;
 }
 function pretty(value, decimals = 1) {
@@ -553,9 +558,9 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
         status:state.status,loading,
         historyLoader:(device,key,frame)=>api("/parallel/history?device="+
           encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
-          "&hours="+encodeURIComponent(frame)),
+          "&hours="+encodeURIComponent(frame)+"&anchor=latest&resolution=auto"),
         historyRangeLoader:(device,key,start,end)=>api("/history/range?device="+encodeURIComponent(device)+
-          "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end))
+          "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)+"&resolution=auto")
       });
       return;
     }
@@ -680,7 +685,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     const index = ++requestIndex;
     bodies.forEach(body => body.replaceChildren(element("p", "subtle", "Завантаження графіка…")));
     const results = await Promise.allSettled(series.map(([key]) =>
-      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours+"&anchor=latest")));
+      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours+"&anchor=latest&resolution=auto")));
     if (!current(cycle) || index !== requestIndex) return;
     const allEmpty = results.every(result => result.status === "fulfilled" &&
       !(result.value.points || []).some(point => point.value_decimal !== null &&
@@ -732,7 +737,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
       body.appendChild(element("strong", "trend-latest", pretty(Number(currentValue)) +
         " " + series[i][2]));
       body.appendChild(interactiveChart(points, series[i][2]));
-      body.appendChild(element("p", "subtle", points.length +
+      body.appendChild(element("p", "subtle", (result.value.resolution==="extrema"?"Деталізація: "+points.length+" із "+result.value.sample_count+" · ":"") + points.length +
         " точок · " + time(points[0].observed_at_utc) +
         " — " + time(points[points.length - 1].observed_at_utc)));
     });
@@ -775,7 +780,7 @@ async function renderComparativeAnalytics(cycle){
     const dates=devices.flatMap(d=>Object.values(d.values||{}).map(r=>Date.parse(r.observed_at_utc))).filter(Number.isFinite);
     if(!dates.length){body.replaceChildren(createEmpty("Немає часу запису","Неможливо визначити спільний період."));return;}
     const end=Math.max(...dates),start=end-Number(span.value||72)*3600000;
-    const results=await Promise.allSettled(devices.map(d=>api("/history/range?device="+encodeURIComponent(d.device_key)+"&key="+metric[0]+"&start="+encodeURIComponent(new Date(start).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z")))));
+    const results=await Promise.allSettled(devices.map(d=>api("/history/range?device="+encodeURIComponent(d.device_key)+"&key="+metric[0]+"&start="+encodeURIComponent(new Date(start).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z"))+"&resolution=auto")));
     if(!current(cycle)||token!==requestNo)return;
     clear(body);
     const all=results.flatMap(r=>r.status==="fulfilled"?(r.value.points||[]):[]).filter(x=>x.value_decimal!=null&&x.value_decimal!==""&&Number.isFinite(Number(x.value_decimal))).map(x=>Number(x.value_decimal));
@@ -902,7 +907,7 @@ async function renderGroup(groups, title, cycle) {
       const record=values[metric.key],value=record?.value_decimal;
       const tile=element("div","product-metric-highlight");
       add(tile,element("small","",metric.label),
-        element("strong","",value==null?"—":pretty(Number(value),3)+" "+(record.unit||"")),
+        element("strong","",value==null||value===""?"—":pretty(Number(value),3)+" "+(record.unit||"")),
         element("span","",record?.observed_at_utc?time(record.observed_at_utc):"Немає запису"));
       overview.appendChild(tile);
     }
@@ -1075,7 +1080,7 @@ async function renderHistory(cycle, archived) {
     clear(tableArea);
     try {
       const result = await api("/history?key=" +
-        encodeURIComponent(picker.value) + "&hours=" + range.value + "&anchor=latest");
+        encodeURIComponent(picker.value) + "&hours=" + range.value + "&anchor=latest&resolution=auto");
       if (!current(cycle) || id !== requestId) return;
       clear(plot);
       const points = result.points || [];
@@ -1084,7 +1089,7 @@ async function renderHistory(cycle, archived) {
           "Вибери інший сигнал або довший проміжок часу."));
         return;
       }
-      const unit = result.signal && result.signal.unit || "";
+      const unit = result.signal && result.signal.unit || points[0]?.unit || "";
       const stats = element("div", "history-summary");
       const numericPoints = points.filter(point => point.value_decimal != null && point.value_decimal !== "" && Number.isFinite(Number(point.value_decimal)));
       const latestNumeric = numericPoints.length ? numericPoints[numericPoints.length - 1] : null;
@@ -1097,7 +1102,7 @@ async function renderHistory(cycle, archived) {
       plot.appendChild(interactiveChart(points, unit));
 
       const head = element("div", "history-table-head");
-      head.appendChild(element("h3", "", "Останні вимірювання"));
+      head.appendChild(element("h3", "", result.resolution==="extrema"?"Вибрані точки графіка":"Останні вимірювання"));
       head.appendChild(element("span", "subtle", "Час Київ · " +
         "MySQL"));
       tableArea.appendChild(head);
@@ -1279,7 +1284,7 @@ async function renderParallel(cycle) {
     card.appendChild(metrics);
     grid.appendChild(card);
     const result = await Promise.allSettled([
-      api("/parallel/history" + query + "&key=pv_power&hours=24"),
+      api("/parallel/history" + query + "&key=pv_power&hours=24&anchor=latest&resolution=auto"),
       api("/parallel/modbus-fields" + query),
       api("/parallel/raw" + query + "&limit=200"),
       api("/parallel/events" + query),
@@ -1923,7 +1928,7 @@ async function renderSettings(cycle) {
 async function renderArchive(cycle) {
   section("Архів · Deye №"+state.selectedSlotNo,
     "Точний часовий інтервал і експорт лише фактично повернених MySQL записів");
-  const root=panel("Пошук в архіві","Діапазон до 31 доби, максимум 1000 значень на запит.");
+  const root=panel("Пошук в архіві","Діапазон до 31 доби · адаптивний графік · точний CSV");
   root.className+=" history-workspace";
   const controls=element("div","settings-fields");
   const signals=state.verified || [];
@@ -1975,14 +1980,15 @@ async function renderArchive(cycle) {
          from>=to||(to-from)>31*86400*1000)
         throw Error("Вкажіть коректний інтервал тривалістю до 31 доби");
       const requestedKey=picker.value,requestedSlot=state.selectedSlotNo;
-      const response=await api("/history/range?key="+encodeURIComponent(requestedKey)+
+      const query="/history/range?key="+encodeURIComponent(requestedKey)+
         "&start="+encodeURIComponent(from.toISOString())+
-        "&end="+encodeURIComponent(to.toISOString()));
+        "&end="+encodeURIComponent(to.toISOString().replace(/Z$/,"999Z"))+
+        (state.selectedDeviceKey?"&device="+encodeURIComponent(state.selectedDeviceKey):"");
+      const response=await api(query+"&resolution=auto");
       if(!current(cycle)||token!==request)return;
       clear(resultArea);
       const points=response.points||[];
-      resultArea.appendChild(element("p","subtle",points.length+
-        " записів"+(response.truncated?" · не всі записи помістилися в ліміт":"")));
+      resultArea.appendChild(element("p","subtle",response.resolution==="extrema"?points.length+" точок графіка з "+response.sample_count+" записів":points.length+" записів"+(response.truncated?" · частковий результат":"")));
       if(!points.length){
         resultArea.appendChild(createEmpty("Вимірювань немає",
           "Виберіть іншу дату або інший показник."));
@@ -1991,13 +1997,24 @@ async function renderArchive(cycle) {
       resultArea.appendChild(interactiveChart(points,response.signal?.unit||signals.find(s=>s.signal_key===requestedKey)?.unit||""));
       const exportButton=element("button","settings-save","Експорт CSV");
       exportButton.type="button";
-      exportButton.disabled=Boolean(response.truncated);
-      exportButton.title=response.truncated?"Звузьте інтервал: ліміт 1000 записів":"";
-      exportButton.addEventListener("click",()=>{
+      exportButton.addEventListener("click",async()=>{
+        exportButton.disabled=true;exportButton.textContent="Експорт…";
+        try{
+        let all=[],before=null;
+        for(let page=0;page<100;page++){
+          const raw=await api(query+(before?"&before="+encodeURIComponent(before):""));
+          if(!current(cycle)||token!==request)return;
+          all.unshift(...(raw.points||[]));
+          if(!raw.truncated){before=null;break;}
+          if(!raw.next_before||raw.next_before===before)throw Error("Неможливо продовжити точний експорт");
+          before=raw.next_before;
+        }
+        if(before)throw Error("Понад 100 000 записів. Виберіть коротший період.");
+        if(!all.length)throw Error("Немає записів для експорту");
         const csvCell=value=>'"'+String(value??"").replaceAll('"','""')+'"';
         const safeText=value=>/^[=+\-@\t\r\n]/.test(String(value??""))?"'"+value:value;
         const lines=["observed_at_utc,value_decimal,quality"];
-        for(const p of points) lines.push([
+        for(const p of all) lines.push([
           csvCell(safeText(p.observed_at_utc)),csvCell(p.value_decimal),csvCell(safeText(p.quality))].join(","));
         const blob=new Blob(["\ufeff"+lines.join("\r\n")],
           {type:"text/csv;charset=utf-8"});
@@ -2007,6 +2024,8 @@ async function renderArchive(cycle) {
           requestedSlot+".csv";
         document.body.appendChild(link);
         link.click();link.remove();URL.revokeObjectURL(url);
+        }catch(error){if(current(cycle)&&token===request)resultArea.appendChild(createEmpty("Експорт не завершено",error.message));}
+        finally{exportButton.disabled=false;exportButton.textContent="Експорт CSV";}
       });
       resultArea.appendChild(exportButton);
       const wrap=element("div","table-wrap");
@@ -2016,7 +2035,7 @@ async function renderArchive(cycle) {
         th.appendChild(element("th","",x)));
       const head=element("thead","");head.appendChild(th);table.appendChild(head);
       const body=element("tbody","");
-      if(points.length>50)resultArea.appendChild(element("p","subtle","У таблиці — останні 50 записів. У CSV — весь доступний результат."));
+      if(points.length>50)resultArea.appendChild(element("p","subtle","У таблиці — останні 50 точок графіка. CSV містить точні записи за вибраний період."));
       for(const p of points.slice(-50).reverse()){
         const row=element("tr","");
         [time(p.observed_at_utc),p.value_decimal==null?"—":number(p.value_decimal)]
@@ -2198,6 +2217,13 @@ async function refreshOverviewInPlace(){
   }catch(_error){/* Keep last successfully displayed readings. */}
   finally{state.autoBusy=false;}
 }
+async function refreshSystemMetadata(){
+  const results=await Promise.allSettled([api("/status"),api("/signals"),api("/catalog")]);
+  state.status=results[0].status==="fulfilled"?results[0].value:null;
+  if(results[1].status==="fulfilled")state.verified=results[1].value.signals||[];
+  if(results[2].status==="fulfilled")state.catalog=results[2].value;
+  updateConnection(state.status!==null);
+}
 async function boot() {
   // Load the database status before rendering all views.
   const results = await Promise.allSettled([
@@ -2259,7 +2285,7 @@ async function boot() {
       if(refresh.disabled)return;
       refresh.disabled=true;
       refresh.textContent="◌ Оновлення…";
-      try{await render();}
+      try{await refreshSystemMetadata();await render();}
       finally{
         refresh.disabled=false;
         refresh.textContent="↻ Оновити";

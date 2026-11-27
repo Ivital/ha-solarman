@@ -394,9 +394,9 @@
    const cursor=x(chosenTime);
    layer.appendChild(s("line",{x1:cursor,y1:9,x2:cursor,y2:154,
     class:"rv7-chart-cursor"}));
-   for(const line of present){const p=M.historicalValue(line.points,chosenTime);if(p)layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3.5,fill:line.color,class:"rv7-chart-selection"}));}
+   for(const line of present){const p=M.historicalValue(line.points,chosenTime,0);if(p)layer.appendChild(s("circle",{cx:x(p.timestamp),cy:line.id==="soc"?socY(p.number):y(p.number),r:3.5,fill:line.color,class:"rv7-chart-selection"}));}
    const active=present.map(line=>{
-    const v=M.historicalValue(line.points,chosenTime);
+    const v=M.historicalValue(line.points,chosenTime,0);
     const stat=h("div","rv7-chart-stat");
     const label=h("small","",line.label);label.style.color=line.color;
     put(stat,label,h("strong","",v?M.pretty(v.number)+" "+(v.unit||"кВт"):"—"));
@@ -459,7 +459,7 @@
     if(!item.device?.device_key)return {points:[],truncated:false};
     const r=hasRange?await config.historyRangeLoader(item.device.device_key,item.key,new Date(endTime-hours*3600000).toISOString(),new Date(endTime).toISOString().replace(/Z$/,"999Z")):await config.historyLoader(item.device.device_key,item.key,hours);
     const unit=M.read(item.device.values,item.key,item.device).unit||(item.id==="soc"?"%":"кВт");
-    return {points:M.normalizeHistory((r?.points||[]).map(p=>({...p,unit:p.unit||unit}))),truncated:!!r?.truncated};
+    return {points:M.normalizeHistory((r?.points||[]).map(p=>({...p,unit:p.unit||unit}))),truncated:!!r?.truncated,resolution:r?.resolution,sampleCount:r?.sample_count};
    }));
    if(scope.cancelled||current!==revision)return;
    scope.historyBusy=false;
@@ -467,6 +467,7 @@
    historyError.textContent=failedHistoryRequests ?
     "Не вдалося прочитати частину архіву ("+failedHistoryRequests+"). Повторіть запит.":"";
    if(got.some(item=>item.status==="fulfilled"&&item.value.truncated))historyError.textContent+=(historyError.textContent?" · ":"")+"Ліміт записів. Для повної деталізації виберіть коротший період.";
+   if(got.some(item=>item.status==="fulfilled"&&item.value.resolution==="extrema"))historyError.textContent+=(historyError.textContent?" · ":"")+"Огляд піків за весь період. Для точних записів відкрийте архів.";
    series=planned.map((item,i)=>({...item,
     points:got[i].status==="fulfilled"?got[i].value.points:[]}));
    for(const line of series.filter(item=>!item.diagnostic)){
@@ -564,7 +565,7 @@
     const deviceRows=(snap.devices||[]).map(d=>{
       const archive={};
       for(const row of series.filter(s=>s.device?.device_key===d.device_key)){
-        const p=M.historicalValue(row.points,timestamp,600000);
+        const p=M.historicalValue(row.points,timestamp,0);
         if(p)archive[row.key]={value_decimal:p.number,
           unit:p.unit||M.read(d.values,row.key,d).unit,
           observed_at_utc:p.timestamp,quality:p.quality,sign_verified:false,register_verified:false};
