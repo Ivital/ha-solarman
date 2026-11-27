@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import socket
 import threading
 from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -94,6 +95,13 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
         parts = urlsplit(self.path)
         path, args = parts.path, parse_qs(parts.query)
+        if path == "/" and self.server.scenario == "offline-nav":
+            self.close_connection=True
+            try:
+                self.connection.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
+            return
         if path == "/":
             html = TEMPLATE.render(initial_cards=SSR).encode("utf-8")
             self.respond(200, html, "text/html; charset=utf-8")
@@ -276,10 +284,14 @@ def run():
                 page.wait_for_function("navigator.serviceWorker.controller !== null",timeout=15000)
                 assert page.locator('link[rel="manifest"]').get_attribute("href")=="/static/rakurs.webmanifest"
                 assert page.evaluate("async()=>await caches.keys()")==[]
-                pwa.set_offline(True)
-                page.goto(base+"/",wait_until="load")
-                assert "Показники не завантажено" in page.locator("body").inner_text()
-                pwa.set_offline(False);pwa.close()
+                server.scenario="offline-nav"
+                try:
+                    page.goto(base+"/",wait_until="load")
+                    assert "Показники не завантажено" in page.locator("body").inner_text()
+                    assert "5,1 кВт" not in page.locator("body").inner_text()
+                finally:
+                    server.scenario="normal"
+                    pwa.close()
                 print("RAKURS_PWA_NETWORK_ONLY_OFFLINE_NO_TELEMETRY_CACHE=PASS")
                 for width, height, theme in [(360, 780, "light"), (390, 844, "light"),
                                              (412, 915, "dark"), (768, 1024, "light"),

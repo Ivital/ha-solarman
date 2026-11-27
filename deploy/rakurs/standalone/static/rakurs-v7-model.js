@@ -211,7 +211,7 @@
   function evaluateEpisodes(points,rule){
     const threshold=NUM(rule?.threshold),h=NUM(rule?.hysteresis),delay=NUM(rule?.delaySeconds),gap=NUM(rule?.maxGapSeconds);
     if(threshold===null||h===null||h<0||delay===null||delay<0||gap===null||gap<=0||!["above","below"].includes(rule?.direction))throw Error("Некоректні межі правила");
-    const normalized=normalizeHistory(points),episodes=[];let pending=null,previous=null;
+    const normalized=(Array.isArray(points)?points:[]).map(p=>({timestamp:date(p.timestamp||p.observed_at_utc),number:NUM(p.number??p.value_decimal)})).filter(p=>p.timestamp).sort((a,b)=>a.timestamp.localeCompare(b.timestamp)),episodes=[];let pending=null,previous=null;
     const enters=v=>rule.direction==="above"?v>=threshold:v<=threshold;
     const exits=v=>rule.direction==="above"?v<threshold-h:v>threshold+h;
     function finish(end,reason){
@@ -220,6 +220,7 @@
       pending=null;
     }
     for(const p of normalized){
+      if(p.number===null){finish(previous?.timestamp,"gap");previous=null;continue;}
       if(previous&&(Date.parse(p.timestamp)-Date.parse(previous.timestamp))/1000>gap)finish(previous.timestamp,"gap");
       if(pending&&exits(p.number))finish(p.timestamp,"recovered");
       if(!pending&&enters(p.number))pending={start:p.timestamp,last:p.timestamp,confirmed:delay===0,extreme:p.number};

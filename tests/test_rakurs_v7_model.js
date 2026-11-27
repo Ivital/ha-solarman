@@ -141,3 +141,5 @@ const episodes=M.evaluateEpisodes(episodePoints,{direction:"above",threshold:10,
 assert.equal(episodes.length,2);assert.equal(episodes[0].state,"recovered");assert.equal(episodes[0].durationSeconds,180);assert.equal(episodes[1].state,"open");assert.equal(episodes[1].durationSeconds,120);
 const broken=M.evaluateEpisodes([row(11,"кВт","2026-11-25T00:00:00Z"),row(12,"кВт","2026-11-25T00:10:00Z")],{direction:"above",threshold:10,hysteresis:1,delaySeconds:60,maxGapSeconds:90});assert.equal(broken.length,0);
 console.log("RAKURS_ALARM_EPISODES_DELAY_HYSTERESIS_AND_GAP=PASS");
+
+assert.equal(M.evaluateEpisodes([row(11,"кВт","2026-11-25T00:00:00Z"),row(null,"кВт","2026-11-25T00:01:00Z"),row(12,"кВт","2026-11-25T00:02:00Z")],{direction:"above",threshold:10,hysteresis:1,delaySeconds:60,maxGapSeconds:180}).length,0);
