@@ -29,7 +29,7 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product14"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product15"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -45,7 +45,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-28' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-29' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"
@@ -171,6 +171,8 @@ sudo -u rakurs env \
   /var/lib/rakurs/.venv/bin/python - <<'PY'
 from importlib import import_module
 import time
+from datetime import datetime,timedelta
+from urllib.parse import urlencode
 
 m = import_module("standalone.app")
 with m.open_db() as db:
@@ -247,6 +249,24 @@ for item in profile["devices"]:
                    base_url="https://localhost")
     assert latest.status_code == 200
     assert latest.get_json()["device_key"] == device
+    values=latest.get_json()["values"]
+    report=c.get("/api/v1/energy?"+urlencode({"device":device,"period":"day"}),base_url="https://localhost")
+    assert report.status_code==200
+    cells=c.get("/api/v1/bms/cells?"+urlencode({"device":device}),base_url="https://localhost")
+    assert cells.status_code==200
+    pv=values.get("pv_power")
+    if pv and pv.get("observed_at_utc"):
+        at=pv["observed_at_utc"]
+        frame=c.get("/api/v1/parallel/frame?"+urlencode({"at":at}),base_url="https://localhost")
+        assert frame.status_code==200
+        match=next(x for x in frame.get_json()["devices"] if x["device_key"]==device)
+        assert match["values"]["pv_power"]["value_decimal"]==pv["value_decimal"]
+        end=datetime.fromisoformat(at.replace("Z","+00:00"))
+        start=end-timedelta(hours=24)
+        chart=c.get("/api/v1/history/range?"+urlencode({"device":device,"key":"pv_power","start":start.isoformat(),"end":end.isoformat(),"resolution":"auto"}),base_url="https://localhost")
+        assert chart.status_code==200
+        assert chart.get_json()["sample_count"]>=1
+print("EXACT_FRAME_ENERGY_BMS_ADAPTIVE_HISTORY=PASS")
 print("ALL_MYSQL_DEVICES_VISIBLE=PASS")
 print("EMPTY_MYSQL_COMPATIBLE=YES")
 print("MYSQL_READ_ONLY=PASS")
@@ -282,6 +302,14 @@ for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.c
   rm -f "$tmp"
 done
 sudo nginx -t
+curl --noproxy '*' -fsSI --connect-timeout 4 --max-time 15 "https://$DOMAIN/static/rakurs-sw.js" | grep -Eiq '^Service-Worker-Allowed:[[:space:]]*/[[:space:]]*
+echo 'RAKURS_PARALLEL_UI=PASS'
+echo 'PHYSICAL_TOPOLOGY=UNVERIFIED'
+echo 'MODBUS_COMMANDS=0 MYSQL_WRITES=0'
+echo 'OPEN=https://rakurs.zakryttya.org.ua/'
+echo "PARALLEL_UI_BACKUP=$BACKUP"
+
+echo PWA_PUBLIC_SCOPE_HEADER=PASS
 trap - ERR
 echo 'RAKURS_PARALLEL_UI=PASS'
 echo 'PHYSICAL_TOPOLOGY=UNVERIFIED'

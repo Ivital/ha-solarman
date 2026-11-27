@@ -414,6 +414,24 @@ def signals():
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
 
 
+@app.get("/api/v1/bms/cells")
+def bms_cells():
+    """Stored cell-level readings only, independent of the generic signal list limit."""
+    device_id=selected_overview_device_id()
+    if device_id is None:
+        return jsonify({"values":{}})
+    pattern=r"^bms_([1-9]|1[0-9]|20)_cell_([1-9]|[1-5][0-9]|6[0-4])_voltage$"
+    samples=rows(
+        "SELECT s.signal_key,s.unit,m.value_decimal,m.quality,m.observed_at_utc "
+        "FROM rakurs_signals s JOIN rakurs_samples m ON m.signal_id=s.id "
+        "AND m.device_id=%s AND m.observed_at_utc=(SELECT MAX(mx.observed_at_utc) "
+        "FROM rakurs_samples mx WHERE mx.device_id=%s AND mx.signal_id=s.id) "
+        "WHERE REGEXP_LIKE(s.signal_key,%s,'c') ORDER BY s.signal_key LIMIT 1280",
+        (device_id,device_id,pattern))
+    return jsonify({"values":{r["signal_key"]:serialize(r) for r in samples},
+                    "primary_device_id":device_id})
+
+
 @app.get("/api/v1/latest")
 def latest():
     value = request.args.get("keys", "")

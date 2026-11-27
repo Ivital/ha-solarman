@@ -177,6 +177,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": {**device_values(1),"battery_soh":reading(98,"%"),"grid_l1_voltage":reading(230,"В"),"grid_l2_voltage":reading(231,"В"),"grid_l3_voltage":reading(229,"В"),"bms_1_min_cell_voltage":reading(3.31,"В"),"bms_1_max_cell_voltage":reading(3.35,"В"),"bms_1_voltage":reading(53.2,"В")}})
+        elif path == "/api/v1/bms/cells":
+            self.reply({"values":{"bms_1_cell_1_voltage":reading(3.31,"В"),"bms_1_cell_2_voltage":reading(3.35,"В")}})
+        elif path == "/api/v1/alerts":
+            self.reply({"state":"running","checked_at_utc":MEASURED,"rules":[{"key":"mysql","label":"Доступність MySQL","phase":"normal"}],"events":[]})
+        elif path == "/api/v1/solar-forecast":
+            self.reply({"state":"available","arrays":[{"slot":i,"hours":[{"start_utc":f"2026-11-27T{hour:02d}:00:00Z","kw":float(hour-7)*i} for hour in range(8,11)]} for i in (1,2)],"common_hours":3,"estimated_kwh":18,"updated_at_utc":MEASURED})
         elif path == "/api/v1/energy":
             self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
@@ -454,13 +460,23 @@ def run():
                             module=page.locator(".product-bms-module").first
                             module.locator("summary").click()
                             assert "40 мВ" in module.locator(".product-bms-delta").text_content()
+                            assert module.locator(".product-technical-bars").count()==1
+                            page.locator(".product-battery-estimate summary").click()
+                            inputs=page.locator(".product-battery-estimate input")
+                            inputs.nth(0).fill("20");inputs.nth(1).fill("20")
+                            assert "10,4 кВт·год" in page.locator(".product-battery-estimate").inner_text()
                         if route=="grid":
                             assert "230 В" in page.locator(".product-phase-grid").inner_text()
                             assert page.locator(".product-technical-bars").count()>=1
                         if route=="pv":
                             assert page.locator(".product-mppt").count()==1
                             assert page.locator(".product-mppt .product-phase-card").count()==2
+                            page.locator(".product-forecast summary").click()
+                            page.wait_for_selector(".product-forecast .product-overlay-line")
+                            assert page.locator(".product-forecast .product-overlay-line").count()==2
                         if route=="events":
+                            page.wait_for_selector(".product-alert-center .product-energy-row")
+                            assert "Монітор працює" in page.locator(".product-alert-center").inner_text()
                             page.get_by_label("Важливість подій").select_option("critical")
                             page.wait_for_function("document.querySelector(\".event-count-card strong\").textContent !== \"…\"")
                         if route=="system":

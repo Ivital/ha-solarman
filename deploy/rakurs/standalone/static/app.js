@@ -98,7 +98,7 @@ function message(title, detail, warning) {
   main.appendChild(box);
 }
 async function api(path, options = {}) {
-  const scoped = /^\/(latest|history(?:\/range)?|modbus-fields|energy)(\?|$)/.test(path);
+  const scoped = /^\/(latest|history(?:\/range)?|modbus-fields|energy|bms\/cells)(\?|$)/.test(path);
   const suffix = scoped && state.selectedDeviceKey && !/[?&]device=/.test(path) ?
     (path.includes("?") ? "&" : "?") +
     "device=" + encodeURIComponent(state.selectedDeviceKey) : "";
@@ -1015,8 +1015,7 @@ async function renderGroup(groups, title, cycle) {
   }
   const known = verifiedKeys();
   const keys = items.filter(i => known.has(i.key)).map(i => i.key);
-  // Recognize individually stored cell readings only; never invent cells from extrema.
-  if(groups[0]==="battery")for(const key of known)if(/^bms_(?:[1-9]|1[0-9]|20)_cell_(?:[1-9]|[1-5][0-9]|6[0-4])_voltage$/.test(key)&&!keys.includes(key))keys.push(key);
+  // Cell values are retrieved separately, without the generic 500-signal list limit.
   const values = {};
   for (let i = 0; i < keys.length; i += 24) {
     try {
@@ -1027,6 +1026,10 @@ async function renderGroup(groups, title, cycle) {
         "Останні значення з MySQL не вдалося отримати повністю.", true);
       break;
     }
+  }
+  if(groups[0]==="battery"){
+    try{Object.assign(values,(await api("/bms/cells")).values||{});}
+    catch(_error){if(current(cycle))message("Комірки АКБ","Покоміркові записи недоступні.",true);}
   }
   if (!current(cycle)) return;
   const controls = element("div", "catalog-controls");

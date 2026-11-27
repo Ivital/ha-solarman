@@ -170,43 +170,63 @@ def condition_for(rule,reading,now):
         return (True if n>=t else False if n<t-h else "hold"),stamp
     return (True if n<=t else False if n>t+h else "hold"),stamp
 
+def poll_is_fresh(poll,now,interval):
+    if not poll or poll.get("quality")!="good" or poll.get("status")!="complete" or not poll.get("response_count") or poll.get("exception_count"):
+        return False
+    try:
+        age=(now-parse_time(poll.get("observed_at_utc"))).total_seconds()
+        return -30<=age<=max(180,2*int(interval)+10)
+    except (ValueError,TypeError,OverflowError):
+        return False
+
 def run_once():
     from . import app as module
     now=utc_now()
     state=read_state()
-    before=len(state["events"])
-    last_event=state["events"][-1] if state["events"] else None
+    previous_events={json.dumps(item,sort_keys=True) for item in state["events"]}
     try:
         rules=load_rules()
         transition(state,"configuration","Конфігурація діагностики",False,now,0,180,"config-v1")
     except (OSError,ValueError,TypeError):
         rules={}
         transition(state,"configuration","Конфігурація діагностики",True,now,0,180,"config-v1")
-    active_keys={"configuration","mysql","worker"}
+    active_keys={"configuration","mysql","worker","slot_1","slot_2"}|{"signal_"+key for key in rules}
+    observations=[]
     try:
         with module.app.app_context():
             module.one("SELECT 1 AS n")
             health=module.collector_health()
-            devices={d["slot_no"]:d for d in module.parallel_registered_devices()} if rules else {}
-            transition(state,"mysql","Доступність MySQL",False,now,120,180,"mysql-v1")
-            transition(state,"worker","Modbus-агент",not health["collector_active"] if health["enabled"] else None,now,120,180,"worker-v1")
+            devices={d["slot_no"]:d for d in module.parallel_registered_devices()}
+            observations.append(("worker","Modbus-агент",not health["collector_active"] if health["enabled"] else None,now,120,180,"worker-v1"))
+            for slot in (1,2):
+                d=devices.get(slot)
+                bad=None
+                if health["enabled"] and d and d.get("member_verified") and d.get("transport_verified"):
+                    cfg=module.one("SELECT enabled,verified_connection FROM rakurs_device_settings WHERE device_id=%s",(d["id"],))
+                    if cfg and cfg.get("enabled") and cfg.get("verified_connection"):
+                        poll=module.one("SELECT observed_at_utc,status,quality,response_count,exception_count "
+                            "FROM rakurs_modbus_poll_runs WHERE device_id=%s "
+                            "ORDER BY observed_at_utc DESC,id DESC LIMIT 1",(d["id"],))
+                        bad=not poll_is_fresh(poll,now,health["interval_seconds"])
+                observations.append(("slot_"+str(slot),"Канал читання Deye №"+str(slot),bad,now,120,180,"slot-v1"))
             for key,rule in rules.items():
-                rid="signal_"+key
-                active_keys.add(rid)
                 d=devices.get(rule["slot"])
                 reading=module.one("SELECT m.value_decimal,m.observed_at_utc,s.unit FROM rakurs_samples m "
                     "JOIN rakurs_signals s ON s.id=m.signal_id WHERE m.device_id=%s AND s.signal_key=%s "
                     "ORDER BY m.observed_at_utc DESC LIMIT 1",(d["id"],rule["signal"])) if d else None
                 label="Deye №"+str(rule["slot"])+" · "+rule["signal"]
                 condition,stamp=condition_for(rule,reading,now)
-                transition(state,rid,label,condition,stamp,rule["delay"],rule["gap"],rule)
+                observations.append(("signal_"+key,label,condition,stamp,rule["delay"],rule["gap"],rule))
+        transition(state,"mysql","Доступність даних MySQL",False,now,120,180,"mysql-v1")
+        for observation in observations:
+            transition(state,*observation)
     except Exception:
-        transition(state,"mysql","Доступність MySQL",True,now,120,180,"mysql-v1")
+        transition(state,"mysql","Доступність даних MySQL",True,now,120,180,"mysql-v1")
         transition(state,"worker","Modbus-агент",None,now,120,180,"worker-v1")
+        for slot in (1,2):
+            transition(state,"slot_"+str(slot),"Канал читання Deye №"+str(slot),None,now,120,180,"slot-v1")
         for key,rule in rules.items():
-            rid="signal_"+key
-            active_keys.add(rid)
-            transition(state,rid,"Deye №"+str(rule["slot"])+" · "+rule["signal"],None,now,rule["delay"],rule["gap"],rule)
+            transition(state,"signal_"+key,"Deye №"+str(rule["slot"])+" · "+rule["signal"],None,now,rule["delay"],rule["gap"],rule)
     for key in list(state["rules"]):
         if key not in active_keys:
             old=state["rules"].pop(key)
@@ -216,10 +236,9 @@ def run_once():
     state["events"]=state["events"][-MAX_EVENTS:]
     write_state(state)
     # Journal only transitions, no credentials, addresses or raw telemetry.
-    if state["events"] and state["events"][-1]!=last_event:
-        for item in state["events"]:
-            if item.get("at")==iso(now):
-                print("RAKURS_ALERT",item["key"],item["kind"],flush=True)
+    for item in state["events"]:
+        if json.dumps(item,sort_keys=True) not in previous_events:
+            print("RAKURS_ALERT",item["key"],item["kind"],flush=True)
     return state
 
 def public_status():

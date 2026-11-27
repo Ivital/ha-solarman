@@ -235,7 +235,7 @@
     const result={energyKwh:null,hours:null,soh:soh.valid&&soh.unit==="%"&&soh.number>=0&&soh.number<=100?soh.number:null};
     if(cap===null||cap<=0||cap>10000||min===null||min<0||min>100||!soc.valid||soc.unit!=="%"||soc.number<0||soc.number>100)return result;
     result.energyKwh=cap*Math.max(0,soc.number-min)/100;
-    if(power.valid&&["кВт","kW"].includes(power.unit)&&power.number>0&&soc.observed_at_utc&&power.observed_at_utc===soc.observed_at_utc)result.hours=result.energyKwh/power.number;
+    if(power.valid&&["кВт","kW"].includes(values?.battery_power?.unit)&&power.number>0&&soc.observed_at_utc&&power.observed_at_utc===soc.observed_at_utc)result.hours=result.energyKwh/power.number;
     return result;
   }
   return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,pairEnergy,evaluateEpisodes,batteryEstimate,

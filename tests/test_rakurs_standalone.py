@@ -102,6 +102,20 @@ class StandaloneMySqlTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             rules_from_config({"rules":[rule,rule]})
 
+    def test_per_device_poll_health_and_cell_query(self):
+        from standalone.alert_monitor import poll_is_fresh
+        from datetime import timezone,timedelta
+        now=datetime(2026,11,25,tzinfo=timezone.utc)
+        poll={"quality":"good","status":"complete","response_count":1,"exception_count":0,"observed_at_utc":now}
+        self.assertTrue(poll_is_fresh(poll,now,60))
+        self.assertFalse(poll_is_fresh({**poll,"status":"partial"},now,60))
+        self.assertFalse(poll_is_fresh({**poll,"observed_at_utc":now-timedelta(hours=1)},now,60))
+        self.data_rows=lambda sql,params:[{"signal_key":"bms_1_cell_1_voltage","unit":"В","value_decimal":Decimal("3.31"),"observed_at_utc":now}] if "REGEXP_LIKE" in sql else []
+        with patch.object(module,"selected_overview_device_id",return_value=2):
+            result=self.client.get("/api/v1/bms/cells")
+        self.assertEqual(result.status_code,200)
+        self.assertEqual(result.get_json()["values"]["bms_1_cell_1_voltage"]["value_decimal"],"3.31")
+
     def test_forecast_disabled_no_network(self):
         from unittest.mock import patch
         with patch("standalone.solar_forecast.load_config",return_value=None), patch("standalone.solar_forecast.retrieve") as remote:
