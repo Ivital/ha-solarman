@@ -658,3 +658,18 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 .pair-detail-row{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;align-items:center;gap:.5rem;padding:.35rem 0}
 .pair-detail{font-variant-numeric:tabular-nums}.pair-plots svg{width:100%;display:block}
 @media(max-width:700px){.pair-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.pair-detail-row{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:.5rem}.pair-detail-row button{font-size:.8rem}.pair-legend{font-size:.8rem}}
+
+.state-axis,.state-key,.state-detail,.state-editor{margin-block:.75rem}
+.state-axis,.state-key{display:flex;justify-content:space-between;gap:.5rem}
+.state-key{justify-content:flex-start;flex-wrap:wrap;font-size:.83rem}
+.state-key span::before{content:"";display:inline-block;width:1em;height:.72em;margin-right:.35em;border-radius:2px}
+.state-row{margin:.6rem 0}.state-row>strong{display:block;margin-bottom:.25rem}
+.state-track{height:1.6rem;position:relative;overflow:hidden;border-radius:4px}
+.state-track .state-segment{position:absolute;top:0;height:100%;min-width:1px;padding:0;margin:0;border:0;border-radius:0}
+.state-track .state-point{min-width:4px;z-index:1;transform:translateX(-50%)}
+.state-track button:focus-visible,.state-track [aria-pressed=true]{outline:2px solid currentColor;outline-offset:-2px;z-index:2}
+.state-observed,.state-key-observed::before{background:#6a95bd!important}.state-normal,.state-key-normal::before{background:#75aa96!important}
+.state-pending,.state-key-pending::before{background:#dfaf53!important}.state-active,.state-key-active::before{background:#ce6b60!important}
+.state-unknown,.state-key-unknown::before{background:repeating-linear-gradient(135deg,#a3adba55 0 3px,transparent 3px 6px)!important}
+.state-detail{display:grid;gap:.5rem}.state-detail button{justify-self:start}.state-editor summary{cursor:pointer}.state-editor[open] .settings-fields{margin-block:.65rem}
+@media(max-width:650px){.state-axis small{font-size:.65rem}.state-key{font-size:.72rem}}

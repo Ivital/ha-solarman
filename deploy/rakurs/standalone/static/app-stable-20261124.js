@@ -1653,7 +1653,7 @@ function svgChart(points, unit, domain={}) {
   const svg=node("svg",{class:"chart product-timeseries",viewBox:"0 0 640 226",role:"group",tabindex:0,"aria-label":"Інтерактивний графік. Стрілки ліворуч і праворуч вибирають запис."});
   const left=55,right=620,top=27,bottom=181;
   const first=domain.start??real[0].t,last=domain.end??real.at(-1).t;
-  const values=real.map(p=>p.v).concat((domain.band||[]).flatMap(b=>[b.low,b.high])),min=domain.bounds?.[0]??Math.min(...values),max=domain.bounds?.[1]??Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
+  const values=real.map(p=>p.v).concat((domain.band||[]).flatMap(b=>[b.low,b.high]),domain.guides||[]),min=domain.bounds?.[0]??Math.min(...values),max=domain.bounds?.[1]??Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
   // Choose readable intervals while retaining signed flows and flat signals.
   const rough=span/4, decade=10**Math.floor(Math.log10(rough));
   const step=([1,2,2.5,5,10].find(v=>v*decade>=rough)||10)*decade;
@@ -1670,9 +1670,18 @@ function svgChart(points, unit, domain={}) {
   if(unit)svg.appendChild(node("text",{x:9,y:13,class:"product-axis"},unit));
   const intervals=real.slice(1).map((p,i)=>p.t-real[i].t).filter(v=>v>0).sort((a,b)=>a-b);
   const cadence=intervals.length?intervals[Math.floor((intervals.length-1)/2)]:0;
-  const gap=Math.max(1200000,cadence*3);
+  const gap=domain.maxGap??Math.max(1200000,cadence*3);
+  const breaks=new Set();
+  if(domain.highlight){
+    let missing=false;
+    for(const p of points){
+      if(p.value_decimal==null){missing=true;continue;}
+      if(missing)breaks.add(p.observed_at_utc);
+      missing=false;
+    }
+  }
   const segments=[];let segment=[];
-  for(const p of real){if(segment.length&&p.t-segment.at(-1).t>gap){segments.push(segment);segment=[];}segment.push(p);}
+  for(const p of real){if(segment.length&&(p.t-segment.at(-1).t>gap||breaks.has(p.stamp))){segments.push(segment);segment=[];}segment.push(p);}
   if(segment.length)segments.push(segment);
   const fillId="rakurs-area-"+(++chartGradientId);
   const defs=node("defs"),gradient=node("linearGradient",{id:fillId,x1:0,x2:0,y1:0,y2:1,gradientUnits:"objectBoundingBox"});
@@ -1686,6 +1695,13 @@ function svgChart(points, unit, domain={}) {
     for(const [offset,color] of [[0,"#39ad92"],[split,"#39ad92"],[split,"#4185d7"],[100,"#4185d7"]])
       gradient.appendChild(node("stop",{offset:offset+"%","stop-color":color,"stop-opacity":".48"}));
     svg.appendChild(node("line",{x1:left,x2:right,y1:y(0),y2:y(0),stroke:"currentColor",opacity:".65"}));
+  }
+  if(domain.highlight){
+    const [a,b]=domain.highlight;
+    svg.appendChild(node("rect",{x:x(a),y:top,width:Math.max(1,x(b)-x(a)),height:bottom-top,fill:"#7d87ac",opacity:".13"}));
+  }
+  for(const [i,value] of (domain.guides||[]).entries()){
+    svg.appendChild(node("line",{x1:left,x2:right,y1:y(value),y2:y(value),stroke:i?"#159288":"#b57219","stroke-width":1.6,"stroke-dasharray":i?"2 3":"8 4"}));
   }
   for(const b of domain.band||[]){
     const upper=y(b.high),lower=y(b.low);
@@ -2214,45 +2230,138 @@ async function renderParallel(cycle) {
   }
 }
 
-function renderRuleAnalyzer(cycle){
-  if(!window.RakursV7Model?.evaluateEpisodes)return;
-  const available=state.verified||[],keys=["battery_soc","battery_temperature","inverter_temperature","grid_frequency","grid_l1_voltage","grid_l2_voltage","grid_l3_voltage","load_power","pv_power","battery_power"];
-  const metrics=keys.map(k=>available.find(x=>x.signal_key===k)).filter(Boolean);if(!metrics.length)return;
-  const box=element("details","product-analytics product-rule-analyzer");box.appendChild(element("summary","","Аналіз перевищень за архівом · Deye №"+state.selectedSlotNo));
-  box.appendChild(element("p","subtle","Вкажіть власну межу, затримку та гістерезис. Це аналіз наявних записів, не автоматична аварійна сигналізація і не команда обладнанню."));
-  const controls=element("div","settings-fields");
-  const metric=settingsField(controls,"Параметр",metrics[0].signal_key,"select",metrics.map(x=>[x.signal_key,x.label_uk+" ("+(x.unit||"—")+")"]));
-  const direction=settingsField(controls,"Умова","above","select",[["above","Не менше межі"],["below","Не більше межі"]]);
-  const threshold=settingsField(controls,"Межа (в одиницях параметра)","","number");
-  const hysteresis=settingsField(controls,"Гістерезис","0","number");
-  const delay=settingsField(controls,"Затримка, хв","5","number");
-  const gap=settingsField(controls,"Макс. інтервал між записами, хв","30","number");
-  const button=element("button","settings-save","Проаналізувати 24 години");button.type="button";
-  const result=element("div","");add(box,controls,button,result);main.appendChild(box);
-  let token=0;
-  button.addEventListener("click",async()=>{
-    const revision=++token;button.disabled=true;result.replaceChildren(element("p","subtle","Читання точних записів…"));
-    try{
-      const rule={direction:direction.value,threshold:threshold.value,hysteresis:hysteresis.value,delaySeconds:Number(delay.value)*60,maxGapSeconds:Number(gap.value)*60};
-      if(!threshold.value.trim()||!delay.value.trim()||!gap.value.trim())throw Error("Заповніть межу, затримку й інтервал.");
-      const key=metric.value,latest=await api("/latest?keys="+encodeURIComponent(key)),stamp=latest.values?.[key]?.observed_at_utc;
-      const end=Date.parse(stamp);if(!Number.isFinite(end))throw Error("Немає часу останнього запису.");
-      const query="/history/range?key="+encodeURIComponent(key)+"&start="+encodeURIComponent(new Date(end-86400000).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z"));
-      let points=[],before=null;
-      for(let page=0;page<20;page++){const r=await api(query+(before?"&before="+encodeURIComponent(before):""));if(!current(cycle)||revision!==token)return;points.unshift(...(r.points||[]));if(!r.truncated){before=null;break;}if(!r.next_before||before===r.next_before)throw Error("Неповний архів");before=r.next_before;}
-      if(before)throw Error("Понад 20 000 записів; аналіз за цей період недоступний.");
-      if(!points.length)throw Error("За цей період немає вимірювань.");
-      const episodes=window.RakursV7Model.evaluateEpisodes(points,rule);
-      clear(result);result.appendChild(element("strong","","Підтверджені епізоди: "+episodes.length));
-      result.appendChild(element("p","subtle",points.length+" записів · "+time(points[0].observed_at_utc)+" — "+time(points.at(-1).observed_at_utc)));
-      for(const episode of episodes.slice(-50).reverse()){
-        const row=element("div","product-energy-row"),stateLabel={recovered:"Відновлено",open:"Триває на останньому записі",gap:"Далі немає даних"}[episode.state];
-        add(row,element("span","",time(episode.start)),element("strong","",stateLabel),element("small","subtle","Підтверджена тривалість: "+number(episode.durationSeconds/60)+" хв · Екстремум: "+number(episode.extreme)+(episode.end?" · Відновлення: "+time(episode.end):"")));result.appendChild(row);
+async function renderStateTimeline(host,cycle){
+  const head=element("div","grid-day-head"),period=element("select",""),lanes=element("div","state-lanes"),detail=element("section","state-detail"),editor=element("details","state-editor");
+  period.setAttribute("aria-label","Період історії станів");
+  for(const h of [24,72]){const o=element("option","",h===24?"24 години":"3 доби");o.value=String(h);period.appendChild(o);}
+  add(head,element("h2","","Історія станів"),period);add(host,head,lanes,detail,editor);
+  lanes.textContent="Читання архіву…";
+  const [devices,config]=await Promise.all([fetchParallelDevices(cycle),api("/alerts/timeline-rules")]);
+  if(!current(cycle))return;
+  if(!devices?.length){lanes.textContent="Немає зареєстрованих інверторів.";return;}
+  const shared=k=>/^(load_|battery_|grid_)/.test(k);
+  const names=new Map((state.verified||[]).map(s=>[s.signal_key,s.label_uk]));
+  const specs=[],known=new Set(),latest=devices.flatMap(d=>Object.values(d.values||{})).map(v=>Date.parse(v.observed_at_utc)).filter(Number.isFinite);
+  if(!latest.length){lanes.textContent="Немає часу останнього вимірювання.";return;}
+  const end=Math.max(...latest);
+  function put(key,slot,unit,rule){
+    const device=shared(key)?devices[0]:devices.find(d=>Number(d.slot_no)===Number(slot));
+    if(!device)return;
+    const id=JSON.stringify([key,device.device_key,unit,rule?.direction,rule?.threshold,rule?.hysteresis,rule?.delaySeconds,rule?.maxGapSeconds]);
+    if(known.has(id))return;
+    known.add(id);
+    const label=(shared(key)?"Система":deviceLabel(device))+" · "+(names.get(key)||key);
+    specs.push({key,unit,device:device.device_key,label,rule});
+  }
+  for(const r of config.rules||[])put(r.signal,r.slot,r.unit,{direction:r.direction,threshold:Number(r.threshold),hysteresis:Number(r.hysteresis),delaySeconds:r.delay,maxGapSeconds:r.gap});
+  const suggested=devices.map(d=>["inverter_temperature",d.slot_no,"°C"]).concat([["battery_soc",devices[0].slot_no,"%"]]);
+  for(const [key,slot,unit] of suggested)if(!specs.some(s=>s.key===key&&s.device===devices.find(d=>d.slot_no===slot)?.device_key))put(key,slot,unit,null);
+  editor.appendChild(element("summary","","Додати умову для аналізу архіву"));
+  const form=element("div","settings-fields");
+  const metrics=(state.verified||[]).filter(x=>["battery_soc","inverter_temperature","battery_temperature","pv_power","load_power","battery_power","grid_frequency","grid_l1_voltage","grid_l2_voltage","grid_l3_voltage"].includes(x.signal_key));
+  const metric=settingsField(form,"Показник",metrics.find(x=>x.signal_key==="inverter_temperature")?.signal_key||metrics[0]?.signal_key,"select",metrics.map(x=>[x.signal_key,x.label_uk]));
+  const slot=settingsField(form,"Інвертор",devices[0].slot_no,"select",devices.map(d=>[d.slot_no,deviceLabel(d)]));
+  const dir=settingsField(form,"Умова","above","select",[["above","Не менше"],["below","Не більше"]]),threshold=settingsField(form,"Поріг","","number");
+  const hyst=settingsField(form,"Гістерезис","0","number"),delay=settingsField(form,"Затримка, хв","5","number"),gap=settingsField(form,"Макс. інтервал, хв","30","number");
+  const apply=element("button","rv7-range","Показати на шкалі"),validation=element("span","subtle");
+  apply.type="button";add(editor,form,apply,validation);
+  metric.onchange=()=>{slot.disabled=shared(metric.value);threshold.value="";};metric.onchange();
+  const phases={observed:"Є вимірювання",normal:"Норма",pending:"Очікування",active:"Активний епізод",unknown:"Немає даних"};
+  const legend=element("div","state-key");
+  for(const [k,label] of Object.entries(phases))legend.appendChild(element("span","state-key-"+k,label));
+  head.after(legend);
+  let revision=0;
+  async function refresh(){
+    const token=++revision,start=end-Number(period.value)*3600000;
+    lanes.replaceChildren();detail.replaceChildren();
+    const cache=new Map();
+    async function records(s){
+      const query="/history/range?"+new URLSearchParams({device:s.device,key:s.key,start:new Date(start).toISOString(),end:new Date(end).toISOString().replace(/Z$/,"999Z")});
+      let points=[],before="";
+      for(let n=0;n<20;n++){
+        const page=await api(query+(before?"&before="+encodeURIComponent(before):""));
+        if(!current(cycle)||token!==revision)return [];
+        points=(page.points||[]).concat(points);
+        if(!page.truncated)return points;
+        if(!page.next_before||page.next_before===before)break;
+        before=page.next_before;
       }
-    }catch(error){if(current(cycle)&&revision===token)result.replaceChildren(createEmpty("Аналіз недоступний",error.message));}
-    finally{button.disabled=false;}
-  });
+      throw Error("Архів перевищує ліміт. Оберіть коротший період.");
+    }
+    function inspect(s,points,part,ep){
+      const unit=s.unit,r=s.rule;
+      detail.replaceChildren(element("h3","",s.label));
+      if(part.phase==="unknown"){
+        detail.appendChild(element("p","subtle","Немає підтверджених вимірювань · "+time(new Date(part.a).toISOString())+" — "+time(new Date(part.b).toISOString())));return;
+      }
+      const a=ep?Date.parse(ep.start):part.a,b=ep?Date.parse(ep.end||ep.last):part.last;
+      const valid=points.filter(p=>p.value_decimal!=null&&p.unit===unit);
+      const inPart=valid.filter(p=>Date.parse(p.observed_at_utc)>=a&&Date.parse(p.observed_at_utc)<=(ep?Date.parse(ep.last):b));
+      if(!inPart.length)return;
+      const extreme=inPart.reduce((x,y)=>(r?.direction==="below"?Number(y.value_decimal)<Number(x.value_decimal):Number(y.value_decimal)>Number(x.value_decimal))?y:x);
+      const context=Math.max(1800000,(b-a)/3),left=Math.max(start,a-context),right=Math.min(end,b+context);
+      const guides=r?[Number(r.threshold)]:[];
+      if(r&&r.hysteresis>0)guides.push(r.threshold+(r.direction==="above"?-1:1)*r.hysteresis);
+      const info=element("p","subtle",ep?("Початок "+time(ep.start)+" · "+(ep.state==="recovered"?"Відновлення "+time(ep.end):"Останнє підтвердження "+time(ep.last))+" · "+pretty(ep.durationSeconds/60,1)+" хв підтверджено"):phases[part.phase]);
+      const selected=element("strong",""),archive=element("button","rv7-range","Відкрити в архіві");archive.type="button";
+      const values=new Map(valid.map(p=>[p.observed_at_utc,p]));
+      function choose(t,stamp){selected.textContent=time(stamp)+" · "+pretty(Number(values.get(stamp).value_decimal),3)+" "+unit;archive.onclick=()=>openArchivePoint(s.key,stamp,s.device);}
+      const chart=svgChart(points.filter(p=>{const t=Date.parse(p.observed_at_utc);return t>=left&&t<=right;}).map(p=>p.unit===unit?p:{...p,value_decimal:null}),unit,{start:left,end:right,guides,highlight:[a,b],maxGap:r?r.maxGapSeconds*1000:undefined,onSelect:choose,key:s.key});
+      add(detail,info,chart);
+      if(guides.length)detail.appendChild(element("small","subtle","Поріг "+pretty(guides[0],3)+" "+unit+(guides.length>1?" · Межа відновлення "+pretty(guides[1],3)+" "+unit:"")));
+      add(detail,selected,archive);chart.showStamp?.(Date.parse(extreme.observed_at_utc),s.key,extreme.observed_at_utc);choose(null,extreme.observed_at_utc);
+    }
+    const axis=element("div","state-axis");
+    for(const t of [start,(start+end)/2,end])axis.appendChild(element("small","",time(new Date(t).toISOString()).slice(0,-3)));
+    lanes.appendChild(axis);
+    const defaults=[];
+    await Promise.all(specs.filter(s=>s.rule||!specs.some(other=>other.rule&&other.key===s.key&&other.device===s.device)).map(async s=>{
+      const row=element("div","state-row"),track=element("div","state-track");
+      const subtitle=s.rule?" · "+(s.rule.direction==="above"?"≥ ":"≤ ")+pretty(s.rule.threshold,3)+" "+s.unit:"";
+      add(row,element("strong","",s.label+subtitle),track);lanes.appendChild(row);
+      try{
+        const cacheKey=s.device+"/"+s.key;
+        if(!cache.has(cacheKey))cache.set(cacheKey,records(s));
+        const points=await cache.get(cacheKey);if(!current(cycle)||token!==revision)return;
+        const trace=[];
+        const input=points.map(p=>p.unit===s.unit?p:{...p,value_decimal:null});
+        const durations=input.slice(1).map((p,i)=>Date.parse(p.observed_at_utc)-Date.parse(input[i].observed_at_utc)).filter(n=>n>0).sort((a,b)=>a-b);
+        const maxGap=s.rule?s.rule.maxGapSeconds*1000:Math.max(60000,3*(durations[Math.floor((durations.length-1)/2)]||0));
+        const episodes=s.rule?window.RakursV7Model.evaluateEpisodes(input,s.rule,(stamp,phase)=>trace.push({t:Date.parse(stamp),phase})): [];
+        if(!s.rule)input.forEach(p=>trace.push({t:Date.parse(p.observed_at_utc),phase:p.value_decimal==null?"unknown":"observed"}));
+        const parts=[];
+        function append(phase,a,b,last){
+          if(b<a)return;
+          const prev=parts.at(-1);
+          if(prev&&prev.phase===phase&&prev.b===a){prev.b=b;prev.last=last;}else parts.push({phase,a,b,last});
+        }
+        append("unknown",start,trace.length?trace[0].t:end,start);
+        trace.forEach(({t,phase},i)=>{
+          const next=trace[i+1]?.t??end,separated=!trace[i+1]||next-t>maxGap||trace[i+1].phase==="unknown";
+          append(phase,t,separated?t:next,t);
+          if(separated&&next>t)append("unknown",t,next,t);
+        });
+        for(const p of parts.filter(p=>p.b>p.a||p.phase!=="unknown")){
+          const b=element("button","state-segment state-"+p.phase);b.type="button";b.style.left=((p.a-start)*100/(end-start))+"%";b.style.width=((p.b-p.a)*100/(end-start))+"%";
+          if(p.b===p.a)b.classList.add("state-point");
+          b.title=phases[p.phase]+" · "+time(new Date(p.a).toISOString());b.setAttribute("aria-label",s.label+" · "+b.title);
+          const ep=p.phase==="active"?episodes.find(e=>Date.parse(e.start)<=p.a&&Date.parse(e.last)>=p.a):null;
+          b.onclick=()=>{for(const el of lanes.querySelectorAll('[aria-pressed="true"]'))el.removeAttribute("aria-pressed");b.setAttribute("aria-pressed","true");inspect(s,points,p,ep);};
+          track.appendChild(b);defaults.push({b,phase:p.phase,t:p.a});
+        }
+      }catch(error){track.replaceChildren(element("small","",error.message||"Архів недоступний"));}
+    }));
+    if(current(cycle)&&token===revision)defaults.sort((a,b)=>Number(b.phase==="active")-Number(a.phase==="active")||Number(a.phase==="unknown")-Number(b.phase==="unknown")||b.t-a.t)[0]?.b.click();
+  }
+  apply.onclick=()=>{
+    const m=metrics.find(x=>x.signal_key===metric.value),values=[threshold,hyst,delay,gap].map(i=>i.value.trim()===""?NaN:Number(i.value));
+    if(!m||!values.every(Number.isFinite)||values[1]<0||values[2]<0||values[3]<=0){validation.textContent="Перевірте поріг, гістерезис та інтервали.";return;}
+    put(m.signal_key,Number(slot.value),m.unit,{direction:dir.value,threshold:values[0],hysteresis:values[1],delaySeconds:values[2]*60,maxGapSeconds:values[3]*60});
+    validation.textContent="";editor.open=false;refresh();
+  };
+  period.onchange=refresh;await refresh();
 }
+
 function renderAlertCenter(cycle){
   const box=element("section","product-analytics product-alert-center");box.appendChild(element("h2","","Оперативна діагностика"));
   const body=element("div","");box.appendChild(body);main.appendChild(box);
@@ -2278,6 +2387,8 @@ function renderAlertCenter(cycle){
 }
 async function renderEvents(cycle) {
   section("Журнал подій", "Події обладнання та підтверджені операції імпорту MySQL");
+  const timeline=element("section","product-analytics state-timeline");main.appendChild(timeline);
+  renderStateTimeline(timeline,cycle).catch(()=>{if(current(cycle))timeline.replaceChildren(createEmpty("Історія станів недоступна","Оновіть сторінку, щоб повторити читання."));});
   renderAlertCenter(cycle);
   const summary = element("div", "event-summary");
   const deviceCard = element("div", "event-count-card");
@@ -2385,7 +2496,7 @@ async function renderEvents(cycle) {
     "Відсутність записів у журналі подій не доводить, що аварій не було: " +
     "потрібне підключене джерело подій та його опитування.");
   main.appendChild(note);
-  renderRuleAnalyzer(cycle);
+
 }
 
 async function renderTable(path, sectionName, headings, fields, cycle) {

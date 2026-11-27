@@ -210,6 +210,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"peak":{"module":"2","stamp":MEASURED,"spread":60}})
         elif path == "/api/v1/bms/cells":
             self.reply({"values":{"bms_1_cell_1_voltage":reading(3.31,"В"),"bms_1_cell_2_voltage":reading(3.35,"В")}})
+        elif path == "/api/v1/alerts/timeline-rules":
+            self.reply({"rules":[{"slot":1,"signal":"battery_soc","unit":"%","direction":"above","threshold":"75","hysteresis":"2","delay":60,"gap":8000}]})
         elif path == "/api/v1/alerts":
             self.reply({"state":"running","checked_at_utc":MEASURED,"rules":[{"key":"mysql","label":"Доступність MySQL","phase":"normal"}],"events":[]})
         elif path == "/api/v1/solar-forecast":
@@ -230,13 +232,12 @@ class Handler(BaseHTTPRequestHandler):
                 if start<=stamp<=end:
                     value=70+i if key=="battery_soc" else i*(.44 if device==D1 else .37)
                     point=reading(value,"%" if key=="battery_soc" else "кВт",stamp.isoformat().replace("+00:00","Z"))
-                    point.pop("unit")
                     points.append(point)
             # Include a real latest-row fixture with sub-millisecond MySQL precision.
             latest_stamp=datetime.fromisoformat(MEASURED.replace("Z","+00:00"))
             latest_row=device_values(1 if device==D1 else 2).get(key)
             if latest_row and start<=latest_stamp<=end:
-                points.append({k:v for k,v in latest_row.items() if k!="unit"})
+                points.append(dict(latest_row))
             # Internal archive also uses this route; keep its fixture deterministic.
             if not points and scenario=="normal" and key=="pv_power" and end>datetime(2026,11,25,12,tzinfo=timezone.utc):
                 points=[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(2,"кВт","2026-11-24T11:00:00Z")]
@@ -567,6 +568,13 @@ def run():
                             page.wait_for_selector(".product-forecast .product-overlay-line")
                             assert page.locator(".product-forecast .product-overlay-line").count()==2
                         if route=="events":
+                            tl=page.locator(".state-timeline")
+                            tl.locator(".state-active").first.click()
+                            assert "81 %" in tl.locator(".state-detail > strong").inner_text()
+                            assert "Межа відновлення 73 %" in tl.locator(".state-detail").inner_text()
+                            assert tl.locator(".state-row").count()==3
+                            assert tl.locator(".state-unknown").count()>0
+                            tl.screenshot(path=str(OUT/f"events-states-{width}.png"))
                             page.wait_for_selector(".product-alert-center .product-energy-row")
                             assert "Монітор працює" in page.locator(".product-alert-center").inner_text()
                             page.get_by_label("Важливість подій").select_option("critical")

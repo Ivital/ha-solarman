@@ -1000,6 +1000,12 @@ def history_range():
                     "start":serialize(start),"end":serialize(end)})
 
 
+@app.get("/api/v1/alerts/timeline-rules")
+def timeline_rules():
+    from .alert_monitor import load_rules
+    return jsonify({"rules":list(load_rules().values())})
+
+
 @app.get("/api/v1/alerts")
 def alerts():
     from .alert_monitor import public_status
