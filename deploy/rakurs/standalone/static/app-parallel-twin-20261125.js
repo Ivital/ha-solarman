@@ -831,7 +831,7 @@ function multiDeviceChart(lines,unit,first,last){
     const left=55,right=620,top=44,bottom=207,lo=Math.min(...values),hi=Math.max(...values),padding=Math.max((hi-lo)*.08,.01),min=lo-padding,max=hi+padding;
     const x=t=>from===to?(left+right)/2:left+(t-from)/(to-from)*(right-left),y=v=>bottom-(v-min)/(max-min)*(bottom-top);
     for(let n=0;n<4;n++){const yy=top+(bottom-top)*n/3;add(svg,node("line",{x1:left,x2:right,y1:yy,y2:yy,class:"product-gridline"}),node("text",{x:left-6,y:yy+4,"text-anchor":"end",class:"product-axis"},pretty(max-(max-min)*n/3,2)));}
-    for(let n=0;n<4;n++){const stamp=from+(to-from)*n/3;svg.appendChild(node("text",{x:x(stamp),y:232,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},new Date(stamp).toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",...(to-from>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})}));}
+    for(let n=0;n<4;n++){const stamp=from+(to-from)*n/3;svg.appendChild(node("text",{x:x(stamp),y:232,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},new Date(stamp).toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",...(to-from>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})})));}
     for(const l of visible){const steps=l.data.slice(1).map((p,i)=>p.t-l.data[i].t).filter(n=>n>0).sort((a,b)=>a-b),gap=Math.max(1200000,(steps[Math.floor(steps.length/2)]||0)*3);let d="";
       for(const [i,p] of l.data.entries()){d+=(i&&p.t-l.data[i-1].t<=gap?" L":" M")+x(p.t)+" "+y(p.v);}
       if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,class:"product-overlay-line","data-device":l.label}));
