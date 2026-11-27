@@ -673,3 +673,25 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 .state-unknown,.state-key-unknown::before{background:repeating-linear-gradient(135deg,#a3adba55 0 3px,transparent 3px 6px)!important}
 .state-detail{display:grid;gap:.5rem}.state-detail button{justify-self:start}.state-editor summary{cursor:pointer}.state-editor[open] .settings-fields{margin-block:.65rem}
 @media(max-width:650px){.state-axis small{font-size:.65rem}.state-key{font-size:.72rem}}
+
+.balance-body,.balance-info{display:grid;gap:.6rem;min-width:0}
+.balance-key,.balance-key span{display:flex;align-items:center;gap:.35rem}.balance-key{gap:.5rem 1rem;flex-wrap:wrap;font-size:.85rem}
+.balance-key i{width:.8rem;height:.8rem;border-radius:2px}
+.balance-frame{display:grid;grid-template-columns:3rem minmax(0,1fr);height:220px}
+.balance-y{display:flex;flex-direction:column;justify-content:space-between}
+.balance-bars{display:flex;gap:2px;border-block:1px solid #8995a644}
+.balance-hour{position:relative;min-width:0;flex:1;border:0;background:transparent;padding:0;display:flex;flex-direction:column;border-radius:2px}
+.balance-hour>span{height:50%;display:flex;flex-direction:column;width:100%;overflow:hidden}
+.balance-hour .balance-in{flex-direction:column-reverse;border-bottom:1px solid #7d8899}.balance-hour i{width:100%;flex-shrink:0}
+.balance-partial{background:repeating-linear-gradient(135deg,transparent 0 4px,#8392a733 4px 6px)}
+.balance-hour[aria-pressed=true],.balance-hour:focus-visible,.balance-hour:hover{outline:2px solid currentColor;outline-offset:-2px;z-index:1}
+.balance-ticks{display:flex;justify-content:space-between;margin-left:3rem}
+.balance-values{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:.5rem}
+.balance-values>div{display:grid;gap:.2rem;border-top:3px solid;padding:.45rem .1rem}
+.balance-scroll{overflow:auto}.balance-scroll .data-table{width:100%}.balance-scroll button{white-space:nowrap}
+@media(max-width:760px){.balance-values{grid-template-columns:repeat(2,minmax(0,1fr))}.balance-frame{height:170px;grid-template-columns:2.5rem minmax(0,1fr)}.balance-ticks{margin-left:2.5rem}.balance-bars{gap:1px}}
+.balance-body,.balance-info{grid-template-columns:minmax(0,1fr)}
+.balance-compare,.balance-scroll,.balance-info details{min-width:0}
+.hourly-balance .settings-field:has(input[type=checkbox]){display:flex;align-items:center;gap:.4rem}
+.hourly-balance .settings-field input[type=checkbox]{width:1.1rem;height:1.1rem}
+@media(max-width:760px){.balance-compare .data-table{min-width:0;table-layout:fixed;font-size:.76rem}.balance-compare .data-table :is(th,td){padding:.4rem .25rem;white-space:normal;overflow-wrap:anywhere}.balance-compare .data-table :is(th,td):first-child{width:24%}}

@@ -834,6 +834,102 @@ ENERGY_COUNTERS = ("pv_energy_total", "load_energy_total", "grid_import_total",
                    "grid_export_total", "battery_charge_total", "battery_discharge_total")
 
 
+@app.get("/api/v1/energy/hourly")
+def hourly_balance():
+    try:
+        day = datetime.strptime(request.args.get("day", ""), "%Y-%m-%d")
+    except ValueError:
+        abort(400, description="Оберіть добу")
+    if not 2000 <= day.year <= 2100:
+        abort(400, description="Дата поза діапазоном")
+    zone = ZoneInfo("Europe/Kyiv")
+    hour = timedelta(hours=1)
+    def midnight(d):
+        return d.replace(tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None)
+    start, end = midnight(day), midnight(day+timedelta(days=1))
+    prior = midnight(day-timedelta(days=1))
+    compare = request.args.get("compare") == "1"
+    devices = parallel_registered_devices()
+    channels = {"pv1":None,"pv2":None}
+    for d in devices:
+        channels["pv"+str(d["slot_no"])] = (d,"pv_energy_total")
+    for k in ENERGY_COUNTERS[1:]:
+        channels[k] = (devices[0], k) if devices else None
+    first = prior if compare else start
+    by_hour = {}
+    for device in devices:
+        keys = [source[1] for source in channels.values() if source and source[0]["id"]==device["id"]]
+        marks = ",".join(["%s"]*len(keys))
+        samples = rows("SELECT s.signal_key,s.unit,m.observed_at_utc AS t,m.value_decimal AS v "
+                       "FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+                       "WHERE m.device_id=%s AND s.signal_key IN ("+marks+") "
+                       "AND m.observed_at_utc BETWEEN %s AND %s ORDER BY m.observed_at_utc",
+                       (device["id"],)+tuple(keys)+(first,end))
+        for r in samples:
+            t = r["t"]
+            h = t.replace(minute=0,second=0,microsecond=0)
+            channel = "pv"+str(device["slot_no"]) if r["signal_key"]=="pv_energy_total" else r["signal_key"]
+            valid = r["unit"] in {"кВт·год","кВт⋅год","кВт*год","kWh","кВт·г"}
+            for bucket in ([h-hour,h] if t==h else [h]):
+                by_hour.setdefault((bucket,channel),{})[t-bucket] = r["v"] if valid else None
+
+    def delta(samples, lo=None, hi=None):
+        items = [(t,v) for t,v in samples.items() if lo is None or lo<=t<=hi]
+        result = {"value":None,"status":"missing"}
+        if not items:
+            return result
+        a,opening = items[0]
+        b,closing = items[-1]
+        result.update(opening=opening,closing=closing)
+        if any(v is None for t,v in items):
+            result["status"]="invalid"
+        elif any(y[1]<x[1] for x,y in zip(items,items[1:])):
+            result["status"]="reset"
+        elif b>a:
+            result.update(value=closing-opening,status="full" if a==timedelta() and b==hour else "partial")
+        return result
+
+    # Match Kyiv wall-clock hours, including the fold on the autumn transition.
+    def key(h):
+        local = h.replace(tzinfo=timezone.utc).astimezone(zone)
+        return local.hour,local.fold
+    prior_hours = {}
+    h = prior
+    while h<start:
+        prior_hours[key(h)] = h
+        h += hour
+    output = []
+    h = start
+    while h<end:
+        local = h.replace(tzinfo=timezone.utc).astimezone(zone)
+        bucket = {"start":h,"end":h+hour,"label":local.strftime("%H:%M"),"offset":local.strftime("%z"),
+                  "channels":{},"comparison":{}}
+        previous = prior_hours.get(key(h))
+        for channel in channels:
+            samples = by_hour.get((h,channel),{})
+            reading = delta(samples)
+            if samples:
+                reading.update(first_at=h+min(samples),last_at=h+max(samples))
+            bucket["channels"][channel] = reading
+        if compare and previous is not None:
+            for name,members in [("pv",["pv1","pv2"])]+[(c,[c]) for c in ENERGY_COUNTERS[1:]]:
+                sets = [by_hour.get((base,c),{}) for base in (h,previous) for c in members]
+                common = set.intersection(*(set(s) for s in sets))
+                if len(common)<2:
+                    continue
+                lo,hi = min(common),max(common)
+                vals = [delta(s,lo,hi)["value"] for s in sets]
+                if None not in vals:
+                    n=len(members)
+                    bucket["comparison"][name]={"current":sum(vals[:n]),"previous":sum(vals[n:]),
+                        "seconds":(hi-lo).total_seconds(),"first_at":h+lo,"last_at":h+hi,
+                        "prior_first":previous+lo,"prior_last":previous+hi}
+        output.append(bucket)
+        h += hour
+    sources = {c:{"device":d[0]["device_key"],"key":d[1]} for c,d in channels.items() if d}
+    return jsonify(serialize({"hours":output,"sources":sources,"prior_day":(day-timedelta(days=1)).date().isoformat()}))
+
+
 def energy_period(anchor, period):
     local = anchor.replace(tzinfo=timezone.utc).astimezone(ZoneInfo("Europe/Kyiv"))
     start = local.replace(hour=0, minute=0, second=0, microsecond=0)

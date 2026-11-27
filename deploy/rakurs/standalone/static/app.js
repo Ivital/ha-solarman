@@ -829,6 +829,131 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false,sharedK
   }
   await refresh();
 }
+let hourlyCompare=false;
+function renderHourlyBalance(host,cycle,range){
+  const metrics=[["pv","Генерація PV","#e5ad26"],["grid_import_total","Імпорт","#4382d2"],["battery_discharge_total","Розряд АКБ","#198b80"],["load_energy_total","Навантаження","#67778f"],["battery_charge_total","Заряд АКБ","#44b7ac"],["grid_export_total","Експорт","#9c78bc"]];
+  const labels=Object.fromEntries(metrics.map(([k,label])=>[k,label]));
+  const head=element("div","grid-day-head"),controls=element("div","grid-day-controls"),body=element("div","balance-body");
+  const date=settingsField(controls,"Доба за Києвом",localValue(new Date(range.end)).slice(0,10),"date");
+  const toggle=settingsField(controls,"Порівняти з попередньою добою",hourlyCompare,"checkbox");
+  add(head,element("h2","","Погодинний енергобаланс"),controls);add(host,head,body);
+  const fmt=v=>v==null?"—":pretty(Number(v),3);
+  const fmtTime=t=>localValue(new Date(t)).slice(-5);
+  function pv(h){
+    const a=h.channels.pv1,b=h.channels.pv2;
+    if(a?.value==null||b?.value==null||a.first_at!==b.first_at||a.last_at!==b.last_at)return {value:null,status:"missing"};
+    return {...a,value:Number(a.value)+Number(b.value)};
+  }
+  function reading(h,key){return key==="pv"?pv(h):h.channels[key]||{value:null,status:"missing"};}
+  function balance(h){
+    const rows=metrics.map(([k])=>reading(h,k));
+    if(rows.some(r=>r.value==null||r.first_at!==rows[0].first_at||r.last_at!==rows[0].last_at))return null;
+    return {v:rows.reduce((sum,r,i)=>sum+(i<3?1:-1)*Number(r.value),0),from:rows[0].first_at,to:rows[0].last_at};
+  }
+  const statuses={missing:"Недостатньо показів",reset:"Лічильник зменшився",invalid:"Некоректний показ або одиниця",partial:"Неповний інтервал",full:"Повна година"};
+  let rev=0;
+  async function refresh(){
+    const token=++rev;
+    body.textContent="Читання лічильників…";
+    const compare=toggle.checked;
+    let data;
+    try{data=await api("/energy/hourly?day="+encodeURIComponent(date.value)+"&compare="+(compare?"1":"0"));}
+    catch(error){if(current(cycle)&&token===rev)body.textContent="Не вдалося завантажити погодинні покази.";return;}
+    if(!current(cycle)||token!==rev)return;
+    const hours=data.hours||[];
+    if(!hours.length){body.textContent="За вибрану добу немає показів.";return;}
+    body.replaceChildren();
+    const keys=element("div","balance-key");
+    for(const [,name,color] of metrics){const swatch=element("i","");swatch.style.backgroundColor=color;const label=element("span","");add(label,swatch,document.createTextNode(name));keys.appendChild(label);}
+    const axis=element("div","balance-y"),chart=element("div","balance-bars"),frame=element("div","balance-frame");
+    const total=(h,offset)=>metrics.slice(offset,offset+3).reduce((s,[k])=>s+Number(reading(h,k).value||0),0);
+    const peak=Math.max(.01,...hours.flatMap(h=>[total(h,0),total(h,3)]));
+    for(const v of [peak,0,peak])axis.appendChild(element("small","",pretty(v,2)));
+    const buttons=[],info=element("div","balance-info"),compareBox=element("div","balance-compare");
+    const makeButton=(label,fn)=>{const b=element("button","rv7-range",label);b.type="button";b.onclick=fn;return b;};
+    const cell=(tr,tag,txt)=>tr.appendChild(element(tag,"",txt));
+    const hourName=h=>h.label+"–"+fmtTime(h.end)+(hours.filter(x=>x.label===h.label).length>1?" UTC"+h.offset:"");
+    function compareRows(active){
+      compareBox.replaceChildren();if(!compare)return;
+      const list=active==null?hours:[hours[active]];
+      const heading=element("div","grid-day-head");
+      heading.appendChild(element("h3","","Порівняння · "+(active==null?"за добу":hourName(hours[active]))));
+      if(active!=null)heading.appendChild(makeButton("Порівняти всю добу",()=>select(null)));
+      const table=element("table","data-table"),hr=element("tr","");
+      for(const label of ["кВт·год",date.value,data.prior_day,"Різниця","Спільний час"])cell(hr,"th",label);
+      table.appendChild(hr);
+      for(const [key,title] of metrics){
+        const matches=list.map(h=>h.comparison[key]).filter(Boolean),tr=element("tr","");
+        const sum=k=>matches.reduce((n,r)=>n+Number(r[k]),0);
+        cell(tr,"th",title);
+        for(const v of [sum("current"),sum("previous"),sum("current")-sum("previous")])cell(tr,"td",fmt(matches.length?v:null));
+        cell(tr,"td",matches.length?pretty(sum("seconds")/60,1)+" хв":"—");
+        if(matches.length===1){const r=matches[0];tr.title=time(r.first_at)+" — "+time(r.last_at)+" / "+time(r.prior_first)+" — "+time(r.prior_last);}
+        table.appendChild(tr);
+      }
+      const wrap=element("div","balance-scroll");wrap.appendChild(table);
+      add(compareBox,heading,wrap,element("small","subtle","Підсумки охоплюють лише відрізки з парними показами за однаковий час обох діб."));
+    }
+    function select(i){
+      buttons.forEach((b,j)=>b.setAttribute("aria-pressed",String(j===i)));info.replaceChildren();
+      if(i==null){
+        const covered=hours.map(balance).filter(Boolean);
+        info.appendChild(element("strong","","Різниця надходження й використання · "+(covered.length?fmt(covered.reduce((n,r)=>n+r.v,0))+" кВт·год":"—")));
+        const mins=covered.reduce((n,r)=>n+(Date.parse(r.to)-Date.parse(r.from))/60000,0);
+        info.appendChild(element("small","subtle","Спільне покриття: "+pretty(mins,1)+" хв · Виберіть годину для перегляду лічильників."));
+      }else{
+        const h=hours[i],cap=element("div","grid-day-head");add(cap,element("h3","",hourName(h)),makeButton("За добу",()=>select(null)));info.appendChild(cap);
+        const grid=element("div","balance-values");
+        for(const [k,label,color] of metrics){
+          const r=reading(h,k),item=element("div","");item.style.borderColor=color;
+          add(item,element("small","",label),element("strong","",fmt(r.value)+(r.value==null?"":" кВт·год")),element("small","subtle",statuses[r.status]));
+          grid.appendChild(item);
+        }
+        info.appendChild(grid);
+        const residual=balance(h);
+        info.appendChild(element("p","subtle",residual?"Різниця: "+fmt(residual.v)+" кВт·год · "+time(residual.from)+" — "+time(residual.to):"Різниця недоступна: потрібні спільні межові покази всіх лічильників."));
+        const details=element("details",""),wrap=element("div","balance-scroll"),table=element("table","data-table"),hr=element("tr","");
+        details.appendChild(element("summary","","Покази лічильників"));
+        for(const col of ["Лічильник","Початок · кВт·год","Кінець · кВт·год","Приріст","Покриття"])cell(hr,"th",col);table.appendChild(hr);
+        for(const [k,r] of Object.entries(h.channels)){
+          const tr=element("tr","");cell(tr,"th",k==="pv1"?"PV · Deye №1":k==="pv2"?"PV · Deye №2":labels[k]);
+          for(const [t,v] of [[r.first_at,r.opening],[r.last_at,r.closing]]){
+            const td=element("td",""),source=data.sources[k];
+            if(t&&source&&v!=null)td.appendChild(makeButton(time(t)+" · "+v,()=>openArchivePoint(source.key,t,source.device)));else td.textContent="—";tr.appendChild(td);
+          }
+          cell(tr,"td",fmt(r.value));cell(tr,"td",statuses[r.status]);table.appendChild(tr);
+        }
+        wrap.appendChild(table);details.appendChild(wrap);info.appendChild(details);
+      }
+      compareRows(i);
+    }
+    for(const [i,h] of hours.entries()){
+      const b=element("button","balance-hour");b.type="button";b.title=hourName(h);b.setAttribute("aria-label","Енергобаланс "+hourName(h));
+      for(const offset of [0,3]){
+        const half=element("span",offset?"balance-out":"balance-in");
+        for(const [k,,color] of metrics.slice(offset,offset+3)){
+          const r=reading(h,k);if(r.value==null)continue;
+          const bar=element("i","");bar.style.height=(100*Number(r.value)/peak)+"%";bar.style.backgroundColor=color;half.appendChild(bar);
+        }
+        if(metrics.slice(offset,offset+3).some(([k])=>reading(h,k).status!=="full"))half.classList.add("balance-partial");
+        b.appendChild(half);
+      }
+      b.onclick=()=>select(i);chart.appendChild(b);buttons.push(b);
+    }
+    const ticks=element("div","balance-ticks");
+    for(const i of [0,Math.floor(hours.length/4),Math.floor(hours.length/2),Math.floor(hours.length*3/4),hours.length-1])ticks.appendChild(element("small","",hours[i].label));
+    add(frame,axis,chart);
+    add(body,keys,element("small","subtle","Надходження · кВт·год"),frame,ticks,element("small","subtle","Використання · кВт·год · Штрихування — неповний облік"),info,compareBox);select(null);
+  }
+  toggle.onchange=()=>{hourlyCompare=toggle.checked;refresh();};
+  date.onchange=()=>{
+    if(!date.value)return;
+    const a=parseKyiv(date.value+"T00:00",false),b=parseKyiv(date.value+"T23:59",true);
+    if(setRange(a.getTime(),b.getTime()))render();
+  };
+  refresh();
+}
+
 async function renderTrends(cycle) {
   addStatusMessage();
   const devices=await fetchParallelDevices(cycle);
@@ -837,6 +962,8 @@ async function renderTrends(cycle) {
   const latest=stamps.length?Math.max(...stamps):Date.now();
   if(!analysisRange)setRange(overviewRange?.start??(latest-24*3600000),overviewRange?.end??latest);
   main.appendChild(rangeEditor(analysisRange,render));
+  const balance=element("section","product-analytics hourly-balance");main.appendChild(balance);
+  renderHourlyBalance(balance,cycle,analysisRange);
   const comparison=renderComparativeAnalytics(cycle,devices);
   await Promise.allSettled([comparison,renderTrendDeck(cycle,72,false,devices[0]?.device_key)]);
 }

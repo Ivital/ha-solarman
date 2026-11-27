@@ -216,6 +216,19 @@ class Handler(BaseHTTPRequestHandler):
             self.reply({"state":"running","checked_at_utc":MEASURED,"rules":[{"key":"mysql","label":"Доступність MySQL","phase":"normal"}],"events":[]})
         elif path == "/api/v1/solar-forecast":
             self.reply({"state":"available","arrays":[{"slot":i,"hours":[{"start_utc":f"2026-11-27T{hour:02d}:00:00Z","kw":float(hour-7)*i} for hour in range(8,11)]} for i in (1,2)],"common_hours":3,"estimated_kwh":18,"updated_at_utc":MEASURED})
+        elif path == "/api/v1/energy/hourly":
+            day=datetime.fromisoformat(args["day"][0])
+            keys=["pv1","pv2","grid_import_total","battery_discharge_total","load_energy_total","battery_charge_total","grid_export_total"]
+            hours=[]
+            for h in range(24):
+                t=day+timedelta(hours=h-2)
+                a=t.isoformat()+"Z";b=(t+timedelta(hours=1)).isoformat()+"Z"
+                channels={key:{"value":i+1,"status":"full","first_at":a,"last_at":b,"opening":100,"closing":101+i} for i,key in enumerate(keys)}
+                if h==5:
+                    channels["pv1"].update(value=None,status="reset",closing=0)
+                matches={key:{"current":2,"previous":1,"seconds":3600,"first_at":a,"last_at":b,"prior_first":a,"prior_last":b} for key in ["pv"]+keys[2:]}
+                hours.append({"start":a,"end":b,"label":f"{h:02}:00","offset":"+0200","channels":channels,"comparison":matches if args.get("compare")==["1"] else {}})
+            self.reply({"hours":hours,"prior_day":(day-timedelta(days=1)).date().isoformat(),"sources":{key:{"key":"pv_energy_total" if key.startswith("pv") else key,"device":D2 if key=="pv2" else D1} for key in keys}})
         elif path == "/api/v1/energy":
             self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"daily":[{"day":"2026-11-24","value":"12.5"}],"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":"0"}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
@@ -479,6 +492,17 @@ def run():
                         nav_icon = page.locator(".mobile-tabs a[data-route=overview] .mobile-tab-symbol" if width < 761 else '.nav a[href="#/overview"] .symbol').first
                         assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
                         if route=="trends":
+                            hourly=page.locator(".hourly-balance")
+                            hourly.get_by_label("Порівняти з попередньою добою").check()
+                            hourly.get_by_role("button",name="Енергобаланс 05:00–06:00").click()
+                            hourly.locator("summary").click()
+                            assert "Лічильник зменшився" in hourly.locator("details").inner_text()
+                            assert hourly.locator(".balance-compare tr").count()==7
+                            hourly.get_by_role("button",name="Енергобаланс 13:00–14:00").click()
+                            assert "3 кВт·год" in hourly.locator(".balance-values").inner_text()
+                            assert hourly.locator(".balance-frame").bounding_box()["width"] <= hourly.bounding_box()["width"]
+                            hourly.screenshot(path=str(OUT/f"hourly-balance-{width}.png"))
+
                             page.wait_for_selector(".product-comparison-card .product-timeseries")
                             assert page.locator(".product-overlay-line").count()==2
                             page.wait_for_selector(".product-energy-row")
