@@ -41,7 +41,7 @@ const state = { catalog: null, status: null, verified: [], route: "overview", cy
   };
 
 // One interval follows the operator across the three history workspaces.
-let analysisRange=null, archiveFocus=null;
+let analysisRange=null, overviewRange=null, archiveFocus=null;
 function setRange(start,end){
   if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end-start>31*86400000)return false;
   analysisRange={start,end};
@@ -616,6 +616,7 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
           encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
           "&hours="+encodeURIComponent(frame)+"&anchor=latest&resolution=auto"),
         range:analysisRange,setRange,rangeEditor,openArchivePoint,
+        rememberRange:(start,end)=>{overviewRange={start,end};},
         frameLoader:at=>api("/parallel/frame?at="+encodeURIComponent(at)),
         historyRangeLoader:(device,key,start,end)=>api("/history/range?device="+encodeURIComponent(device)+
           "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)+"&resolution=auto")
@@ -834,7 +835,7 @@ async function renderTrends(cycle) {
   if(!current(cycle))return;
   const stamps=devices.flatMap(d=>Object.values(d.values||{}).map(r=>Date.parse(r.observed_at_utc))).filter(Number.isFinite);
   const latest=stamps.length?Math.max(...stamps):Date.now();
-  if(!analysisRange)setRange(latest-24*3600000,latest);
+  if(!analysisRange)setRange(overviewRange?.start??(latest-24*3600000),overviewRange?.end??latest);
   main.appendChild(rangeEditor(analysisRange,render));
   const comparison=renderComparativeAnalytics(cycle,devices);
   await Promise.allSettled([comparison,renderTrendDeck(cycle,72,false,devices[0]?.device_key)]);
@@ -926,7 +927,7 @@ async function renderComparativeAnalytics(cycle,devices){
       for(const [key,label] of Object.entries(energyLabels)){
         const row=records.find(x=>x.key===key),line=element("div","product-energy-row");
         const value=row?.value!=null?number(row.value)+" "+row.unit:"—";
-        add(line,element("span","",label),element("strong","",value),element("small","subtle",row?.decreases?"Зменшення лічильника":row?.samples>=2?time(row.first_at)+" — "+time(row.last_at):"Недостатньо записів"));
+        add(line,element("span","",label),element("strong","",value),element("small","subtle",Number(row?.decreases)>0?"Зменшення лічильника":row?.samples>=2?time(row.first_at)+" — "+time(row.last_at):"Недостатньо записів"));
         card.appendChild(line);
       }
       totals.appendChild(card);
@@ -2330,6 +2331,7 @@ async function renderArchive(cycle) {
     return;
   }
   let focus=archiveFocus;archiveFocus=null;
+  if(!analysisRange && overviewRange)setRange(overviewRange.start,overviewRange.end);
   const search=settingsField(controls,"Пошук показника","","search");
   const picker=settingsField(controls,"Показник",focus?.key||"pv_power","select",[]);
   const primary=["pv_power","load_power","grid_power","battery_power","battery_soc"];
@@ -2381,7 +2383,7 @@ async function renderArchive(cycle) {
       if(!current(cycle)||token!==request)return;
       clear(resultArea);
       const points=response.points||[];
-      resultArea.appendChild(element("p","subtle",response.resolution==="extrema"?points.length+" точок графіка з "+response.sample_count+" записів":points.length+" записів"+(response.truncated?" · частковий результат":"")));
+      resultArea.appendChild(element("p","subtle",response.resolution==="extrema"?points.length+" точок графіка з "+response.sample_count+" записів":new Intl.NumberFormat("uk-UA").format(points.length)+" "+({one:"запис",few:"записи",many:"записів"}[new Intl.PluralRules("uk-UA").select(points.length)]||"записів")+(response.truncated?" · частковий результат":"")));
       if(focus){
         const chosen=points.find(p=>p.observed_at_utc===focus.stamp)||points.find(p=>Date.parse(p.observed_at_utc)===Date.parse(focus.stamp));
         resultArea.appendChild(element("strong","period-reading",time(focus.stamp)+" · "+(chosen?.value_decimal!=null?number(chosen.value_decimal)+" "+(chosen.unit||signals.find(x=>x.signal_key===requestedKey)?.unit||""):"—")));

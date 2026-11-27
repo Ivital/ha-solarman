@@ -295,6 +295,7 @@
   const latest=Date.parse(snap.updated_at_utc),hasRange=Number.isFinite(latest)&&typeof config.historyRangeLoader==="function";
   let endTime=config.range?.end??(hasRange?latest:null);
   let startTime=config.range?.start??(endTime-hours*3600000);
+  if(hasRange)config.rememberRange?.(startTime,endTime);
   if(config.range)hours=(endTime-startTime)/3600000;
   const editor=hasRange && config.rangeEditor?config.rangeEditor({start:startTime,end:endTime},()=>root.dispatchEvent(new Event("hashchange"))):null;
   if(editor){

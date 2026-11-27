@@ -184,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/solar-forecast":
             self.reply({"state":"available","arrays":[{"slot":i,"hours":[{"start_utc":f"2026-11-27T{hour:02d}:00:00Z","kw":float(hour-7)*i} for hour in range(8,11)]} for i in (1,2)],"common_hours":3,"estimated_kwh":18,"updated_at_utc":MEASURED})
         elif path == "/api/v1/energy":
-            self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"daily":[{"day":"2026-11-24","value":"12.5"}],"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
+            self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"daily":[{"day":"2026-11-24","value":"12.5"}],"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":"0"}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
             key=args.get("key",[""])[0]
             device=args["device"][0]
@@ -452,6 +452,7 @@ def run():
                             page.wait_for_selector(".product-energy-row")
                             assert page.locator(".product-energy-row").count()==12
                             assert page.locator(".period-column").count()==2
+                            assert "Зменшення лічильника" not in page.locator(".product-energy-row").first.inner_text()
                             page.get_by_label("Показник порівняння").select_option("load_power")
                             page.wait_for_function("document.querySelectorAll('.product-overlay-line').length===1")
                             series=page.locator(".trend-card svg").first
