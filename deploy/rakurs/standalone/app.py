@@ -778,6 +778,30 @@ def parallel_selected_device():
     return found
 
 
+@app.get("/api/v1/parallel/frame")
+def parallel_archive_frame():
+    """Exact timestamp, both registered slots. No interpolation or nearest row."""
+    at = checked_utc("at")
+    devices = parallel_registered_devices()
+    output = [{"device_key":d["device_key"],"slot_no":d["slot_no"],"values":{}} for d in devices]
+    if devices:
+        ids = tuple(d["id"] for d in devices)
+        samples = rows(
+            "SELECT m.device_id,s.signal_key,s.unit,m.value_decimal,m.quality,m.observed_at_utc "
+            "FROM rakurs_samples AS m JOIN rakurs_signals AS s ON s.id=m.signal_id "
+            "WHERE m.device_id IN ("+",".join(["%s"]*len(ids))+") "
+            "AND m.observed_at_utc=%s AND s.signal_key IN ("+
+            ",".join(["%s"]*len(PARALLEL_SIGNAL_KEYS))+")",
+            ids+(at,)+PARALLEL_SIGNAL_KEYS)
+        by_id = {d["id"]:item for d,item in zip(devices,output)}
+        for sample in samples:
+            item = by_id.get(sample["device_id"])
+            if item is not None:
+                item["values"][sample["signal_key"]] = sample
+    return jsonify(serialize({"data_source":"mysql","at":at,"devices":output,
+                              "aggregate_verified":False}))
+
+
 @app.get("/api/v1/parallel/latest")
 def parallel_device_latest():
     selected = parallel_selected_device()

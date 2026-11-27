@@ -559,6 +559,7 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
         historyLoader:(device,key,frame)=>api("/parallel/history?device="+
           encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
           "&hours="+encodeURIComponent(frame)+"&anchor=latest&resolution=auto"),
+        frameLoader:at=>api("/parallel/frame?at="+encodeURIComponent(at)),
         historyRangeLoader:(device,key,start,end)=>api("/history/range?device="+encodeURIComponent(device)+
           "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)+"&resolution=auto")
       });

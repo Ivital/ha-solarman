@@ -174,6 +174,25 @@ class ParallelApiTests(unittest.TestCase):
         self.assertEqual(self.client.get(
             "/api/v1/parallel/events?device=").status_code, 400)
 
+    def test_exact_archival_frame_queries_both_registered_ids(self):
+        self.fake_devices=[{"id":21,"device_key":"inverter_1","model":MODEL},{"id":22,"device_key":"inverter_2","model":MODEL}]
+        at=datetime(2026,11,25,0,16,18,786)
+        data=[{"device_id":21,"signal_key":"pv_power","value_decimal":Decimal("5.1"),"observed_at_utc":at,"unit":"кВт","quality":"good"}]
+        original=module.rows.side_effect
+        def query(sql,params=()):
+            if "m.observed_at_utc=%s AND s.signal_key IN" in sql:
+                self.assertEqual(params[:3],(21,22,at))
+                return data
+            return original(sql,params)
+        with patch.object(module,"rows",side_effect=query):
+            r=self.client.get("/api/v1/parallel/frame?at=2026-11-25T00:16:18.000786Z")
+        self.assertEqual(r.status_code,200)
+        payload=r.get_json()
+        self.assertEqual(payload["at"],"2026-11-25T00:16:18.000786Z")
+        self.assertEqual(payload["devices"][0]["values"]["pv_power"]["value_decimal"],"5.1")
+        self.assertEqual(payload["devices"][1]["values"],{})
+        self.assertEqual(self.client.get("/api/v1/parallel/frame?at=2026-11-25T00:16:18").status_code,400)
+
     def test_events_scoped_to_physical_device(self):
         self.fake_devices = [{"id": 21, "device_key": "inverter_1",
                               "kind": "inverter", "model": MODEL}]

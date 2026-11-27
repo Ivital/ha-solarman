@@ -306,7 +306,7 @@
   card.appendChild(historyNote);
   container.appendChild(card);
   let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
-  let failedHistoryRequests=0;
+  let failedHistoryRequests=0,frameRevision=0;
   let slider=null;
   const historyError=h("p","rv7-history-error");
   historyError.setAttribute("role","status");
@@ -405,8 +405,20 @@
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
-   if((explicitSelection||(hasRange&&chosenTime!==snap.updated_at_utc))&&typeof onFrame==="function")onFrame(chosenTime,series);
-   else if(!explicitSelection)onRestore?.();
+   const frameToken=++frameRevision,selectedStamp=chosenTime;
+   if((explicitSelection||(hasRange&&chosenTime!==snap.updated_at_utc))&&typeof onFrame==="function"){
+    onFrame(selectedStamp,series);
+    // Decimation only reduces plotted points. A real archive frame is fetched
+    // independently so omitted samples are not misrepresented as absent.
+    if(series.some(l=>l.resolution==="extrema")&&typeof config.frameLoader==="function"){
+     config.frameLoader(selectedStamp).then(result=>{
+      if(scope.cancelled||frameToken!==frameRevision||selectedStamp!==chosenTime)return;
+      const exact=series.map(l=>{const d=(result.devices||[]).find(d=>d.device_key===l.device?.device_key),r=d?.values?.[l.key];return {...l,points:r?M.normalizeHistory([r]):[]};});
+      onFrame(selectedStamp,exact);
+      present.forEach((line,i)=>{const r=M.historicalValue(exact.find(x=>x.id===line.id)?.points||[],selectedStamp,0),value=active[i].querySelector("strong");if(value)value.textContent=r?M.pretty(r.number)+" "+(r.unit||"кВт"):"—";});
+     }).catch(()=>{if(!scope.cancelled&&frameToken===frameRevision)historyError.textContent="Точний кадр недоступний. Показано лише точки графіка.";});
+    }
+   }else if(!explicitSelection)onRestore?.();
    function select(index){
     explicitSelection=true;
     chosenTime=timestamps[Math.max(0,Math.min(timestamps.length-1,index))];
@@ -439,7 +451,7 @@
    else control.querySelector("label").replaceChildren(...Array.from(row.childNodes));
   }
   async function fetchSeries(){
-   const current=++revision;scope.historyBusy=true;
+   const current=++revision;frameRevision++;scope.historyBusy=true;
    stopPlayback();
    chartbox.replaceChildren(h("div","rv7-chart-status","Завантаження архіву…"));
    failedHistoryRequests=0;historyError.textContent="";
@@ -471,7 +483,7 @@
    if(got.some(item=>item.status==="fulfilled"&&item.value.truncated))historyError.textContent+=(historyError.textContent?" · ":"")+"Ліміт записів. Для повної деталізації виберіть коротший період.";
    if(got.some(item=>item.status==="fulfilled"&&item.value.resolution==="extrema"))historyError.textContent+=(historyError.textContent?" · ":"")+"Огляд піків за весь період. Для точних записів відкрийте архів.";
    series=planned.map((item,i)=>({...item,
-    points:got[i].status==="fulfilled"?got[i].value.points:[]}));
+    points:got[i].status==="fulfilled"?got[i].value.points:[],resolution:got[i].status==="fulfilled"?got[i].value.resolution:null}));
    for(const line of series.filter(item=>!item.diagnostic)){
     const button=h("button","rv7-series-button");button.type="button";
     button.setAttribute("aria-pressed",String(views.has(line.id)));
@@ -562,7 +574,7 @@
    leftColumn.appendChild(diagramCard);
    shell.appendChild(leftColumn);
    paintHistory(shell,snap,config,scope,(timestamp,series)=>{
-    // Historical frames are built only from near-time measurements.
+    // Historical frames are built only from exact timestamp measurements.
     // Missing records stay missing; do not silently reuse current values.
     const deviceRows=(snap.devices||[]).map(d=>{
       const archive={};

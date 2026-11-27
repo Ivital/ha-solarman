@@ -142,6 +142,9 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.reply({"device_key": key,
                             "values": {} if scenario == "empty" else device_values(1 if key == D1 else 2)})
+        elif path == "/api/v1/parallel/frame":
+            at=args.get("at",[""])[0]
+            self.reply({"at":at,"devices":[{"device_key":d,"slot_no":i,"values":{k:{**v,"observed_at_utc":at} for k,v in device_values(i).items()}} for i,d in enumerate([D1,D2],1)]})
         elif path == "/api/v1/parallel/history":
             key = args.get("key", [""])[0]
             device = args.get("device", [""])[0]
@@ -192,7 +195,7 @@ class Handler(BaseHTTPRequestHandler):
             # Internal archive also uses this route; keep its fixture deterministic.
             if not points and scenario=="normal" and key=="pv_power" and end>datetime(2026,11,25,12,tzinfo=timezone.utc):
                 points=[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(2,"кВт","2026-11-24T11:00:00Z")]
-            self.reply({"points":[] if scenario=="empty" else points,"truncated":False})
+            self.reply({"points":[] if scenario=="empty" else points,"truncated":False,"resolution":"extrema" if scenario=="dense" else "raw"})
         elif path in {"/api/v1/history", "/api/v1/history/range"}:
             self.reply({"signal":{"unit":"кВт"},"points":[reading(1,"кВт","2026-11-24T10:00:00Z"),reading(4,"кВт","2026-11-24T11:00:00Z"),reading(2,"кВт","2026-11-24T12:00:00Z")],"truncated":False})
         elif path in {"/api/v1/modbus-fields","/api/v1/parallel/modbus-fields"}:
@@ -492,6 +495,13 @@ def run():
                     context.close()
                     print("V7_INTEGRATED_SSR_" + scenario.upper() + "=PASS")
 
+                server.scenario="dense"
+                dense=browser.new_context(viewport={"width":390,"height":844})
+                page=dense.new_page();page.goto(base+"/",wait_until="load");wait_rendered(page)
+                slider=page.locator(".rv7-time-control input[type=range]");slider.wait_for();slider.fill("0")
+                page.wait_for_function("document.querySelector(\".rv7-mobile [data-node=pv1] .rv7-node-value\").textContent.includes(\"5,1 кВт\")")
+                assert any("/parallel/frame?at=" in path for _,path in server.calls)
+                dense.close();print("RAKURS_ADAPTIVE_CHART_EXACT_FRAME=PASS")
                 for scenario in ["d2-down", "empty", "legacy-down"]:
                     server.scenario = scenario
                     context = browser.new_context(viewport={"width": 390, "height": 844})
