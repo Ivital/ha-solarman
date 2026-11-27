@@ -182,6 +182,12 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": {**device_values(1),"battery_soh":reading(98,"%"),"grid_l1_voltage":reading(230,"В"),"grid_l2_voltage":reading(231,"В"),"grid_l3_voltage":reading(229,"В"),"bms_1_min_cell_voltage":reading(3.31,"В"),"bms_1_max_cell_voltage":reading(3.35,"В"),"bms_1_voltage":reading(53.2,"В")}})
+        elif path == "/api/v1/grid/day":
+            date=args["day"][0]
+            frames=[{"t":date+"T"+hour+":00:00Z","v":[231,v,230,50,6.4,1.3],"breaks":([0,1,2] if i==3 else [])}
+                    for i,(hour,v) in enumerate([("01",230),("02",209),("03",230),("08",228)])]
+            self.reply({"start":date+"T00:00:00Z","end":(datetime.fromisoformat(date)+timedelta(days=1)).isoformat()+"Z",
+                        "frames":frames,"plot":[0,1,2,3],"gaps":[[2,3]],"peak":1})
         elif path == "/api/v1/bms/history":
             if "at" in args:
                 self.reply({"modules":{"1":{"cell_1_voltage":3310,"cell_2_voltage":3350},"2":{"min_cell_voltage":3300,"max_cell_voltage":3360}}})
@@ -506,6 +512,15 @@ def run():
                             inputs.nth(0).fill("20");inputs.nth(1).fill("20")
                             assert "10,4 кВт·год" in page.locator(".product-battery-estimate").inner_text()
                         if route=="grid":
+                            grid=page.locator(".grid-day")
+                            grid.get_by_role("button",name="Найбільша різниця між фазами").click()
+                            assert "209 В" in grid.locator(".grid-voltage").nth(1).inner_text()
+                            assert "22 В" in " ".join(grid.locator(".grid-selected").all_text_contents())
+                            assert grid.locator(".grid-inspect tr").count()==(9 if width<=760 else 4)
+                            grid.locator(".grid-gap").click()
+                            assert "Перший після" in grid.locator(".grid-day-coverage").inner_text()
+                            grid.get_by_role("button",name="Найбільша різниця між фазами").click()
+                            grid.screenshot(path=str(OUT/f"grid-day-{width}.png"))
                             assert "230 В" in page.locator(".product-phase-grid").inner_text()
                             assert page.locator(".product-technical-bars").count()>=1
                         if route=="pv":

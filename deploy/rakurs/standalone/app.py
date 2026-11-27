@@ -414,6 +414,89 @@ def signals():
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
 
 
+GRID_ANALYSIS_SIGNALS = (
+    ("grid_l1_voltage", "В", "V"), ("grid_l2_voltage", "В", "V"),
+    ("grid_l3_voltage", "В", "V"), ("grid_frequency", "Гц", "Hz"),
+    ("load_power", "кВт", "kW"), ("battery_power", "кВт", "kW"),
+)
+
+
+@app.get("/api/v1/grid/day")
+def grid_day():
+    try:
+        day = datetime.strptime(request.args.get("day", ""), "%Y-%m-%d")
+    except ValueError:
+        abort(400, description="Оберіть добу")
+    zone = ZoneInfo("Europe/Kyiv")
+    start, end = (d.replace(tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None)
+                  for d in (day, day+timedelta(days=1)))
+    devices = parallel_registered_devices()
+    result = {"start":start, "end":end, "frames":[], "plot":[], "gaps":[], "peak":None}
+    if not devices:
+        return jsonify(serialize(result))
+    # A row is one exact UTC timestamp. Each value keeps its physical unit.
+    columns = ",".join("MAX(CASE WHEN s.signal_key=%s AND s.unit IN (%s,%s) "
+                       "THEN m.value_decimal END) AS v"+str(i) for i in range(6))
+    keys = tuple(entry[0] for entry in GRID_ANALYSIS_SIGNALS)
+    frames = rows("SELECT m.observed_at_utc AS t,"+columns+
+                  " FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+                  "WHERE m.device_id=%s AND m.observed_at_utc >= %s AND m.observed_at_utc < %s "
+                  "AND s.signal_key IN (%s,%s,%s,%s,%s,%s) AND m.value_decimal IS NOT NULL "
+                  "GROUP BY m.observed_at_utc HAVING v0 IS NOT NULL OR v1 IS NOT NULL OR v2 IS NOT NULL "
+                  "ORDER BY m.observed_at_utc",
+                  tuple(v for entry in GRID_ANALYSIS_SIGNALS for v in entry)+(devices[0]["id"],start,end)+keys)
+    if not frames:
+        return jsonify(serialize(result))
+    intervals = sorted((b["t"]-a["t"]).total_seconds() for a,b in zip(frames,frames[1:]))
+    cadence = intervals[(len(intervals)-1)//2] if intervals else None
+    threshold = 2.5*cadence if cadence else None
+    breaks = [set() for _ in frames]
+    chosen = {0,len(frames)-1}
+    gaps = []
+    prev = [None]*3
+    best = peak = None
+    for i,row in enumerate(frames):
+        if i and threshold and (row["t"]-frames[i-1]["t"]).total_seconds()>threshold:
+            gaps.append([i-1,i])
+            chosen.update([i-1,i])
+        volts = [row["v"+str(k)] for k in range(3)]
+        for k,value in enumerate(volts):
+            if value is None:
+                continue
+            j = prev[k]
+            if j is not None and (i!=j+1 or (threshold and (row["t"]-frames[j]["t"]).total_seconds()>threshold)):
+                breaks[i].add(k)
+                chosen.update([j,i])
+            prev[k]=i
+        if None not in volts:
+            spread=max(volts)-min(volts)
+            if best is None or spread>best:
+                best,peak=spread,i
+    # Keep extrema, gap boundaries and the true daily peak before reducing the plot.
+    if len(frames)<=960:
+        chosen.update(range(len(frames)))
+    else:
+        size=(len(frames)+119)//120
+        for lo in range(0,len(frames),size):
+            hi=min(lo+size,len(frames))
+            chosen.update((lo,hi-1))
+            for k in range(3):
+                key="v"+str(k)
+                valid=[i for i in range(lo,hi) if frames[i][key] is not None]
+                if valid:
+                    chosen.update((min(valid,key=lambda i:frames[i][key]),max(valid,key=lambda i:frames[i][key])))
+    if peak is not None:
+        chosen.add(peak)
+    needed=sorted({j for i in chosen for j in (i-1,i,i+1) if 0<=j<len(frames)})
+    mapping={source:i for i,source in enumerate(needed)}
+    result.update(frames=[{"t":frames[i]["t"],"v":[frames[i]["v"+str(k)] for k in range(6)],
+                           "breaks":sorted(breaks[i])} for i in needed],
+                  plot=[mapping[i] for i in sorted(chosen)],
+                  gaps=[[mapping[a],mapping[b]] for a,b in gaps],
+                  peak=mapping[peak] if peak is not None else None)
+    return jsonify(serialize(result))
+
+
 CELL_FRAME_PATTERN = r"^bms_([1-9]|1[0-9]|20)_((min|max)_cell_voltage|cell_([1-9]|[1-5][0-9]|6[0-4])_voltage)$"
 
 

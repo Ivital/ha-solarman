@@ -624,3 +624,13 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 .battery-plots svg{width:100%;height:clamp(140px,15vw,225px);display:block}.battery-frame h3,.battery-plots h3{margin:.8rem 0 .3rem}
 .battery-module{padding:.65rem 0;border-top:1px solid #8b98aa40}.battery-spread{margin-left:1rem}
 .battery-cell{display:grid;padding:.45rem .65rem;border:1px solid #8b98aa55;border-radius:.4rem;font-variant-numeric:tabular-nums}.battery-cells{margin-top:.4rem}.battery-cell small{font-weight:700}
+.grid-day{min-width:0}.grid-day-head,.grid-day-controls{display:flex;align-items:center;justify-content:space-between;gap:.65rem;flex-wrap:wrap}
+.grid-day-stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;margin:.6rem 0}
+.grid-voltage{border-inline-start:4px solid;padding:.4rem .75rem;background:#8491a010;display:grid;font-variant-numeric:tabular-nums}.grid-voltage strong{font-size:1.25rem}
+.grid-day-body svg{display:block;width:100%;height:clamp(170px,20vw,350px)}.grid-gap-strip{height:1.25rem;position:relative;background:#8b97a124;margin:.35rem 0}
+.grid-span,.grid-gap{position:absolute;height:100%;top:0}.grid-span{background:#398d7955}.grid-gap{padding:0;border:0;cursor:pointer;background:repeating-linear-gradient(135deg,#89909a 0 2px,#d6dce0 2px 7px)}
+.grid-inspect .table-wrap{overflow:auto}.grid-inspect table{white-space:nowrap}.grid-selected{background:#367fd419;font-weight:650}.grid-day-body,.grid-inspect{min-width:0}
+@media(max-width:760px){.grid-voltage{padding:.35rem}.grid-voltage strong{font-size:1rem}.grid-day-controls{justify-content:flex-start}.grid-inspect .table-wrap{max-width:100%}}
+@media(max-width:760px){.grid-day-body{display:flex;flex-direction:column}.grid-day-body>.grid-day-stats{order:1}.grid-day-coverage{order:2}.grid-inspect{order:3}}
+.grid-gap-strip{margin-left:7.19%;margin-right:2.19%}
+@media(max-width:760px){.grid-inspect .data-table th,.grid-inspect .data-table td{padding:.35rem .2rem;white-space:normal;font-size:.78rem}.grid-inspect .data-table{min-width:0;width:100%}}
