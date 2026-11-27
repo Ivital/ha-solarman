@@ -871,7 +871,6 @@ function multiDeviceChart(lines,unit,first,last){
   for(const [text,name,action] of [["+","Збільшити масштаб порівняння",()=>zoom(.5)],["−","Зменшити масштаб порівняння",()=>zoom(2)],["Увесь","Скинути масштаб порівняння",()=>{from=first;to=last;draw();}]]){
     const b=element("button","",text);b.type="button";b.setAttribute("aria-label",name);b.addEventListener("click",action);controls.appendChild(b);
   }
-  if(lines.some(line=>containsDemo(line.points)))host.appendChild(element("small","product-data-origin","Містить демонстраційні дані"));
   add(host,legend,plot,controls);draw();return host;
 }
 function technicalBars(label,entries){
@@ -1048,7 +1047,6 @@ async function renderGroup(groups, title, cycle) {
   const count = element("span", "catalog-count");
   controls.appendChild(search);
   controls.appendChild(count);
-  if(containsDemo(Object.values(values)))main.appendChild(element("p","product-data-origin",demoNotice(Object.values(values))));
   if(groups[0]==="inverter")main.appendChild(element("p","subtle","Адреса Modbus у цьому каталозі — збережене поле інвертора. Налаштований Unit ID каналу наведено в розділі «Керування»."));
   const preferred={pv:["pv_power","pv_energy_today"],battery:["battery_soc","battery_power","battery_voltage","battery_current"],grid:["grid_power","grid_voltage","grid_frequency"],load:["load_power","load_energy_today"],inverter:["inverter_temperature","inverter_power","output_power"]};
   const priority=(preferred[groups[0]]||[]).map(key=>items.find(item=>item.key===key)).filter(Boolean);
@@ -1198,7 +1196,6 @@ function interactiveChart(points,unit,domain={}){
   plot.addEventListener("touchmove",e=>{if(pinch&&e.touches.length===2){if(e.cancelable)e.preventDefault();pinch.last=distance(e);}},{passive:false});
   plot.addEventListener("touchend",()=>{if(pinch){const f=pinch.initial/Math.max(1,pinch.last);pinch=null;if(Math.abs(f-1)>.08)zoom(f);}});
   plot.addEventListener("touchcancel",()=>{pinch=null;});
-  if(containsDemo(points))host.appendChild(element("small","product-data-origin",demoNotice(points)));
   add(host,plot,controls,status);redraw();return host;
 }
 async function renderHistory(cycle, archived) {
@@ -1339,12 +1336,6 @@ function deviceReading(values, key) {
   return item && item.value_decimal !== null && item.value_decimal !== undefined && item.value_decimal !== "" ?
     pretty(Number(item.value_decimal), 2) + " " + (item.unit || "") : "—";
 }
-function containsDemo(records) {
-  return records.some(r => ["generated","demo","simulated","synthetic"].includes(r?.quality));
-}
-function demoNotice(records) {
-  return containsDemo(records) ? "Містить демонстраційні дані" : "";
-}
 function storedDeviceNote(reading) {
   return reading?.observed_at_utc ?
     "Останній запис: " + time(reading.observed_at_utc) : "Записів немає";
@@ -1379,7 +1370,7 @@ async function renderTwinSummary(cycle,preloadedDevices=null) {
     const card = element("article", "parallel-device parallel-home-device");
     const head = element("div", "parallel-device-head");
     add(head, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", device.telemetry_error?"Недоступно":demoNotice(Object.values(device.values))||"Архів"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
     card.appendChild(head);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));
@@ -1449,7 +1440,7 @@ async function renderParallel(cycle) {
     const card = element("article", "parallel-device");
     const heading = element("div", "parallel-device-head");
     add(heading, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", device.telemetry_error?"Недоступно":demoNotice(Object.values(device.values))||"Архів"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
     card.appendChild(heading);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));

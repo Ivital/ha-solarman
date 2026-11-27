@@ -532,10 +532,9 @@
   put(copy,h("h2","rv7-title","Енергосистема"),
    h("span","rv7-subtitle","Два паралельні інвертори"));
   put(heading,copy);
-  const archiveLabel=frame=>frame.generated?"Архів · демонстраційні дані":"◷ Архів";
   const statuses=h("div","rv7-status");
   statuses.appendChild(h("span","rv7-pill is-"+snap.data_state,
-   snap.data_state==="archive"?archiveLabel(snap):
+   snap.data_state==="archive"?"◷ Архів":
     snap.data_state==="live"?"● Онлайн":"○ Немає даних"));
   const statusDate=h("span","rv7-pill rv7-status-date",snap.updated_at_utc?M.ukTime(snap.updated_at_utc):"");
   if(snap.updated_at_utc)statuses.appendChild(statusDate);
@@ -597,14 +596,14 @@
     statuses.firstChild.className="rv7-pill is-archive";
     displayed=M.snapshot({...config,devices:deviceRows,
       fallbackValues:{},status:{},now:Date.parse(timestamp)});
-    statuses.firstChild.textContent=archiveLabel(displayed);
+    statuses.firstChild.textContent="◷ Архів";
     paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
       "Архів · "+M.ukTime(timestamp);
    },()=>{
     displayed=snap;statusDate.textContent=snap.updated_at_utc?M.ukTime(snap.updated_at_utc):"";
     statuses.firstChild.className="rv7-pill is-"+snap.data_state;
-    statuses.firstChild.textContent=snap.data_state==="live"?"● Онлайн":snap.data_state==="archive"?archiveLabel(snap):"○ Немає даних";paint();
+    statuses.firstChild.textContent=snap.data_state==="live"?"● Онлайн":snap.data_state==="archive"?"◷ Архів":"○ Немає даних";paint();
     diagramCard.querySelector(".rv7-card-meta").textContent=
       snap.data_state==="live"?"Поточний стан":"Збережений стан";
    });
