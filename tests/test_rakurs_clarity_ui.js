@@ -270,7 +270,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product27"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product28"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -763,11 +763,11 @@ async function run() {
   await app.events.hashchange();
   assert.equal(byClass(app.main,"parallel-device").length,2,
     "Exactly two real-mode stored Deye cards");
-  assert.equal(byClass(app.main,"parallel-reading").length,12,
-    "Six stored readings for each Deye");
+  assert.equal(byClass(app.main,"parallel-reading").length,4,
+    "Two device-specific readings per Deye");
   assert(app.fetchCalls.some(x=>x.includes("/parallel/latest?device=sim_deye20k_parallel_1")));
   assert(app.fetchCalls.some(x=>x.includes("/parallel/latest?device=sim_deye20k_parallel_2")));
-  assert(app.fetchCalls.some(x=>x.includes("/parallel/history?device=sim_deye20k_parallel_1")));
+  assert.equal(byClass(app.main,"pair-shared").length,4);
   assert(app.fetchCalls.some(x=>x.includes("/parallel/modbus-fields?device=sim_deye20k_parallel_2")));
   const parallelText=descendants(app.main).map(x=>x.textContent||"").join("|");
   assert(parallelText.includes("5,1"));

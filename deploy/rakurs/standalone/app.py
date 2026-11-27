@@ -414,6 +414,57 @@ def signals():
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
 
 
+@app.get("/api/v1/parallel/comparison")
+def parallel_comparison():
+    devices = parallel_registered_devices()
+    empty = {"frames": [], "peak": None, "start": None, "end": None}
+    if not devices:
+        return jsonify(empty)
+    ids = [d["id"] for d in devices]
+    keys = ("inverter_temperature", "output_power", "pv_power")
+    filters = (" FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+               "WHERE m.device_id IN (" + ",".join(["%s"]*len(ids)) + ") "
+               "AND s.signal_key IN (%s,%s,%s) AND m.value_decimal IS NOT NULL "
+               "AND ((s.signal_key='inverter_temperature' AND s.unit IN ('°C','°С')) "
+               "OR (s.signal_key<>'inverter_temperature' AND s.unit IN ('кВт','kW'))) ")
+    args = tuple(ids) + keys
+    end = one("SELECT MAX(m.observed_at_utc) AS t" + filters, args)["t"]
+    if end is None:
+        return jsonify(empty)
+    start = end - timedelta(hours=24)
+    samples = rows("SELECT m.observed_at_utc AS t,m.device_id,s.signal_key,m.value_decimal AS v" +
+                   filters + "AND m.observed_at_utc BETWEEN %s AND %s ORDER BY m.observed_at_utc",
+                   args + (start, end))
+    slots = {d["id"]: d["slot_no"]-1 for d in devices}
+    aligned = {}
+    for row in samples:
+        values = aligned.setdefault(row["t"], [None]*6)
+        values[keys.index(row["signal_key"])*2+slots[row["device_id"]]] = row["v"]
+    # Retain actual frames including per-channel extrema, transitions to missing
+    # and the largest simultaneous temperature difference before thinning.
+    selected, buckets = set(), {}
+    peak, largest, previous = None, None, None
+    for stamp, values in aligned.items():
+        if None not in values[:2]:
+            delta = abs(values[0]-values[1])
+            if largest is None or delta > largest:
+                peak, largest = stamp, delta
+        if previous is not None and any((a is None)!=(b is None) for a,b in zip(aligned[previous],values)):
+            selected.update((previous,stamp))
+        buckets.setdefault(stamp.replace(second=0,microsecond=0), []).append(stamp)
+        previous = stamp
+    for group in buckets.values():
+        selected.update((group[0],group[-1]))
+        for i in range(6):
+            valid = [s for s in group if aligned[s][i] is not None]
+            if valid:
+                selected.update((min(valid,key=lambda s:aligned[s][i]),max(valid,key=lambda s:aligned[s][i])))
+    if peak is not None:
+        selected.add(peak)
+    return jsonify(serialize({"start":start,"end":end,"peak":peak,
+                              "frames":[{"t":s,"v":aligned[s]} for s in sorted(selected)]}))
+
+
 LOAD_KEYS = ("load_power", "load_l1_power", "load_l2_power", "load_l3_power")
 
 

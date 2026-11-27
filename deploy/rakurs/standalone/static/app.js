@@ -1966,6 +1966,94 @@ async function renderTwinSummary(cycle,preloadedDevices=null) {
     grid.appendChild(card);
   }
 }
+async function renderPairComparison(host,devices,cycle){
+  const controls=element("div","grid-day-controls"), plots=element("div","pair-plots"), detail=element("section","pair-detail");
+  const power=element("select","");
+  power.setAttribute("aria-label","Показник потужності");
+  for(const [key,label] of [["2","Вихідна потужність"],["4","Генерація PV"]]){
+    const opt=element("option","",label);opt.value=key;power.appendChild(opt);
+  }
+  const peak=element("button","rv7-range","Найбільша різниця температур");
+  peak.type="button";peak.disabled=true;add(controls,power,peak);
+  add(host,element("h2","","Порівняння інверторів · 24 години"),controls,plots,detail);
+  plots.textContent="Читання архіву…";
+  const data=await api("/parallel/comparison");
+  if(!current(cycle))return;
+  const frames=data.frames||[];
+  if(!frames.length){plots.textContent="За цей період немає вимірювань.";return;}
+  const ts=frames.map(f=>Date.parse(f.t)),fullStart=Date.parse(data.start),fullEnd=Date.parse(data.end);
+  let from=fullStart,to=fullEnd,active=frames.length-1,markers=[];
+  function action(label,fn){
+    const b=element("button","rv7-range",label);b.type="button";b.onclick=fn;return b;
+  }
+  const availablePeak=frames.findIndex(f=>f.t===data.peak);
+  peak.disabled=availablePeak<0;peak.onclick=()=>{active=availablePeak;if(ts[active]<from||ts[active]>to){from=fullStart;to=fullEnd;draw();}else inspect(active);};
+  function inspect(i){
+    active=i;const f=frames[i],offset=Number(power.value);
+    for(const update of markers)update(i);
+    const shown=v=>v==null?"—":pretty(Number(v),2);
+    const diff=f.v[0]!=null&&f.v[1]!=null?pretty(Math.abs(Number(f.v[0])-Number(f.v[1])),2)+" °C":"—";
+    detail.replaceChildren(element("strong","",time(f.t)+" · Різниця температур "+diff));
+    for(const d of devices){
+      const slot=Number(d.slot_no)-1, row=element("div","pair-detail-row");
+      add(row,element("strong","",deviceLabel(d)),element("span","",shown(f.v[slot])+" °C"),element("span","",shown(f.v[offset+slot])+" кВт"));
+      for(const [idx,key,label] of [[slot,"inverter_temperature","температура"],[offset+slot,offset===2?"output_power":"pv_power","потужність"]]){
+        const b=action("Архів · "+label,()=>openArchivePoint(key,f.t,d.device_key));
+        b.disabled=f.v[idx]==null;row.appendChild(b);
+      }
+      detail.appendChild(row);
+    }
+  }
+  function draw(){
+    plots.replaceChildren();markers=[];
+    const indices=frames.map((_,i)=>i).filter(i=>ts[i]>=from&&ts[i]<=to);
+    const steps=ts.slice(1).map((t,i)=>t-ts[i]).filter(v=>v>0).sort((a,b)=>a-b);
+    const gap=3*(steps[Math.floor((steps.length-1)/2)]||Infinity);
+    const node=(tag,attrs={},txt)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(txt!==undefined)n.textContent=txt;return n;};
+    for(const [offset,title,unit] of [[0,"Температура інверторів","°C"],[Number(power.value),power.selectedOptions[0].textContent,"кВт"]]){
+      const titlebar=element("div","grid-day-head"),legend=element("div","pair-legend");
+      for(const d of devices)legend.appendChild(element("span","pair-slot-"+d.slot_no,deviceLabel(d)));
+      add(titlebar,element("h3","",title+" · "+unit),legend);plots.appendChild(titlebar);
+      const series=indices.flatMap(i=>frames[i].v.slice(offset,offset+2)).filter(v=>v!=null).map(Number);
+      if(!series.length){plots.appendChild(element("p","subtle","За вибраний період немає вимірювань."));continue;}
+      const low=series.reduce((a,b)=>Math.min(a,b)),high=series.reduce((a,b)=>Math.max(a,b)),pad=Math.max((high-low)*.12,.1);
+      const svg=node("svg",{class:"chart product-timeseries",viewBox:"0 0 640 195",role:"group",tabindex:0,"aria-label":title+". Стрілки вибирають час."});
+      const x=t=>50+(t-from)/(to-from)*578,y=v=>153-(v-low+pad)/(high-low+2*pad)*123;
+      for(let n=0;n<4;n++){
+        const v=low-pad+(high-low+pad*2)*n/3,t=from+(to-from)*n/3;
+        add(svg,node("line",{x1:50,x2:628,y1:y(v),y2:y(v),class:"product-gridline"}),node("text",{x:44,y:y(v)+4,"text-anchor":"end",class:"product-axis"},pretty(v,2)),node("text",{x:x(t),y:180,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},localValue(new Date(t)).slice(-5)));
+      }
+      for(const d of devices){
+        const slot=Number(d.slot_no)-1,color=slot?"#d47a13":"#387de0",col=offset+slot;
+        let path="",last=null;
+        for(const i of indices){
+          const val=frames[i].v[col];if(val==null){last=null;continue;}
+          const begin=last===null||ts[i]-last>gap;
+          path+=(begin?" M":" L")+x(ts[i])+" "+y(Number(val));last=ts[i];
+          if(begin)svg.appendChild(node("circle",{cx:x(ts[i]),cy:y(Number(val)),r:2,fill:color}));
+        }
+        svg.appendChild(node("path",{d:path,fill:"none",stroke:color,"stroke-width":2.4,"stroke-dasharray":slot?"7 4":"none"}));
+      }
+      const cursor=node("line",{y1:24,y2:153,class:"product-cursor"}),label=node("text",{x:625,y:15,"text-anchor":"end",class:"product-chart-label"});
+      add(svg,cursor,label);markers.push(i=>{cursor.setAttribute("x1",x(ts[i]));cursor.setAttribute("x2",x(ts[i]));label.textContent=time(frames[i].t);});
+      function pick(e){
+        const matrix=svg.getScreenCTM();if(!matrix)return;
+        const point=svg.createSVGPoint();point.x=e.clientX;point.y=e.clientY;
+        const target=from+(point.matrixTransform(matrix.inverse()).x-50)/578*(to-from);
+        const idx=indices.reduce((a,b)=>Math.abs(ts[a]-target)<=Math.abs(ts[b]-target)?a:b);
+        if(active!==idx)inspect(idx);
+      }
+      svg.onclick=pick;svg.onpointermove=e=>{if(e.pointerType==="mouse")pick(e);};
+      svg.onkeydown=e=>{if(["Home","End","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();const n=indices.indexOf(active);inspect(indices[e.key==="Home"?0:e.key==="End"?indices.length-1:Math.max(0,Math.min(indices.length-1,n+(e.key==="ArrowLeft"?-1:1)))]);}};
+      plots.appendChild(svg);window.RakursV7?.fitChart?.(svg);
+    }
+    inspect(active);
+  }
+  controls.appendChild(action("Година навколо точки",()=>{from=Math.max(fullStart,Math.min(ts[active]-1800000,fullEnd-3600000));to=from+3600000;draw();}));
+  controls.appendChild(action("Усі 24 години",()=>{from=fullStart;to=fullEnd;draw();}));
+  power.onchange=draw;draw();
+}
+
 async function renderParallel(cycle) {
   addStatusMessage();
   section("Паралельна система Deye",
@@ -1986,12 +2074,18 @@ async function renderParallel(cycle) {
       "Після очищення бази дані з'являться після першого завантаження."));
     return;
   }
-  const comparison=element("section","product-analytics product-pair-summary");comparison.appendChild(element("h2","","Зведення інверторів"));
-  const table=element("table","data-table product-pair-table"),head=element("thead",""),hr=element("tr","");
-  for(const label of ["Параметр",...devices.map((d,i)=>deviceLabel(d,i))])hr.appendChild(element("th","",label));head.appendChild(hr);table.appendChild(head);
-  const body=element("tbody","");
-  for(const [key,label] of [["pv_power","PV"],["load_power","Будинок"],["battery_soc","SOC"],["battery_power","АКБ"],["grid_power","Мережа"],["inverter_temperature","Температура"]]){const row=element("tr","");row.appendChild(element("th","",label));for(const d of devices)row.appendChild(element("td","",deviceReading(d.values,key)));body.appendChild(row);}
-  table.appendChild(body);comparison.appendChild(table);main.appendChild(comparison);
+  const strip=element("section","product-analytics pair-strip");
+  const model=window.RakursV7Model;
+  const reports=model?.snapshot({devices}).reports;
+  for(const [key,label] of [["load_power","Навантаження"],["grid_power","Мережа"],["battery_power","АКБ"],["battery_soc","Заряд АКБ"]]){
+    const card=element("div","pair-shared"),report=reports?.[key];
+    const flow=report&&["grid_power","battery_power"].includes(key)?model.sharedFlow(report,key).label:"";
+    add(card,element("small","",label),element("strong","",deviceReading(devices[0].values,key)),element("span","subtle",flow));
+    card.title=storedDeviceNote(devices[0].values[key]);strip.appendChild(card);
+  }
+  const comparison=element("section","product-analytics pair-comparison");
+  add(main,strip,comparison);
+  renderPairComparison(comparison,devices,cycle).catch(()=>{if(current(cycle))comparison.appendChild(createEmpty("Історія порівняння недоступна","Спробуйте оновити сторінку."));});
   const grid = element("div", "parallel-devices");
   main.appendChild(grid);
   for (const [i, device] of devices.entries()) {
@@ -2004,11 +2098,7 @@ async function renderParallel(cycle) {
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));
     const metrics = element("div", "parallel-metric-list");
-    const fieldsToShow = [
-      ["pv_power", "Генерація PV"], ["battery_power", "Потужність АКБ"],
-      ["battery_soc", "SOC"], ["load_power", "Навантаження"],
-      ["grid_power", "Мережа"], ["inverter_temperature", "Температура"]
-    ];
+    const fieldsToShow = [["pv_power","Генерація PV"],["inverter_temperature","Температура"]];
     const stamps=new Set(fieldsToShow.map(([key])=>device.values[key]?.observed_at_utc));
     const sharedTime=stamps.size===1 && device.values.pv_power?.observed_at_utc;
     if(sharedTime)card.appendChild(element("p","subtle",storedDeviceNote(device.values.pv_power)));
@@ -2022,13 +2112,12 @@ async function renderParallel(cycle) {
     card.appendChild(metrics);
     grid.appendChild(card);
     const result = await Promise.allSettled([
-      api("/parallel/history" + query + "&key=pv_power&hours=24&anchor=latest&resolution=auto"),
       api("/parallel/modbus-fields" + query),
       api("/parallel/raw" + query + "&limit=200"),
       api("/parallel/events" + query),
     ]);
     if (!current(cycle)) return;
-    const [history, fields, raw, events] = result;
+    const [fields, raw, events] = result;
     const fieldList = fields.status === "fulfilled" ?
       (fields.value.fields || []) : [];
     const rawRows = raw.status === "fulfilled" ?
@@ -2045,17 +2134,6 @@ async function renderParallel(cycle) {
       info.appendChild(item);
     }
     card.appendChild(info);
-    const chart = element("section", "parallel-device-chart");
-    chart.appendChild(element("h3", "", "Генерація PV · останні 24 години"));
-    const points = history.status === "fulfilled" ? (history.value.points || []) : [];
-    if (points.filter(p => p.value_decimal !== null).length === 0) {
-      chart.appendChild(createEmpty("Вимірювань немає",
-        "За останні 24 години немає числових значень."));
-    } else {
-      chart.appendChild(interactiveChart(points, "кВт"));
-    }
-    card.appendChild(chart);
-
     const rawPanel = element("details", "parallel-raw-viewer");
     rawPanel.appendChild(element("summary", "", "Регістри Modbus"));
     const rawArea = element("div", "parallel-raw-table");

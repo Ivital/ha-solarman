@@ -649,3 +649,12 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 .load-heat .load-hour{height:1.6rem;min-width:0;padding:0;border:0;border-radius:3px;background:color-mix(in srgb,#158474 var(--intensity),#eef5f3)}
 .load-heat .load-hour:disabled{opacity:.65;background:repeating-linear-gradient(135deg,transparent 0 3px,#8199a766 3px 5px)}
 .load-hour:focus-visible,.load-hour:hover:enabled{outline:2px solid currentColor;outline-offset:-2px}
+
+.pair-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.75rem}
+.pair-shared{display:grid;align-content:start;gap:.2rem;font-variant-numeric:tabular-nums}.pair-shared strong{font-size:1.35rem}
+.pair-legend,.pair-comparison .grid-day-controls{display:flex;gap:.9rem;flex-wrap:wrap;align-items:center}
+.pair-legend span:before{content:"";display:inline-block;width:1.5rem;border-top:3px solid #387de0;margin-right:.35rem;vertical-align:middle}
+.pair-legend .pair-slot-2:before{border-top:3px dashed #d47a13}
+.pair-detail-row{display:grid;grid-template-columns:1fr 1fr 1fr auto auto;align-items:center;gap:.5rem;padding:.35rem 0}
+.pair-detail{font-variant-numeric:tabular-nums}.pair-plots svg{width:100%;display:block}
+@media(max-width:700px){.pair-strip{grid-template-columns:repeat(2,minmax(0,1fr))}.pair-detail-row{grid-template-columns:repeat(3,minmax(0,1fr));margin-top:.5rem}.pair-detail-row button{font-size:.8rem}.pair-legend{font-size:.8rem}}

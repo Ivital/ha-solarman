@@ -158,6 +158,13 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/parallel/frame":
             at=args.get("at",[""])[0]
             self.reply({"at":at,"devices":[{"device_key":d,"slot_no":i,"values":{k:{**v,"observed_at_utc":at} for k,v in device_values(i).items()}} for i,d in enumerate([D1,D2],1)]})
+        elif path == "/api/v1/parallel/comparison":
+            self.reply({"start":"2026-11-24T00:16:18Z","end":MEASURED,
+                        "peak":"2026-11-24T12:16:18.000115Z",
+                        "frames":[{"t":t,"v":v} for t,v in [
+                            ("2026-11-24T00:16:18Z",[35,None,2,None,3,None]),
+                            ("2026-11-24T12:16:18.000115Z",[34,38,3,4,5,6]),
+                            (MEASURED,[37,38,None,None,4,5])]]})
         elif path == "/api/v1/parallel/history":
             key = args.get("key", [""])[0]
             device = args.get("device", [""])[0]
@@ -441,7 +448,7 @@ def run():
                     "grid": ".product-metric-catalog .metric",
                     "load": ".product-metric-catalog .metric",
                     "inverter": ".product-metric-catalog .metric",
-                    "parallel": ".parallel-device .product-timeseries",
+                    "parallel": ".pair-comparison .product-timeseries",
                     "trends": ".trend-card .product-timeseries",
                     "history": ".history-workspace .product-timeseries",
                     "archive": ".history-workspace .product-timeseries",
@@ -583,7 +590,15 @@ def run():
                             assert page.locator(".product-metric-catalog .metric:visible").count() > 0
                         if route=="parallel":
                             assert page.locator(".parallel-device").count()==2
-                            assert page.locator(".product-pair-table tbody tr").count()==6
+                            assert page.locator(".pair-shared").count()==4
+                            panel=page.locator(".pair-comparison")
+                            panel.get_by_role("button",name="Найбільша різниця температур").click()
+                            assert "4 °C" in panel.locator(".pair-detail > strong").inner_text()
+                            assert len(set(panel.locator(".product-chart-label").all_text_contents()))==1
+                            panel.get_by_label("Показник потужності").select_option("4")
+                            assert "5 кВт" in panel.locator(".pair-detail-row").first.inner_text()
+                            panel.get_by_role("button",name="Година навколо точки").click()
+                            panel.screenshot(path=str(OUT/f"pair-{width}.png"))
                             assert not page.locator("details.parallel-raw-viewer").first.get_attribute("open")
                             page.locator("details.parallel-raw-viewer summary").first.click()
                             assert page.locator("details.parallel-raw-viewer").first.get_attribute("open") is not None
