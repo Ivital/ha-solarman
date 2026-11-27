@@ -1584,8 +1584,32 @@ function renderRuleAnalyzer(cycle){
     finally{button.disabled=false;}
   });
 }
+function renderAlertCenter(cycle){
+  const box=element("section","product-analytics product-alert-center");box.appendChild(element("h2","","Оперативна діагностика"));
+  const body=element("div","");box.appendChild(body);main.appendChild(box);
+  const refresh=element("button","more-button","Оновити стан");refresh.type="button";box.appendChild(refresh);
+  let revision=0;
+  async function load(){
+    const token=++revision;refresh.disabled=true;
+    try{
+      const data=await api("/alerts");if(!current(cycle)||token!==revision)return;clear(body);
+      const recent=data.state==="running",labels={running:"Монітор працює",stale:"Монітор не оновлюється",not_installed:"Фоновий монітор не встановлено",unavailable:"Стан монітора недоступний"};
+      add(body,element("strong","",labels[data.state]||"Стан невідомий"),element("p","subtle",data.checked_at_utc?"Перевірено: "+time(data.checked_at_utc):"Немає підтвердженого циклу"));
+      const phase={normal:"Норма",pending:"Очікування затримки",active:"Активний епізод",unknown:"Не підтверджено / немає даних"};
+      for(const r of data.rules||[]){const row=element("div","product-energy-row");add(row,element("span","",r.label),element("strong","",recent?(phase[r.phase]||"Невідомо"):"Стан застарів"));if(r.start)row.appendChild(element("small","subtle","Початок: "+time(r.start)));body.appendChild(row);}
+      const events=element("details","");events.appendChild(element("summary","","Останні переходи стану"));
+      const status={active:"Виникнення",recovered:"Відновлення",unknown:"Перервано — стан невідомий"};
+      for(const item of (data.events||[]).slice().reverse()){const row=element("div","product-energy-row");add(row,element("span","",item.label),element("strong","",status[item.kind]||item.kind),element("small","subtle",time(item.at)+(item.start?" · початок: "+time(item.start):"")));events.appendChild(row);}
+      if(!(data.events||[]).length)events.appendChild(element("p","subtle","Переходів ще немає."));
+      body.appendChild(events);
+    }catch(_error){if(current(cycle)&&token===revision)body.replaceChildren(createEmpty("Монітор недоступний","Оновіть стан."));}
+    finally{refresh.disabled=false;}
+  }
+  refresh.addEventListener("click",load);load();
+}
 async function renderEvents(cycle) {
   section("Журнал подій", "Події обладнання та підтверджені операції імпорту MySQL");
+  renderAlertCenter(cycle);
   const summary = element("div", "event-summary");
   const deviceCard = element("div", "event-count-card");
   const batchCard = element("div", "event-count-card");

@@ -75,6 +75,33 @@ class StandaloneMySqlTests(unittest.TestCase):
         self.assertNotIn("/static/rakurs-energy-board-20261126", html)
         self.assertNotIn("dashboard-toolbar-ssr", html)
 
+    def test_alert_monitor_transition_delay_and_unknown(self):
+        from standalone.alert_monitor import transition,empty_state
+        from datetime import timezone,timedelta
+        s=empty_state();t=datetime(2026,11,25,tzinfo=timezone.utc)
+        for seconds,condition in [(0,True),(60,True),(60,True),(120,True),(180,"hold"),(240,False)]:
+            transition(s,"test","Test",condition,t+timedelta(seconds=seconds),120,180,"test-v1")
+        self.assertEqual([x["kind"] for x in s["events"]],["active","recovered"])
+        transition(s,"test","Test",True,t+timedelta(seconds=300),0,180,"test-v1")
+        transition(s,"test","Test",None,t+timedelta(seconds=360),0,180,"test-v1")
+        self.assertEqual(s["events"][-1]["kind"],"unknown")
+        self.assertEqual(s["rules"]["test"]["phase"],"unknown")
+        with patch("standalone.alert_monitor.read_state",return_value=s):
+            self.assertEqual(self.client.get("/api/v1/alerts").status_code,200)
+
+    def test_alert_rules_require_units_and_fresh_values(self):
+        from standalone.alert_monitor import rules_from_config,condition_for
+        from datetime import timezone,timedelta
+        rule={"id":"soc","slot":1,"signal":"battery_soc","unit":"%","direction":"below",
+              "threshold":20,"hysteresis":3,"delay_seconds":120,"max_gap_seconds":180}
+        r=rules_from_config({"rules":[rule]})["soc"]
+        t=datetime(2026,11,25,tzinfo=timezone.utc)
+        self.assertEqual(condition_for(r,{"unit":"%","value_decimal":19,"observed_at_utc":t},t)[0],True)
+        self.assertEqual(condition_for(r,{"unit":"%","value_decimal":22,"observed_at_utc":t},t)[0],"hold")
+        self.assertIsNone(condition_for(r,{"unit":"%","value_decimal":19,"observed_at_utc":t-timedelta(hours=1)},t)[0])
+        with self.assertRaises(ValueError):
+            rules_from_config({"rules":[rule,rule]})
+
     def test_forecast_disabled_no_network(self):
         from unittest.mock import patch
         with patch("standalone.solar_forecast.load_config",return_value=None), patch("standalone.solar_forecast.retrieve") as remote:

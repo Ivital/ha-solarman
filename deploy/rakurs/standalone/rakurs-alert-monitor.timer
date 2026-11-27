@@ -1,0 +1,11 @@
+[Unit]
+Description=RAKURS operational alert evaluation every minute
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+Unit=rakurs-alert-monitor.service
+
+[Install]
+WantedBy=timers.target

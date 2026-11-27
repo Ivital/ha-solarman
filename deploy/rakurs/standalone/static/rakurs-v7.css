@@ -567,3 +567,7 @@ body[data-theme] .product-rule-analyzer .product-energy-row{margin-top:5px}
 body[data-theme] .product-forecast summary,body[data-theme] .product-battery-estimate summary{cursor:pointer;font-weight:650}
 body[data-theme] .product-forecast>div,body[data-theme] .product-battery-estimate>div{margin-top:12px}
 body[data-theme] .product-battery-estimate .settings-fields{margin:10px 0}
+
+body[data-theme] .product-alert-center>div>strong{display:block;font-size:16px;margin:8px 0}
+body[data-theme] .product-alert-center details{margin:10px 0}
+body[data-theme] .product-alert-center summary{cursor:pointer}
