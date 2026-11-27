@@ -226,7 +226,7 @@ def runtime(db,state,*,device=None,error=None,attempt=False,success=False):
     with db.cursor() as cur:
         cur.execute(
             "UPDATE rakurs_poll_runtime SET worker_heartbeat_utc=UTC_TIMESTAMP(6),"
-            "state=%s,last_device_id=COALESCE(%s,last_device_id),"
+            "state=COALESCE(%s,state),last_device_id=COALESCE(%s,last_device_id),"
             "last_error=CASE WHEN %s THEN NULL "
             "WHEN %s IS NOT NULL THEN %s ELSE last_error END,"
             "last_attempt_utc=IF(%s,UTC_TIMESTAMP(6),last_attempt_utc),"
@@ -268,32 +268,47 @@ def main():
                     runtime(db,"blocked",error="NO_VERIFIED_GATEWAY")
                 elif time.monotonic()-last_run >= int(cfg["interval_seconds"]):
                     last_run=time.monotonic()
+                    failures=0
+                    completed=0
+                    interrupted=False
                     for device in devices:
                         # Re-read enabled switch before EVERY hardware request.
                         with db.cursor() as cur:
                             cur.execute("SELECT enabled FROM rakurs_poll_settings WHERE id=1")
                             switch=cur.fetchone()
                         if not switch or not switch["enabled"]:
+                            interrupted=True
                             break
                         # Device-level disable/config changes must also be
                         # enforced immediately before the network request.
                         fresh=next((d for d in ready_devices(db)
                                     if d["id"]==device["id"]),None)
                         if fresh is None:
+                            failures+=1
                             continue
-                        runtime(db,"active",device=fresh["id"],attempt=True)
+                        runtime(db,"probing",device=fresh["id"],attempt=True)
                         try:
                             payload=poll_probe(fresh)
                             result=persist(db,payload)
                             if result["status"]=="saved" and payload["quality"]=="good":
-                                runtime(db,"active",device=device["id"],success=True)
+                                completed+=1
+                                runtime(db,"probing",device=device["id"],success=True)
                             else:
+                                failures+=1
                                 runtime(db,"error",device=device["id"],error="READ_UNSUCCESSFUL")
                         except (OSError,ValueError,RuntimeError,PermissionError) as error:
+                            failures+=1
                             runtime(db,"error",device=device["id"],
                                     error=type(error).__name__[:96])
+                    if interrupted:
+                        runtime(db,"disabled")
+                    elif failures or completed!=len(devices):
+                        runtime(db,"error",error="INCOMPLETE_POLL_CYCLE")
+                    else:
+                        runtime(db,"active")
                 else:
-                    runtime(db,"active")
+                    # Heartbeat must not overwrite a failed cycle.
+                    runtime(db,None)
             time.sleep(2)
     finally:
         db.close()

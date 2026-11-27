@@ -15,7 +15,10 @@
   function date(input){
     if(!input)return null;
     const d=new Date(input);
-    return Number.isFinite(d.getTime())?d.toISOString():null;
+    if(!Number.isFinite(d.getTime()))return null;
+    const fraction=String(input).match(/\.(\d{1,6})(?:Z|[+-]\d{2}:\d{2})$/i);
+    const micro=fraction?fraction[1].padEnd(6,"0").slice(3):"000";
+    return d.toISOString().replace(/Z$/,micro+"Z");
   }
   function read(values,key,device){
     const item=values&&typeof values==="object"?values[key]:undefined;
@@ -154,8 +157,9 @@
       .sort((a,b)=>a.timestamp.localeCompare(b.timestamp));
   }
   function historicalValue(points,timestamp,toleranceMs=600000){
-    const t=Date.parse(timestamp);
-    if(!Number.isFinite(t))return null;
+    const exact=date(timestamp),t=Date.parse(timestamp);
+    if(!exact||!Number.isFinite(t))return null;
+    if(toleranceMs===0)return normalizeHistory(points).find(p=>p.timestamp===exact)||null;
     let found=null,best=Infinity;
     for(const p of normalizeHistory(points)){
       const dist=Math.abs(Date.parse(p.timestamp)-t);
@@ -178,6 +182,31 @@
     return {direction:incoming?"reverse":"forward",
       label:key==="battery_power"?(incoming?"Розряд":"Заряд"):(incoming?"Імпорт":"Експорт")};
   }
-  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,
+  // Only combine report counters covering exactly the same interval. PV is
+  // independent according to the owner topology; common counters count once.
+  // This is arithmetic on stored reports, not verification of electrical metering.
+  function pairEnergy(reports){
+    const keys=["pv_energy_total","load_energy_total","grid_import_total","grid_export_total","battery_charge_total","battery_discharge_total"];
+    const result={values:{},window:null,residual:null,complete:false,reason:"Немає порівнюваного інтервалу двох Deye"};
+    if(!Array.isArray(reports)||reports.length!==2||reports.some(r=>!r))return result;
+    let common=null;
+    for(const key of keys){
+      const rows=reports.map(report=>(report.counters||[]).find(r=>r.key===key));
+      if(rows.some(r=>!r||NUM(r.value)===null||NUM(r.value)<0||Number(r.samples)<2||Number(r.decreases||0)!==0||!["кВт·год","кВт⋅год","кВт*год","kWh","кВт·г"].includes(r.unit)))continue;
+      const [a,b]=rows,window=[date(a.first_at),date(a.last_at)];
+      if(!window[0]||!window[1]||window[0]>=window[1]||window[0]!==date(b.first_at)||window[1]!==date(b.last_at))continue;
+      if(key!=="pv_energy_total"&&NUM(a.value)!==NUM(b.value))continue;
+      result.values[key]={number:key==="pv_energy_total"?NUM(a.value)+NUM(b.value):NUM(a.value),first_at:window[0],last_at:window[1]};
+      if(!common)common=window;else if(common[0]!==window[0]||common[1]!==window[1])common=false;
+      if(common===false)break;
+    }
+    if(common&&keys.every(k=>result.values[k])){
+      const n=k=>result.values[k].number;
+      result.window=common;result.complete=true;result.reason=null;
+      result.residual=n("pv_energy_total")+n("grid_import_total")+n("battery_discharge_total")-n("load_energy_total")-n("grid_export_total")-n("battery_charge_total");
+    }else result.reason="Для балансу потрібні всі шість узгоджених лічильників з однаковим початком і кінцем";
+    return result;
+  }
+  return Object.freeze({snapshot,read,fmt,pretty,ukTime,normalizeHistory,sharedFlow,pairEnergy,
     historicalValue,differing,POWER_KEYS,SHARED_KEYS});
 });

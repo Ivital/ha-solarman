@@ -124,3 +124,14 @@ assert.equal(M.sharedFlow(M.snapshot({...cfg,devices:[d1,discharge[1]]}).reports
 assert.equal(M.sharedFlow(M.snapshot(cfg).reports.grid_power,"grid_power").direction,"none");
 assert.equal(M.sharedFlow(M.snapshot({}).reports.battery_power,"battery_power").label,"Немає даних");
 console.log("RAKURS_SIGNED_BATTERY_DIRECTION=PASS");
+
+const micro=[row(1,"кВт","2026-11-25T00:16:18.000100Z"),row(2,"кВт","2026-11-25T00:16:18.000786Z")];
+assert.equal(M.historicalValue(micro,"2026-11-25T00:16:18.000786Z",0).number,2);
+assert.equal(M.historicalValue(micro,"2026-11-25T00:16:18.000101Z",0),null);
+const counters=["pv_energy_total","load_energy_total","grid_import_total","grid_export_total","battery_charge_total","battery_discharge_total"];
+const makeEnergy=values=>({counters:counters.map((key,i)=>({key,value:values[i],samples:3,decreases:0,unit:"кВт·год",first_at:"2026-11-25T00:00:00Z",last_at:"2026-11-25T01:00:00Z"}))});
+const energy1=makeEnergy([4,10,2,1,1,2]),energy2=makeEnergy([4,10,2,1,1,2]);
+const balance=M.pairEnergy([energy1,energy2]);assert(balance.complete);assert.equal(balance.values.pv_energy_total.number,8);assert.equal(balance.values.load_energy_total.number,10);assert.equal(balance.residual,0);
+const wrong=makeEnergy([4,11,2,1,1,2]);assert.equal(M.pairEnergy([energy1,wrong]).complete,false);assert.equal(M.pairEnergy([energy1,null]).complete,false);
+wrong.counters[0].first_at="2026-11-25T00:00:00.000001Z";assert(!M.pairEnergy([energy1,wrong]).values.pv_energy_total);
+console.log("RAKURS_EXACT_MICROSECOND_AND_SHARED_COUNTER_BALANCE=PASS");

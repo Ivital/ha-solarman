@@ -556,3 +556,6 @@ body[data-theme] .event-filter select{max-width:100%;min-height:40px}
  body[data-theme] .modbus-table td:nth-child(2){font-weight:650}
  body[data-theme] .modbus-table td:nth-child(3):before{content:"Регістр: ";color:var(--ux-muted)}
 }
+
+body[data-theme] .product-balance>strong{display:block;margin:10px 0;font-size:17px}
+body[data-theme] .product-balance .product-phase-row{font-size:13px}

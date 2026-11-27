@@ -207,11 +207,11 @@
      const left=id==="inv1",tx=left?66:294,anchor=left?"start":"end";
      equipment(group,id,left?12:304,y+1,1.05);
      group.appendChild(s("text",{x:tx,y:y+23,"text-anchor":anchor,class:"rv7-bus-title"},labels[id]));
-     group.appendChild(s("text",{x:tx,y:y+38,"text-anchor":anchor,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+     group.appendChild(s("text",{x:tx,y:y+38,"text-anchor":anchor,class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":M.read(dev.values,"inverter_temperature",dev).valid?M.fmt(M.read(dev.values,"inverter_temperature",dev)):"Інвертор"));
     }else{
      equipment(group,id,cx-25,y+3,1.1);
      group.appendChild(s("text",{x:cx,y:y+66,"text-anchor":"middle",class:"rv7-bus-title"},labels[id]));
-     group.appendChild(s("text",{x:cx,y:y+80,"text-anchor":"middle",class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":"Інвертор"));
+     group.appendChild(s("text",{x:cx,y:y+80,"text-anchor":"middle",class:"rv7-bus-meta"},!dev?"Немає даних":dev.telemetry_error?"Помилка API":M.read(dev.values,"inverter_temperature",dev).valid?M.fmt(M.read(dev.values,"inverter_temperature",dev)):"Інвертор"));
     }
    }else{
     const cx=x+w/2,title=id==="battery"?"Акумулятор":id==="pv1"?"Сонце 1":id==="pv2"?"Сонце 2":labels[id];
@@ -403,7 +403,7 @@
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
-   if((explicitSelection||(hasRange&&Date.parse(chosenTime)!==latest))&&typeof onFrame==="function")onFrame(chosenTime,series);
+   if((explicitSelection||(hasRange&&chosenTime!==snap.updated_at_utc))&&typeof onFrame==="function")onFrame(chosenTime,series);
    else if(!explicitSelection)onRestore?.();
    function select(index){
     explicitSelection=true;
@@ -615,7 +615,7 @@
  }
  root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
    canAutoRefresh:()=>mode==="overview"&&Array.from(activeScopes).some(s=>s.canAutoRefresh?.()),
-   updateDevices:(host,devices)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices});},
+   updateDevices:(host,devices,status)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices,status:status??scope.config.status});},
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
   reset:()=>{mode="overview";hours=24;chosenTime=null;motionEnabled=true;}});
 })(window);

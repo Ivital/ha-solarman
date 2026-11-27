@@ -15,7 +15,7 @@ sys.path.insert(0,str(ROOT / "deploy" / "rakurs"))
 from standalone.config_api import (validate_ip, valid_device, register,
     shared_gateway_groups, ensure_unique_gateway_units)
 from standalone.poll_worker import (make_read, poll_probe, ready_devices,
-    exclude_conflicting_buses)
+    exclude_conflicting_buses, runtime)
 from standalone.modbus_wire import crc16
 from standalone.modbus_archive import normalize
 
@@ -31,6 +31,15 @@ def config_payload(**updates):
 
 
 class ValidationTests(unittest.TestCase):
+    def test_heartbeat_preserves_previous_worker_state(self):
+        from unittest.mock import MagicMock
+        db=MagicMock()
+        runtime(db,None)
+        call=db.cursor.return_value.__enter__.return_value.execute.call_args
+        self.assertIn("state=COALESCE(%s,state)",call.args[0])
+        self.assertIsNone(call.args[1][0])
+        self.assertFalse(call.args[1][2])
+
     def test_transport_and_ranges_are_bounded(self):
         self.assertEqual(valid_device(config_payload())["gateway_ip"],"192.168.5.21")
         for ip in ("8.8.8.8","127.0.0.1","169.254.10.2","224.0.0.1","::1"):

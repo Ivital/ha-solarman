@@ -785,7 +785,9 @@ async function renderComparativeAnalytics(cycle){
     clear(body);
     const card=element("article","product-comparison-card product-comparison-full");
     const lines=devices.map((d,i)=>({label:deviceLabel(d,i),points:results[i].status==="fulfilled"?(results[i].value.points||[]):[],failed:results[i].status!=="fulfilled"}));
-    card.appendChild(multiDeviceChart(lines,metric[2],start,end));
+    const units=[...new Set(lines.flatMap(l=>l.points.map(p=>p.unit).filter(Boolean)))];
+    if(units.length>1)card.appendChild(createEmpty("Різні одиниці вимірювання","Порівняння потребує однакових одиниць."));
+    else card.appendChild(multiDeviceChart(lines,units[0]||metric[2],start,end));
     if(lines.some(l=>l.failed))card.appendChild(element("p","subtle","Частина архіву недоступна."));
     if(results.some(r=>r.status==="fulfilled"&&r.value.resolution==="extrema"))card.appendChild(element("p","subtle","Показано піки й мінімуми всього періоду."));
     body.appendChild(card);
@@ -811,6 +813,16 @@ async function renderComparativeAnalytics(cycle){
       }
       totals.appendChild(card);
     });
+    if(window.RakursV7Model?.pairEnergy){
+      const r=window.RakursV7Model.pairEnergy(results.map(x=>x.status==="fulfilled"?x.value:null));
+      const summary=element("article","product-comparison-card product-comparison-full product-balance");
+      summary.appendChild(element("h3","","Зведення енергосистеми"));
+      summary.appendChild(element("p","subtle","Підсумок записів: два PV, спільні вузли враховано один раз."));
+      for(const [key,label] of Object.entries(energyLabels)){const item=r.values[key],row=element("div","product-phase-row");add(row,element("span","",label),element("strong","",item?number(item.number)+" кВт·год":"—"));if(item)row.title=time(item.first_at)+" — "+time(item.last_at);summary.appendChild(row);}
+      if(r.complete){add(summary,element("p","subtle",time(r.window[0])+" — "+time(r.window[1])),element("strong","","Нерозподілена різниця: "+number(r.residual)+" кВт·год"),element("p","subtle","Різниця не є підтвердженими втратами перетворення."));}
+      else summary.appendChild(element("p","subtle",r.reason));
+      totals.appendChild(summary);
+    }
   }
   selector.addEventListener("change",compare);span.addEventListener("change",compare);period.addEventListener("change",report);
   await Promise.allSettled([compare(),report()]);
@@ -1237,7 +1249,7 @@ function deviceLabel(device, index = 0) {
 }
 function deviceReading(values, key) {
   const item = values?.[key];
-  return item && item.value_decimal !== null && item.value_decimal !== undefined ?
+  return item && item.value_decimal !== null && item.value_decimal !== undefined && item.value_decimal !== "" ?
     number(item.value_decimal) + " " + (item.unit || "") : "—";
 }
 function storedDeviceNote(reading) {
@@ -2309,12 +2321,17 @@ async function refreshOverviewInPlace(){
   state.autoBusy=true;
   const cycle=state.cycle;
   try{
-    const devices=await fetchParallelDevices(cycle);
-    if(!current(cycle)||!devices?.length||devices.some(d=>d.telemetry_error)||!window.RakursV7.canAutoRefresh())return;
-    if(overviewSignature(devices)!==state.overviewSignature){
+    const results=await Promise.allSettled([fetchParallelDevices(cycle),api("/status")]);
+    if(!current(cycle))return;
+    const devices=results[0].status==="fulfilled"?results[0].value:null;
+    const nextStatus=results[1].status==="fulfilled"?results[1].value:null;
+    const statusChanged=JSON.stringify([state.status?.collector_active,state.status?.physical_topology_verified,state.status?.register_semantics_verified])!==JSON.stringify([nextStatus?.collector_active,nextStatus?.physical_topology_verified,nextStatus?.register_semantics_verified]);
+    state.status=nextStatus;updateConnection(nextStatus!==null);
+    if(!devices?.length||devices.some(d=>d.telemetry_error)||!window.RakursV7.canAutoRefresh())return;
+    if(statusChanged||overviewSignature(devices)!==state.overviewSignature){
       // Replace only the overview component; preserve navigation, theme, and scroll.
       const host=main.querySelector(".v7-host");
-      if(host){state.overviewSignature=overviewSignature(devices);window.RakursV7.updateDevices(host,devices);}
+      if(host){state.overviewSignature=overviewSignature(devices);window.RakursV7.updateDevices(host,devices,state.status);}
     }
   }catch(_error){/* Keep last successfully displayed readings. */}
   finally{state.autoBusy=false;}

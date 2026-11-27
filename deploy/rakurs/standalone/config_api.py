@@ -206,7 +206,7 @@ def register(app, *, rows, one, conn):
             "scheduler_active":bool(setting["enabled"]) and alive and
                                (runtime or {}).get("state")=="active",
             "actively_polling":bool(setting["enabled"]) and alive and
-                               success_recent,
+                               (runtime or {}).get("state")=="active" and success_recent,
             "last_success_recent":success_recent,
             "runtime":{k:iso(v) for k,v in (runtime or {}).items()},
             "devices":[{k:iso(v) for k,v in d.items()} for d in devices],
