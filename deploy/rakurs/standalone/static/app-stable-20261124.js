@@ -746,8 +746,8 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
 }
 async function renderTrends(cycle) {
   addStatusMessage();
-  await renderTrendDeck(cycle, 72, false);
-  if(current(cycle))await renderComparativeAnalytics(cycle);
+  const comparison=renderComparativeAnalytics(cycle);
+  await Promise.allSettled([comparison,renderTrendDeck(cycle,72,false)]);
 }
 
 // Independent report comparison and observed energy counters, on existing Graphs route.
@@ -757,7 +757,7 @@ async function renderComparativeAnalytics(cycle){
   add(head,element("h2","","Порівняння Deye №1 і №2"),element("p","subtle","Спільний часовий інтервал і масштаб; показники спільних вузлів не сумуються."));
   const controls=element("div","product-analytics-controls");
   const selector=element("select","");selector.setAttribute("aria-label","Показник порівняння");
-  const keys=[["pv_power","Генерація PV","кВт"],["load_power","Навантаження","кВт"],["battery_power","Потужність АКБ","кВт"],["battery_soc","SOC","%"],["grid_power","Мережа","кВт"],["output_power","Вихід інвертора","кВт"]];
+  const keys=[["pv_power","Генерація PV","кВт"],["load_power","Навантаження","кВт"],["battery_power","Потужність АКБ","кВт"],["battery_soc","SOC","%"],["grid_power","Мережа","кВт"],["output_power","Вихід інвертора","кВт"],["inverter_temperature","Температура","°C"],["pv1_power","MPPT 1","кВт"],["pv2_power","MPPT 2","кВт"],["grid_l1_voltage","Напруга L1","В"],["grid_l2_voltage","Напруга L2","В"],["grid_l3_voltage","Напруга L3","В"],["output_l1_current","Струм L1","А"],["output_l2_current","Струм L2","А"],["output_l3_current","Струм L3","А"]];
   for(const [key,label] of keys){const opt=element("option","",label);opt.value=key;selector.appendChild(opt);}
   selector.value="pv_power";
   const span=element("select","");span.setAttribute("aria-label","Період порівняння");
@@ -767,7 +767,7 @@ async function renderComparativeAnalytics(cycle){
   const energy=element("section","product-analytics");
   add(energy,element("h2","","Енергетична аналітика"),element("p","subtle","Різниця накопичувальних лічильників за наявним архівом. Не повний баланс без підтвердженого покриття."));
   const period=element("select","");period.setAttribute("aria-label","Період енергетичного звіту");
-  for(const [value,label] of [["day","Доба"],["month","Місяць"],["year","Рік"]]){const opt=element("option","",label);opt.value=value;period.appendChild(opt);}period.value="day";
+  for(const [value,label] of [["day","Доба"],["month","Місяць"],["year","Рік"],["all","Весь час"]]){const opt=element("option","",label);opt.value=value;period.appendChild(opt);}period.value="day";
   const totals=element("div","product-comparison-grid");add(energy,period,totals);main.appendChild(energy);
   let devices;
   try{devices=await fetchParallelDevices(cycle);}catch(_error){}
@@ -783,14 +783,12 @@ async function renderComparativeAnalytics(cycle){
     const results=await Promise.allSettled(devices.map(d=>api("/history/range?device="+encodeURIComponent(d.device_key)+"&key="+metric[0]+"&start="+encodeURIComponent(new Date(start).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z"))+"&resolution=auto")));
     if(!current(cycle)||token!==requestNo)return;
     clear(body);
-    const all=results.flatMap(r=>r.status==="fulfilled"?(r.value.points||[]):[]).filter(x=>x.value_decimal!=null&&x.value_decimal!==""&&Number.isFinite(Number(x.value_decimal))).map(x=>Number(x.value_decimal));
-    const bounds=all.length?[Math.min(...all),Math.max(...all)]:null;
-    devices.forEach((d,i)=>{
-      const card=element("article","product-comparison-card"),r=results[i];add(card,element("h3","",deviceLabel(d,i)));
-      if(r.status==="fulfilled"){card.appendChild(interactiveChart(r.value.points||[],metric[2],{start,end,bounds}));if(r.value.truncated)card.appendChild(element("p","subtle","Обмежений результат — скоротіть період."));}
-      else card.appendChild(createEmpty("Архів недоступний","Повторіть вибір періоду."));
-      body.appendChild(card);
-    });
+    const card=element("article","product-comparison-card product-comparison-full");
+    const lines=devices.map((d,i)=>({label:deviceLabel(d,i),points:results[i].status==="fulfilled"?(results[i].value.points||[]):[],failed:results[i].status!=="fulfilled"}));
+    card.appendChild(multiDeviceChart(lines,metric[2],start,end));
+    if(lines.some(l=>l.failed))card.appendChild(element("p","subtle","Частина архіву недоступна."));
+    if(results.some(r=>r.status==="fulfilled"&&r.value.resolution==="extrema"))card.appendChild(element("p","subtle","Показано піки й мінімуми всього періоду."));
+    body.appendChild(card);
   }
   const energyLabels={pv_energy_total:"Генерація PV",load_energy_total:"Споживання",grid_import_total:"Імпорт",grid_export_total:"Експорт",battery_charge_total:"Заряд АКБ",battery_discharge_total:"Розряд АКБ"};
   async function report(){
@@ -817,11 +815,62 @@ async function renderComparativeAnalytics(cycle){
   selector.addEventListener("change",compare);span.addEventListener("change",compare);period.addEventListener("change",report);
   await Promise.allSettled([compare(),report()]);
 }
+function multiDeviceChart(lines,unit,first,last){
+  const host=element("div","product-chart-interactive product-overlay-chart"),plot=element("div","product-zoom-plot");
+  const legend=element("div","product-chart-legend"),controls=element("div","product-zoom-controls");
+  const colors=["#2e9b83","#4788e6","#ba7b26"];
+  const series=lines.map((line,i)=>({...line,color:colors[i%colors.length],data:line.points.map(p=>({t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t)}));
+  for(const l of series){const item=element("span","");add(item,element("strong","",l.label),element("small","",l.failed?"Недоступно":l.data.length+" точок"));item.setAttribute("data-series",String(series.indexOf(l)));legend.appendChild(item);}
+  let from=first,to=last;
+  function draw(){
+    const visible=series.map(l=>({...l,data:l.data.filter(p=>p.t>=from&&p.t<=to)}));
+    const values=visible.flatMap(l=>l.data.map(p=>p.v)),times=[...new Set(visible.flatMap(l=>l.data.map(p=>p.t)))].sort((a,b)=>a-b);
+    if(!times.length){plot.replaceChildren(createEmpty("Немає точок","За вибраний період немає числових записів."));return;}
+    const ns="http://www.w3.org/2000/svg",node=(tag,attrs={},txt)=>{const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));if(txt!==undefined)n.textContent=txt;return n;};
+    const svg=node("svg",{class:"chart product-timeseries product-multiseries",viewBox:"0 0 640 245",tabindex:0,role:"group","aria-label":"Порівняльний графік Deye. Стрілки вибирають час."});
+    const left=55,right=620,top=44,bottom=207,lo=Math.min(...values),hi=Math.max(...values),padding=Math.max((hi-lo)*.08,.01),min=lo-padding,max=hi+padding;
+    const x=t=>from===to?(left+right)/2:left+(t-from)/(to-from)*(right-left),y=v=>bottom-(v-min)/(max-min)*(bottom-top);
+    for(let n=0;n<4;n++){const yy=top+(bottom-top)*n/3;add(svg,node("line",{x1:left,x2:right,y1:yy,y2:yy,class:"product-gridline"}),node("text",{x:left-6,y:yy+4,"text-anchor":"end",class:"product-axis"},pretty(max-(max-min)*n/3,2)));}
+    for(let n=0;n<4;n++){const stamp=from+(to-from)*n/3;svg.appendChild(node("text",{x:x(stamp),y:232,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},new Date(stamp).toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",...(to-from>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})}));}
+    for(const l of visible){const steps=l.data.slice(1).map((p,i)=>p.t-l.data[i].t).filter(n=>n>0).sort((a,b)=>a-b),gap=Math.max(1200000,(steps[Math.floor(steps.length/2)]||0)*3);let d="";
+      for(const [i,p] of l.data.entries()){d+=(i&&p.t-l.data[i-1].t<=gap?" L":" M")+x(p.t)+" "+y(p.v);}
+      if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,class:"product-overlay-line","data-device":l.label}));
+      if(l.data.length===1)svg.appendChild(node("circle",{cx:x(l.data[0].t),cy:y(l.data[0].v),r:4,fill:l.color}));
+    }
+    const cursor=node("line",{y1:top,y2:bottom,class:"product-cursor"}),label=node("text",{x:left,y:15,class:"product-chart-label"}),tip=node("text",{x:left,y:31,class:"product-axis"});add(svg,cursor,label,tip);
+    let index=times.length-1;
+    function select(i){index=Math.max(0,Math.min(times.length-1,i));const t=times[index];cursor.setAttribute("x1",x(t));cursor.setAttribute("x2",x(t));label.textContent=time(new Date(t).toISOString());tip.textContent=visible.map(l=>{const p=l.data.find(p=>p.t===t);return l.label+": "+(p?number(p.v)+" "+unit:"—");}).join(" · ");}
+    select(index);
+    const choose=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const target=from+Math.max(0,Math.min(1,(p.matrixTransform(matrix.inverse()).x-left)/(right-left)))*(to-from);let i=0;for(let n=1;n<times.length;n++)if(Math.abs(times[n]-target)<Math.abs(times[i]-target))i=n;select(i);};
+    svg.addEventListener("click",choose);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")choose(e);});
+    svg.addEventListener("keydown",e=>{if(["Home","End","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();select(e.key==="Home"?0:e.key==="End"?times.length-1:index+(e.key==="ArrowLeft"?-1:1));}});
+    plot.replaceChildren(svg);
+  }
+  function zoom(f){const width=Math.min(last-first,Math.max(Math.min(last-first,60000),(to-from)*f)),middle=(to+from)/2;from=Math.max(first,Math.min(last-width,middle-width/2));to=from+width;draw();}
+  for(const [text,name,action] of [["+","Збільшити масштаб порівняння",()=>zoom(.5)],["−","Зменшити масштаб порівняння",()=>zoom(2)],["Увесь","Скинути масштаб порівняння",()=>{from=first;to=last;draw();}]]){
+    const b=element("button","",text);b.type="button";b.setAttribute("aria-label",name);b.addEventListener("click",action);controls.appendChild(b);
+  }
+  add(host,legend,plot,controls);draw();return host;
+}
+function technicalBars(label,entries){
+  const box=element("div","product-technical-bars");box.appendChild(element("h3","",label));
+  const valid=entries.filter(x=>x.r&&x.r.unit===entries.find(v=>v.r)?.r.unit),max=Math.max(1,...valid.map(x=>Math.abs(Number(x.r.value_decimal))));
+  const ns="http://www.w3.org/2000/svg",svg=document.createElementNS(ns,"svg");svg.setAttribute("viewBox","0 0 320 "+(entries.length*29+8));svg.setAttribute("role","img");svg.setAttribute("aria-label",label);
+  function node(tag,attrs,txt){const n=document.createElementNS(ns,tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,String(v));if(txt!==undefined)n.textContent=txt;svg.appendChild(n);}
+  entries.forEach((x,i)=>{const yy=i*29+3,ok=valid.includes(x);node("text",{x:0,y:yy+13,fill:"currentColor","font-size":11},x.name);node("rect",{x:65,y:yy,width:155,height:15,rx:4,fill:"currentColor",opacity:.10});if(ok)node("rect",{x:65,y:yy,width:Math.abs(Number(x.r.value_decimal))/max*155,height:15,rx:4,fill:["#4788e6","#2e9b83","#c58b2d"][i%3]});node("text",{x:315,y:yy+13,"text-anchor":"end",fill:"currentColor","font-size":11},ok?number(x.r.value_decimal)+" "+x.r.unit:"—");});
+  box.appendChild(svg);return box;
+}
 function renderTechnicalSummary(groups,values){
   const type=groups[0],isBattery=type==="battery";
-  if(!["grid","load","inverter","battery"].includes(type))return;
+  if(!["pv","grid","load","inverter","battery"].includes(type))return;
   const read=key=>{const r=values[key];return r&&r.value_decimal!=null&&r.value_decimal!==""&&Number.isFinite(Number(r.value_decimal))?r:null;};
   const show=key=>{const r=read(key);return r?number(r.value_decimal)+" "+(r.unit||""):"—";};
+  if(type==="pv"){
+    const box=element("section","product-analytics product-mppt");box.appendChild(element("h2","","Сонячні трекери MPPT"));
+    const cards=element("div","product-comparison-grid");
+    for(let n=1;n<=2;n++){const card=element("article","product-phase-card");card.appendChild(element("h3","","MPPT "+n));for(const [key,label] of [["power","Потужність"],["voltage","Напруга"],["current","Струм"]]){const row=element("div","product-phase-row");add(row,element("span","",label),element("strong","",show("pv"+n+"_"+key)));card.appendChild(row);}cards.appendChild(card);}
+    add(box,cards);main.appendChild(box);return;
+  }
   if(!isBattery){
     const prefix=type==="inverter"?"output":type,box=element("section","product-analytics phase-summary");
     box.appendChild(element("h2","","Три фази"));
@@ -835,7 +884,17 @@ function renderTechnicalSummary(groups,values){
         if(type==="grid"&&key.startsWith("ct"))row.appendChild(element("small","subtle","CT"));
         card.appendChild(row);
       }grid.appendChild(card);
-    }box.appendChild(grid);main.appendChild(box);return;
+    }box.appendChild(grid);
+    const voltages=[1,2,3].map(n=>read(prefix+"_l"+n+"_voltage"));
+    if(voltages.every(r=>r&&r.unit==="В"&&r.observed_at_utc&&r.observed_at_utc===voltages[0].observed_at_utc)){
+      const vals=voltages.map(r=>Number(r.value_decimal)),avg=vals.reduce((s,v)=>s+v,0)/3;
+      if(avg>0)box.appendChild(element("p","subtle","Максимальне відхилення фазної напруги від середньої: "+number(100*Math.max(...vals.map(v=>Math.abs(v-avg)))/avg)+"%"));
+    }
+    for(const [suffix,label] of [["voltage","Напруга, В"],["power","Потужність, кВт"]]){
+      const entries=[1,2,3].map(n=>({name:"L"+n,r:read(prefix+"_l"+n+"_"+suffix)}));
+      if(entries.some(x=>x.r))box.appendChild(technicalBars(label,entries));
+    }
+    main.appendChild(box);return;
   }
   const box=element("section","product-analytics bms-summary");
   add(box,element("h2","","Діагностика BMS"),element("p","subtle","Збережені показники модулів, без припущень про їхню фізичну наявність."));
@@ -865,7 +924,20 @@ function renderTechnicalSummary(groups,values){
     }modules.appendChild(card);
   }
   if(!modules.childNodes.length)modules.appendChild(element("p","subtle","Немає числових записів модулів BMS."));
-  box.appendChild(modules);main.appendChild(box);
+  box.appendChild(modules);
+  const temperatures=Array.from({length:20},(_,i)=>({name:"BMS "+(i+1),r:read("bms_"+(i+1)+"_temperature")})).filter(x=>x.r);
+  if(temperatures.length)box.appendChild(technicalBars("Температури модулів",temperatures));
+  main.appendChild(box);
+}
+function renderEquipmentHistory(groups,items,known,cycle){
+  const preferred={pv:["pv_power","pv1_power","pv2_power","pv1_voltage","pv2_voltage","pv1_current","pv2_current"],battery:["battery_soc","battery_soh","battery_power","battery_temperature","bms_max_charge_current","bms_max_discharge_current"],grid:["grid_power","grid_frequency","grid_l1_voltage","grid_l2_voltage","grid_l3_voltage"],load:["load_power","load_l1_power","load_l2_power","load_l3_power"],inverter:["inverter_temperature","output_power","output_l1_current","output_l2_current","output_l3_current"]};
+  const options=(preferred[groups[0]]||[]).map(key=>items.find(i=>i.key===key)).filter(i=>i&&known.has(i.key));if(!options.length)return;
+  const panel=element("details","product-analytics product-equipment-history");panel.appendChild(element("summary","","Динаміка параметрів"));
+  const select=element("select","");select.setAttribute("aria-label","Показник обладнання");for(const i of options){const opt=element("option","",i.label);opt.value=i.key;select.appendChild(opt);}select.value=options[0].key;
+  const period=element("select","");period.setAttribute("aria-label","Період обладнання");for(const [v,label] of [[24,"24 години"],[72,"3 доби"],[168,"7 діб"]]){const opt=element("option","",label);opt.value=String(v);period.appendChild(opt);}period.value="24";
+  const controls=element("div","product-analytics-controls"),body=element("div","");add(controls,select,period);add(panel,controls,body);main.appendChild(panel);let revision=0;
+  async function refresh(){if(!panel.open)return;const token=++revision;body.replaceChildren(element("p","subtle","Читання історії…"));try{const r=await api("/history?key="+encodeURIComponent(select.value)+"&hours="+period.value+"&anchor=latest&resolution=auto");if(current(cycle)&&token===revision)body.replaceChildren(interactiveChart(r.points||[],r.signal?.unit||options.find(x=>x.key===select.value)?.unit||""));}catch(_error){if(current(cycle)&&token===revision)body.replaceChildren(createEmpty("Історія недоступна","Повторіть запит."));}}
+  panel.addEventListener("toggle",refresh);select.addEventListener("change",refresh);period.addEventListener("change",refresh);
 }
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
@@ -914,6 +986,7 @@ async function renderGroup(groups, title, cycle) {
     main.appendChild(overview);
   }
   renderTechnicalSummary(groups,values);
+  renderEquipmentHistory(groups,items,known,cycle);
   main.appendChild(controls);
   const list = element("div", "metric-list product-metric-catalog");
   const entries = [];
@@ -1258,6 +1331,12 @@ async function renderParallel(cycle) {
       "Після очищення бази дані з'являться після першого завантаження."));
     return;
   }
+  const comparison=element("section","product-analytics product-pair-summary");comparison.appendChild(element("h2","","Зведення інверторів"));
+  const table=element("table","data-table product-pair-table"),head=element("thead",""),hr=element("tr","");
+  for(const label of ["Параметр",...devices.map((d,i)=>deviceLabel(d,i))])hr.appendChild(element("th","",label));head.appendChild(hr);table.appendChild(head);
+  const body=element("tbody","");
+  for(const [key,label] of [["pv_power","PV"],["load_power","Будинок"],["battery_soc","SOC"],["battery_power","АКБ"],["grid_power","Мережа"],["inverter_temperature","Температура"]]){const row=element("tr","");row.appendChild(element("th","",label));for(const d of devices)row.appendChild(element("td","",deviceReading(d.values,key)));body.appendChild(row);}
+  table.appendChild(body);comparison.appendChild(table);main.appendChild(comparison);
   const grid = element("div", "parallel-devices");
   main.appendChild(grid);
   for (const [i, device] of devices.entries()) {
@@ -1422,16 +1501,26 @@ async function renderEvents(cycle) {
   batchPanel.appendChild(batchBody);
   main.appendChild(batchPanel);
 
-  const responses = await Promise.allSettled([api("/events"), api("/batches")]);
-  if (!current(cycle)) return;
-  const [events, batches] = responses;
+  const filters=element("div","product-analytics-controls event-filter");
+  const severity=element("select","");severity.setAttribute("aria-label","Важливість подій");
+  const device=element("select","");device.setAttribute("aria-label","Пристрій подій");
+  const period=element("select","");period.setAttribute("aria-label","Період подій");
+  function opt(select,value,label){const o=element("option","",label);o.value=value;select.appendChild(o);}
+  for(const [v,l] of [["","Усі рівні"],["critical","Аварії"],["warning","Попередження"],["info","Інформація"]])opt(severity,v,l);
+  opt(device,"","Усі пристрої");for(const [v,l] of [["","Увесь час"],["24","24 години"],["168","7 діб"],["720","30 діб"]])opt(period,v,l);
+  const previous=element("button","more-button","Назад"),next=element("button","more-button","Далі");previous.type=next.type="button";previous.disabled=true;next.disabled=true;
+  add(filters,severity,device,period,previous,next);eventPanel.appendChild(filters);
+  let offset=0,revision=0;
+  async function loadEvents(){const token=++revision;const query=new URLSearchParams({limit:"50",offset:String(offset)});if(severity.value)query.set("severity",severity.value);if(device.value)query.set("device",device.value);if(period.value)query.set("start",new Date(Date.now()-Number(period.value)*3600000).toISOString());
+  const events=await api("/events?"+query.toString()).then(value=>({status:"fulfilled",value}),()=>({status:"rejected"}));
+  if(!current(cycle)||token!==revision)return;clear(deviceBody);previous.disabled=offset===0;next.disabled=events.status!=="fulfilled"||!events.value.has_more;
   if (events.status !== "fulfilled") {
     deviceCard.childNodes[0].textContent = "—";
     deviceBody.appendChild(createEmpty("Журнал недоступний",
       "Не вдалося прочитати rakurs_device_events."));
   } else {
     const items = events.value.events || [];
-    deviceCard.childNodes[0].textContent = String(items.length);
+    deviceCard.childNodes[0].textContent = String(offset+items.length)+(events.value.has_more?"+":"");
     if (!items.length) {
       deviceBody.appendChild(createEmpty("Подій обладнання поки немає",
         "Для цього пристрою у MySQL немає зафіксованих повідомлень чи аварій."));
@@ -1453,6 +1542,11 @@ async function renderEvents(cycle) {
       deviceBody.appendChild(row);
     }
   }
+  }
+  for(const filter of [severity,device,period])filter.addEventListener("change",()=>{offset=0;loadEvents();});previous.addEventListener("click",()=>{offset=Math.max(0,offset-50);loadEvents();});next.addEventListener("click",()=>{offset+=50;loadEvents();});
+  const responses=await Promise.allSettled([loadEvents(),api("/batches"),api("/parallel")]);
+  if(!current(cycle))return;
+  const batches=responses[1];if(responses[2].status==="fulfilled")for(const [i,d] of normalizedTwinDevices(responses[2].value.devices).entries())opt(device,d.device_key,deviceLabel(d,i));
   if (batches.status !== "fulfilled") {
     batchCard.childNodes[0].textContent = "—";
     batchBody.appendChild(createEmpty("Журнал завантажень недоступний",
@@ -2063,17 +2157,25 @@ async function renderArchive(cycle) {
 async function renderSystem(cycle) {
   addStatusMessage();
   section("Конфігурація системи", "Показники та пристрої MySQL");
-  let polling=null;
-  try { polling=await api("/config"); } catch(_error) {}
-  if(!current(cycle)) return;
+  const responses=await Promise.allSettled([api("/config"),api("/status"),api("/parallel/health")]);
+  if(!current(cycle))return;
+  const polling=responses[0].status==="fulfilled"?responses[0].value:null;
+  const status=responses[1].status==="fulfilled"?responses[1].value:null;
+  const health=responses[2].status==="fulfilled"?responses[2].value:null;
+  const diagnostic=element("section","product-analytics product-health");diagnostic.appendChild(element("h2","","Оперативний стан"));
+  const healthGrid=element("div","product-comparison-grid");
+  const collector=status?.collector;
+  for(const [label,value,note] of [["MySQL",status?"Доступна":"Недоступна","Стан API"],["Modbus-агент",collector?.worker_online?"Працює":polling?.worker_online?"Працює":"Не підтверджено",collector?.worker_heartbeat_utc?time(collector.worker_heartbeat_utc):"Немає heartbeat"],["Опитування",collector?.collector_active?"Є успішне читання":polling?.enabled?"Немає підтвердженого читання":"Вимкнено",collector?.last_success_utc?time(collector.last_success_utc):"Немає успішного читання"],["Декодування",collector?.telemetry_decoder_ready?"Готове":"Не підтверджено","Не ототожнюється з доступністю RS485"]]){const card=element("article","product-phase-card");add(card,element("small","",label),element("strong","",value),element("p","subtle",note));healthGrid.appendChild(card);}
+  for(const d of health?.devices||[]){const card=element("article","product-phase-card");add(card,element("small","",deviceLabel(d)),element("strong","",d.last_poll?.status||"Немає читань"),element("p","subtle",d.last_poll?.observed_at_utc?time(d.last_poll.observed_at_utc):"Час відсутній"));healthGrid.appendChild(card);}
+  diagnostic.appendChild(healthGrid);main.appendChild(diagnostic);
   const pane = panel("Єдина MySQL");
   const info = element("div", "kv");
   [
     ["Сервер", "192.168.5.30"],
     ["База", "rakurs"],
     ["Джерело", "MySQL"],
-    ["Пристрої у базі", state.status ? state.status.registered_devices : "—"],
-    ["Показники у базі", state.status ? state.status.displayed_signals : "—"],
+    ["Пристрої у базі", status ? status.registered_devices : "—"],
+    ["Показники у базі", status ? status.displayed_signals : "—"],
     ["Автоматичне опитування", polling?.actively_polling ? "Виконується" : polling?.enabled ? "Увімкнено, агент не підтверджений" : "Вимкнено"]
   ].forEach(pair => {
     const item = element("div", "");

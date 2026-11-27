@@ -410,6 +410,7 @@ def run():
                         assert nav_icon.evaluate("(el)=>getComputedStyle(el, '::before').maskImage") != "none"
                         if route=="trends":
                             page.wait_for_selector(".product-comparison-card .product-timeseries")
+                            assert page.locator(".product-overlay-line").count()==2
                             page.wait_for_selector(".product-energy-row")
                             assert page.locator(".product-energy-row").count()==12
                             page.get_by_label("Період енергетичного звіту").select_option("month")
@@ -428,6 +429,15 @@ def run():
                             assert "40 мВ" in module.locator(".product-bms-delta").text_content()
                         if route=="grid":
                             assert "230 В" in page.locator(".product-phase-grid").inner_text()
+                            assert page.locator(".product-technical-bars").count()>=1
+                        if route=="pv":
+                            assert page.locator(".product-mppt").count()==1
+                            assert page.locator(".product-mppt .product-phase-card").count()==2
+                        if route=="events":
+                            page.get_by_label("Важливість подій").select_option("critical")
+                            page.wait_for_function("document.querySelector(\".event-count-card strong\").textContent !== \"…\"")
+                        if route=="system":
+                            assert page.locator(".product-health").count()==1
                         if route=="archive":
                             assert page.locator("input[type=datetime-local]").last.input_value()=="2026-11-25T02:16"
                         if route in {"history","archive","trends","parallel"}:
@@ -445,6 +455,7 @@ def run():
                             assert page.locator(".product-metric-catalog .metric:visible").count() > 0
                         if route=="parallel":
                             assert page.locator(".parallel-device").count()==2
+                            assert page.locator(".product-pair-table tbody tr").count()==6
                             assert not page.locator("details.parallel-raw-viewer").first.get_attribute("open")
                             page.locator("details.parallel-raw-viewer summary").first.click()
                             assert page.locator("details.parallel-raw-viewer").first.get_attribute("open") is not None

@@ -528,3 +528,31 @@ body[data-theme] .product-bms-gauge>span{height:100%;display:block;background:va
 .rakurs-startup p{font-size:12px;color:var(--ux-muted,#53677a);margin:10px 0}
 .rakurs-startup a{color:var(--ux-accent,#1768df);text-decoration:underline}
 @media(max-width:760px){.rakurs-startup{padding:4px 0}.rakurs-startup h2{font-size:19px}.rakurs-startup-placeholder{height:260px}}
+
+/* Shared chart, equipment profiles, and compact operator diagnostics. */
+body[data-theme] .product-comparison-full{grid-column:1/-1}
+body[data-theme] .product-chart-legend{display:flex;flex-wrap:wrap;gap:12px;margin:6px 0}
+body[data-theme] .product-chart-legend span{display:flex;align-items:center;gap:6px;font-size:12px}
+body[data-theme] .product-chart-legend span:before{content:"";width:12px;height:4px;border-radius:2px;background:#2e9b83}
+body[data-theme] .product-chart-legend span[data-series="1"]:before{background:#4788e6}
+body[data-theme] .product-chart-legend small{color:var(--ux-muted)}
+body[data-theme] .product-technical-bars{padding:8px 0;max-width:540px}
+body[data-theme] .product-technical-bars h3{font-size:13px;margin:4px 0}
+body[data-theme] .product-technical-bars svg{width:100%;height:auto;display:block}
+body[data-theme] .product-equipment-history summary{cursor:pointer;font-weight:650}
+body[data-theme] .product-pair-table{table-layout:fixed;width:100%;min-width:0}
+body[data-theme] .product-pair-table :is(th,td){padding:8px;white-space:normal;overflow-wrap:anywhere}
+body[data-theme] .product-health .product-phase-card>strong{font-size:16px;overflow-wrap:anywhere}
+body[data-theme] .event-filter{margin-top:12px}
+body[data-theme] .event-filter select{max-width:100%;min-height:40px}
+@media(max-width:760px){
+ body[data-theme] .product-pair-table :is(th,td){padding:6px;font-size:11px}
+ body[data-theme] .product-chart-legend{gap:8px}
+ body[data-theme] .modbus-table thead{display:none}
+ body[data-theme] .modbus-table,body[data-theme] .modbus-table tbody{display:block;min-width:0;width:100%}
+ body[data-theme] .modbus-table tr{display:grid;grid-template-columns:1fr 1fr;padding:8px;border-bottom:1px solid var(--ux-line);gap:4px}
+ body[data-theme] .modbus-table td{display:block;white-space:normal;padding:3px 4px;border:0;overflow-wrap:anywhere;font-size:12px}
+ body[data-theme] .modbus-table td:nth-child(1),body[data-theme] .modbus-table td:nth-child(2),body[data-theme] .modbus-table td:nth-child(6){grid-column:1/-1}
+ body[data-theme] .modbus-table td:nth-child(2){font-weight:650}
+ body[data-theme] .modbus-table td:nth-child(3):before{content:"Регістр: ";color:var(--ux-muted)}
+}
