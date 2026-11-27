@@ -634,3 +634,18 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 @media(max-width:760px){.grid-day-body{display:flex;flex-direction:column}.grid-day-body>.grid-day-stats{order:1}.grid-day-coverage{order:2}.grid-inspect{order:3}}
 .grid-gap-strip{margin-left:7.19%;margin-right:2.19%}
 @media(max-width:760px){.grid-inspect .data-table th,.grid-inspect .data-table td{padding:.35rem .2rem;white-space:normal;font-size:.78rem}.grid-inspect .data-table{min-width:0;width:100%}}
+
+.load-profile,.load-body,.load-week{min-width:0}
+.load-body{display:grid;gap:.7rem}
+.load-body>.rv7-range{justify-self:start}
+.load-phases{display:grid;gap:.4rem}
+.load-phase{display:grid;grid-template-columns:2rem minmax(0,1fr) 6rem;align-items:center;gap:.6rem}
+.load-phase b{text-align:right;font-variant-numeric:tabular-nums}
+.load-track{height:.55rem;background:#8199a72b;border-radius:4px;overflow:hidden}
+.load-track i{display:block;height:100%;background:#347dc3}
+.load-phase:nth-child(2) i{background:#ba790e}.load-phase:nth-child(3) i{background:#158474}
+.load-week{margin-top:1.2rem}.load-week-scroll{overflow-x:auto}
+.load-heat{display:grid;grid-template-columns:3.2rem repeat(24,minmax(20px,1fr));min-width:620px;gap:3px;text-align:center;align-items:center;font-size:.76rem}
+.load-heat .load-hour{height:1.6rem;min-width:0;padding:0;border:0;border-radius:3px;background:color-mix(in srgb,#158474 var(--intensity),#eef5f3)}
+.load-heat .load-hour:disabled{opacity:.65;background:repeating-linear-gradient(135deg,transparent 0 3px,#8199a766 3px 5px)}
+.load-hour:focus-visible,.load-hour:hover:enabled{outline:2px solid currentColor;outline-offset:-2px}

@@ -414,6 +414,71 @@ def signals():
     return jsonify({"data_source": "mysql", "signals": serialize(result)})
 
 
+LOAD_KEYS = ("load_power", "load_l1_power", "load_l2_power", "load_l3_power")
+
+
+@app.get("/api/v1/load/profile")
+def load_profile():
+    try:
+        day = datetime.strptime(request.args.get("day", ""), "%Y-%m-%d")
+    except ValueError:
+        abort(400, description="Оберіть добу")
+    zone = ZoneInfo("Europe/Kyiv")
+
+    def utc_start(local_day):
+        return local_day.replace(tzinfo=zone).astimezone(timezone.utc).replace(tzinfo=None)
+
+    start, end = utc_start(day), utc_start(day + timedelta(days=1))
+    days = [(day - timedelta(days=n)).date().isoformat() for n in range(6, -1, -1)]
+    result = {"start": start, "end": end, "days": days, "hours": [], "band": [], "frames": []}
+    devices = parallel_registered_devices()
+    if not devices:
+        return jsonify(serialize(result))
+    device = devices[0]["id"]
+    source = (" FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+              "WHERE m.device_id=%s AND m.observed_at_utc >= %s AND m.observed_at_utc < %s "
+              "AND s.unit IN ('кВт','kW') AND m.value_decimal IS NOT NULL ")
+    hourly = rows("SELECT DATE(m.observed_at_utc) AS d,HOUR(m.observed_at_utc) AS h,"
+                  "MAX(m.value_decimal) AS peak,AVG(m.value_decimal) AS avg_kw" + source +
+                  "AND s.signal_key='load_power' GROUP BY DATE(m.observed_at_utc),HOUR(m.observed_at_utc)",
+                  (device, utc_start(day - timedelta(days=28)), end))
+    maxima, references = {}, {}
+    for row in hourly:
+        stamp = datetime.combine(row["d"], datetime.min.time()).replace(hour=row["h"], tzinfo=timezone.utc)
+        local = stamp.astimezone(zone)
+        key = local.date().isoformat(), local.hour
+        if key[0] in days:
+            maxima[key] = max(maxima.get(key, row["peak"]), row["peak"])
+        if local.date() < day.date() and (local.weekday() < 5) == (day.weekday() < 5):
+            references.setdefault(local.hour, {}).setdefault(local.date(), []).append(float(row["avg_kw"]))
+    result["hours"] = [dict(day=d, hour=h, peak=v) for (d, h), v in sorted(maxima.items())]
+    hour = start
+    while hour < end:
+        h = hour.replace(tzinfo=timezone.utc).astimezone(zone).hour
+        values = sorted(sum(v)/len(v) for v in references.get(h, {}).values())
+        if len(values) >= 3:
+            from statistics import quantiles
+            q1, _, q3 = quantiles(values, method="inclusive")
+            result["band"].append(dict(start=hour, end=hour+timedelta(hours=1), low=q1, high=q3))
+        hour += timedelta(hours=1)
+    columns = ",".join("MAX(CASE WHEN s.signal_key=%s THEN m.value_decimal END) AS v"+str(i)
+                       for i in range(len(LOAD_KEYS)))
+    frames = rows("SELECT m.observed_at_utc AS t," + columns + source +
+                  "AND s.signal_key IN (%s,%s,%s,%s) GROUP BY m.observed_at_utc "
+                  "HAVING v0 IS NOT NULL ORDER BY m.observed_at_utc",
+                  LOAD_KEYS + (device, start, end) + LOAD_KEYS)
+    # Preserve the actual timestamp and phase readings of every retained extremum.
+    buckets = {}
+    for row in frames:
+        bucket = row["t"].replace(second=0, microsecond=0)
+        buckets.setdefault(bucket, []).append(row)
+    for group in buckets.values():
+        chosen = [group[0], min(group, key=lambda r:r["v0"]), max(group, key=lambda r:r["v0"]), group[-1]]
+        for t, row in sorted({r["t"]:r for r in chosen}.items()):
+            result["frames"].append(dict(t=t, v=[row["v"+str(i)] for i in range(4)]))
+    return jsonify(serialize(result))
+
+
 GRID_ANALYSIS_SIGNALS = (
     ("grid_l1_voltage", "В", "V"), ("grid_l2_voltage", "В", "V"),
     ("grid_l3_voltage", "В", "V"), ("grid_frequency", "Гц", "Hz"),

@@ -182,6 +182,14 @@ class Handler(BaseHTTPRequestHandler):
                 self.reply({"error": "API offline"}, 503)
             else:
                 self.reply({"values": {**device_values(1),"battery_soh":reading(98,"%"),"grid_l1_voltage":reading(230,"В"),"grid_l2_voltage":reading(231,"В"),"grid_l3_voltage":reading(229,"В"),"bms_1_min_cell_voltage":reading(3.31,"В"),"bms_1_max_cell_voltage":reading(3.35,"В"),"bms_1_voltage":reading(53.2,"В")}})
+        elif path == "/api/v1/load/profile":
+            day=datetime.fromisoformat(args["day"][0])
+            start=day-timedelta(hours=2)
+            stamps=[(start+timedelta(hours=h)).isoformat()+"Z" for h in (4,5,6)]
+            self.reply({"start":start.isoformat()+"Z","end":(start+timedelta(days=1)).isoformat()+"Z",
+                        "days":[(day-timedelta(days=n)).date().isoformat() for n in range(6,-1,-1)],
+                        "hours":[{"day":args["day"][0],"hour":5,"peak":9}],"band":[],
+                        "frames":[{"t":t,"v":[v,*ph]} for t,v,ph in zip(stamps,[4,9,2],[[1,2,1],[6,None,3],[1,1,0]])]})
         elif path == "/api/v1/grid/day":
             date=args["day"][0]
             frames=[{"t":date+"T"+hour+":00:00Z","v":[231,v,230,50,6.4,1.3],"breaks":([0,1,2] if i==3 else [])}
@@ -511,6 +519,15 @@ def run():
                             inputs=page.locator(".product-battery-estimate input")
                             inputs.nth(0).fill("20");inputs.nth(1).fill("20")
                             assert "10,4 кВт·год" in page.locator(".product-battery-estimate").inner_text()
+                        if route=="load":
+                            panel=page.locator(".load-profile")
+                            panel.get_by_role("button",name="Пік",exact=False).click()
+                            assert panel.locator(".load-phase b").all_text_contents()==["6 кВт","—","3 кВт"]
+                            assert panel.locator(".load-hour").count()==168
+                            panel.locator(".load-hour:enabled").click()
+                            panel.get_by_role("button",name="Уся доба",exact=False).click()
+                            panel.locator(".load-phase").first.wait_for()
+                            panel.screenshot(path=str(OUT/f"load-profile-{width}.png"))
                         if route=="grid":
                             grid=page.locator(".grid-day")
                             grid.get_by_role("button",name="Найбільша різниця між фазами").click()

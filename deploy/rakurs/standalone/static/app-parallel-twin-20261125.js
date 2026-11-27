@@ -1150,6 +1150,89 @@ function renderSolarForecast(cycle){
   }
   box.addEventListener("toggle",refresh);
 }
+async function renderLoadProfile(host,cycle,devices){
+  const device=devices?.[0];
+  if(!device){host.textContent="Немає зареєстрованого інвертора.";return;}
+  const latest=device.values?.load_power?.observed_at_utc;
+  const controls=element("div","grid-day-controls"), body=element("div","load-body"), heat=element("div","load-week");
+  const day=settingsField(controls,"Доба за Києвом",localValue(latest?new Date(latest):new Date()).slice(0,10),"date");
+  const heading=element("div","grid-day-head");
+  add(heading,element("h2","","Профіль навантаження будинку"),controls);
+  add(host,heading,body,heat);
+  let revision=0;
+  function drawWeek(data){
+    heat.replaceChildren(element("h3","","Максимум навантаження за годину"));
+    const scroll=element("div","load-week-scroll"), grid=element("div","load-heat");
+    const lookup=new Map(data.hours.map(r=>[r.day+"/"+r.hour,Number(r.peak)]));
+    const max=Math.max(0,...lookup.values());
+    grid.appendChild(element("span",""));
+    for(let h=0;h<24;h++)grid.appendChild(element("span","",String(h).padStart(2,"0")));
+    for(const d of data.days){
+      grid.appendChild(element("strong","",d.slice(8)+"."+d.slice(5,7)));
+      for(let h=0;h<24;h++){
+        const cell=element("button","load-hour"),v=lookup.get(d+"/"+h);
+        cell.type="button";cell.disabled=v===undefined;
+        cell.title=d+" · "+h+":00 · "+(cell.disabled?"Немає вимірювань":pretty(v,2)+" кВт");
+        cell.setAttribute("aria-label",cell.title);
+        if(!cell.disabled){
+          cell.style.setProperty("--intensity",(16+78*(max?Math.max(0,v)/max:0))+"%");
+          cell.onclick=()=>refresh(d,h);
+        }
+        grid.appendChild(cell);
+      }
+    }
+    scroll.appendChild(grid);
+    add(heat,scroll,element("small","subtle","Від 0 до "+pretty(max,2)+" кВт · штрихування — немає вимірювань"));
+  }
+  async function refresh(date,hour=null){
+    const token=++revision;
+    body.textContent="Читання архіву…";
+    if(hour===null)heat.replaceChildren();
+    if(!date){body.textContent="Оберіть добу.";return;}
+    try{
+      const data=await api("/load/profile?day="+encodeURIComponent(date));
+      if(!current(cycle)||revision!==token)return;
+      body.replaceChildren();
+      if(hour===null)drawWeek(data);
+      const frames=data.frames.filter(f=>hour===null||Number(localValue(new Date(f.t)).slice(11,13))===hour);
+      if(!frames.length){body.textContent="За вибраний період немає вимірювань.";return;}
+      const band=data.band.filter(b=>hour===null||Number(localValue(new Date(b.start)).slice(11,13))===hour);
+      const peak=frames.reduce((a,b)=>Number(a.v[0])>=Number(b.v[0])?a:b);
+      const tools=element("div","grid-day-controls"),peakButton=element("button","rv7-range","Пік · "+pretty(Number(peak.v[0]),2)+" кВт · "+time(peak.t));
+      peakButton.type="button";tools.appendChild(peakButton);
+      if(hour!==null){
+        const back=element("button","rv7-range","Уся доба · "+date);
+        back.type="button";back.onclick=()=>{day.value=date;refresh(date);};tools.appendChild(back);
+      }
+      const phases=element("div","load-phases"),stampLabel=element("strong",""),archive=element("button","rv7-range","Відкрити в архіві");
+      archive.type="button";
+      const stamps=new Map(frames.map(f=>[f.t,f]));
+      function inspect(t,stamp){
+        const f=stamps.get(stamp);
+        stampLabel.textContent="Фази · "+time(stamp);
+        const max=Math.max(.001,...f.v.slice(1).map(v=>Math.abs(Number(v))));
+        phases.replaceChildren(...f.v.slice(1).map((v,i)=>{
+          const row=element("div","load-phase"),track=element("span","load-track"),bar=element("i","");
+          bar.style.width=(v==null?0:Math.abs(Number(v))*100/max)+"%";track.appendChild(bar);
+          add(row,element("strong","","L"+(i+1)),track,element("b","",v==null?"—":pretty(Number(v),3)+" кВт"));return row;
+        }));
+        archive.onclick=()=>openArchivePoint("load_power",stamp,device.device_key);
+      }
+      const points=frames.map(f=>({observed_at_utc:f.t,value_decimal:f.v[0]}));
+      const start=hour===null?Date.parse(data.start):parseKyiv(date+"T"+String(hour).padStart(2,"0")+":00",false).getTime();
+      const end=hour===null?Date.parse(data.end):parseKyiv(date+"T"+String(hour).padStart(2,"0")+":59",true).getTime();
+      const chart=svgChart(points,"кВт",{start,end,band,onSelect:inspect,key:"load_power"});
+      function selectPeak(){chart.showStamp(Date.parse(peak.t),"load_power",peak.t);inspect(Date.parse(peak.t),peak.t);}
+      peakButton.onclick=selectPeak;
+      add(body,tools,chart);
+      if(band.length)body.appendChild(element("small","subtle","Сіра смуга — середні 50 % погодинних середніх за попередні 28 днів, окремо для буднів і вихідних."));
+      add(body,stampLabel,phases,archive);
+      selectPeak();
+    }catch(error){if(current(cycle)&&revision===token)body.textContent="Профіль навантаження недоступний.";}
+  }
+  day.onchange=()=>refresh(day.value);await refresh(day.value);
+}
+
 async function renderGridDay(host,cycle,devices){
   const device=devices?.[0];
   if(!device){host.textContent="Немає зареєстрованого інвертора.";return;}
@@ -1454,7 +1537,7 @@ function renderEquipmentHistory(groups,items,known,cycle,sharedDevice){
 async function renderGroup(groups, title, cycle) {
   addStatusMessage();
   const items = groupItems(groups);
-  section(["battery","grid"].includes(groups[0])?title:title + " · Deye №" + state.selectedSlotNo,
+  section(["battery","grid","load"].includes(groups[0])?title:title + " · Deye №" + state.selectedSlotNo,
     items.length + " параметрів · останні збережені показники");
   if (!items.length) {
     main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр."));
@@ -1466,14 +1549,14 @@ async function renderGroup(groups, title, cycle) {
     renderSolarAnalysis(cycle,host).catch(()=>{if(current(cycle))host.textContent="Сонячна аналітика недоступна.";});
   }
   let sharedDevice=null;
-  if(["battery","grid"].includes(groups[0])){
-    const grid=groups[0]==="grid";
-    const host=element("section","product-analytics "+(grid?"grid-day":"battery-history"));
+  if(["battery","grid","load"].includes(groups[0])){
+    const grid=groups[0]==="grid",load=groups[0]==="load";
+    const host=element("section","product-analytics "+(load?"load-profile":grid?"grid-day":"battery-history"));
     main.appendChild(host);
     const devices=await fetchParallelDevices(cycle).catch(()=>[]);
     if(!current(cycle))return;
     sharedDevice=devices?.[0]?.device_key;
-    (grid?renderGridDay:renderBatteryHistory)(host,cycle,devices).catch(()=>{if(current(cycle))host.textContent="Історія недоступна.";});
+    (load?renderLoadProfile:grid?renderGridDay:renderBatteryHistory)(host,cycle,devices).catch(()=>{if(current(cycle))host.textContent="Історія недоступна.";});
   }
   const known = verifiedKeys();
   const keys = items.filter(i => known.has(i.key)).map(i => i.key);
@@ -1570,7 +1653,7 @@ function svgChart(points, unit, domain={}) {
   const svg=node("svg",{class:"chart product-timeseries",viewBox:"0 0 640 226",role:"group",tabindex:0,"aria-label":"Інтерактивний графік. Стрілки ліворуч і праворуч вибирають запис."});
   const left=55,right=620,top=27,bottom=181;
   const first=domain.start??real[0].t,last=domain.end??real.at(-1).t;
-  const values=real.map(p=>p.v),min=domain.bounds?.[0]??Math.min(...values),max=domain.bounds?.[1]??Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
+  const values=real.map(p=>p.v).concat((domain.band||[]).flatMap(b=>[b.low,b.high])),min=domain.bounds?.[0]??Math.min(...values),max=domain.bounds?.[1]??Math.max(...values),span=Math.max(max-min,Math.abs(max)*.08,.1);
   // Choose readable intervals while retaining signed flows and flat signals.
   const rough=span/4, decade=10**Math.floor(Math.log10(rough));
   const step=([1,2,2.5,5,10].find(v=>v*decade>=rough)||10)*decade;
@@ -1604,6 +1687,10 @@ function svgChart(points, unit, domain={}) {
       gradient.appendChild(node("stop",{offset:offset+"%","stop-color":color,"stop-opacity":".48"}));
     svg.appendChild(node("line",{x1:left,x2:right,y1:y(0),y2:y(0),stroke:"currentColor",opacity:".65"}));
   }
+  for(const b of domain.band||[]){
+    const upper=y(b.high),lower=y(b.low);
+    svg.appendChild(node("rect",{x:x(Date.parse(b.start)),y:upper,width:x(Date.parse(b.end))-x(Date.parse(b.start)),height:Math.max(1,lower-upper),fill:"#8794a3",opacity:".32"}));
+  }
   for(const s of segments){
     if(s.length===1)svg.appendChild(node("circle",{cx:x(s[0].t),cy:y(s[0].v),r:3.5,class:"product-sample-dot"}));
     else {
@@ -1629,8 +1716,8 @@ function svgChart(points, unit, domain={}) {
     label.textContent=pretty(p.v,2)+(unit?" "+unit:"")+" · "+time(new Date(p.t).toISOString()).slice(0,-3);
     tip.textContent=time(new Date(p.t).toISOString())+" — "+pretty(p.v,3)+" "+(unit||"");
   }
-  svg.showStamp=(stamp,active)=>{
-    const idx=real.findIndex(p=>p.t===stamp);
+  svg.showStamp=(stamp,active,exact)=>{
+    const idx=real.findIndex(p=>exact?p.stamp===exact:p.t===stamp);
     svg.style.opacity=active===domain.key?"1":".78";
     dot.style.visibility=idx>=0?"visible":"hidden";
     if(idx>=0)choose(idx,false);
