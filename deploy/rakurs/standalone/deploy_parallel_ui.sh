@@ -302,13 +302,8 @@ for path in static/app-parallel-twin-20261125.js static/parallel-twin-20261125.c
   rm -f "$tmp"
 done
 sudo nginx -t
-curl --noproxy '*' -fsSI --connect-timeout 4 --max-time 15 "https://$DOMAIN/static/rakurs-sw.js" | grep -Eiq '^Service-Worker-Allowed:[[:space:]]*/[[:space:]]*
-echo 'RAKURS_PARALLEL_UI=PASS'
-echo 'PHYSICAL_TOPOLOGY=UNVERIFIED'
-echo 'MODBUS_COMMANDS=0 MYSQL_WRITES=0'
-echo 'OPEN=https://rakurs.zakryttya.org.ua/'
-echo "PARALLEL_UI_BACKUP=$BACKUP"
-
+headers="$(curl --noproxy '*' -fsSI --connect-timeout 4 --max-time 15 "https://$DOMAIN/static/rakurs-sw.js")"
+grep -Eiq '^Service-Worker-Allowed:[[:space:]]*/[[:space:]]*$' <<<"$headers"
 echo PWA_PUBLIC_SCOPE_HEADER=PASS
 trap - ERR
 echo 'RAKURS_PARALLEL_UI=PASS'
