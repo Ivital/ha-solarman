@@ -7,7 +7,7 @@
  --v7-battery:#168269;--v7-battery-soft:#e6f6ef;--v7-grid:#7762b5;--v7-grid-soft:#f1eefb;
  --v7-shadow:0 3px 14px #16263b08;--v7-radius:16px;--v7-gap:14px;
  font:14px/1.45 Inter,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--v7-ink);
- font-variant-numeric:tabular-nums;max-width:1500px;margin:auto;min-width:0;
+ font-variant-numeric:tabular-nums;max-width:none;margin:0;min-width:0;
 }
 body[data-theme=dark] .rv7,.rv7[data-theme=dark]{
  --v7-bg:#0d1620;--v7-card:#152331;--v7-card-alt:#1a2b39;--v7-ink:#f0f5fa;--v7-muted:#a1b4c5;
@@ -226,7 +226,7 @@ body[data-theme] .topbar .logout-button::before{
 }
 
 /* PRODUCT WORKSPACES — all application routes use one density and type scale. */
-body[data-theme] .content{max-width:1550px;margin-inline:auto;min-width:0;font-variant-numeric:tabular-nums}
+body[data-theme] .content{max-width:none;margin-inline:0;min-width:0;font-variant-numeric:tabular-nums}
 body[data-theme] .section-header.product-section-heading{margin:8px 0 16px;display:block}
 body[data-theme] .product-section-copy h2{font-size:clamp(20px,2vw,27px);font-weight:760;line-height:1.2;letter-spacing:-.04em;margin:0 0 5px}
 body[data-theme] .product-section-copy .subtle{display:block;font-size:12px;color:var(--ux-muted);line-height:1.45}
@@ -520,7 +520,7 @@ body[data-theme] .product-bms-gauge>span{height:100%;display:block;background:va
 
 /* Initial document: no legacy KPI flash even before deferred JavaScript. */
 .rakurs-server-fallback[hidden]{display:none!important}
-.rakurs-startup{color:var(--ux-ink,#142536);max-width:1500px;margin:auto;padding:12px 0}
+.rakurs-startup{color:var(--ux-ink,#142536);max-width:none;margin:auto;padding:12px 0}
 .rakurs-startup-heading{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:12px}
 .rakurs-startup h2{font-size:22px;letter-spacing:-.035em;margin:0;color:var(--ux-title,#142536)}
 .rakurs-startup-status{font-size:13px;color:var(--ux-muted,#53677a)}
@@ -571,3 +571,12 @@ body[data-theme] .product-battery-estimate .settings-fields{margin:10px 0}
 body[data-theme] .product-alert-center>div>strong{display:block;font-size:16px;margin:8px 0}
 body[data-theme] .product-alert-center details{margin:10px 0}
 body[data-theme] .product-alert-center summary{cursor:pointer}
+
+/* Keep glyphs and sample markers proportional when only the time axis expands. */
+:is(.rv7-chart,.product-timeseries) :is(text,circle){
+ transform-box:fill-box;transform-origin:left center;
+ transform:scaleX(var(--chart-glyph-scale,1))
+}
+:is(.rv7-chart,.product-timeseries) text[text-anchor="end"]{transform-origin:right center}
+:is(.rv7-chart,.product-timeseries) :is(circle,text[text-anchor="middle"]){transform-origin:center}
+:is(.rv7-chart,.product-timeseries) :is(path,polyline,line){vector-effect:non-scaling-stroke}

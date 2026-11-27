@@ -860,6 +860,7 @@ function multiDeviceChart(lines,unit,first,last){
     const choose=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const target=from+Math.max(0,Math.min(1,(p.matrixTransform(matrix.inverse()).x-left)/(right-left)))*(to-from);let i=0;for(let n=1;n<times.length;n++)if(Math.abs(times[n]-target)<Math.abs(times[i]-target))i=n;select(i);};
     svg.addEventListener("click",choose);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")choose(e);});
     svg.addEventListener("keydown",e=>{if(["Home","End","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();select(e.key==="Home"?0:e.key==="End"?times.length-1:index+(e.key==="ArrowLeft"?-1:1));}});
+    window.RakursV7?.fitChart?.(svg);
     plot.replaceChildren(svg);
   }
   function zoom(f){const width=Math.min(last-first,Math.max(Math.min(last-first,60000),(to-from)*f)),middle=(to+from)/2;from=Math.max(first,Math.min(last-width,middle-width/2));to=from+width;draw();}
@@ -1151,6 +1152,7 @@ function svgChart(points, unit, domain={}) {
   };
   svg.addEventListener("click",interact);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")interact(e);});
   svg.addEventListener("keydown",e=>{if(["ArrowLeft","ArrowRight","Home","End"].includes(e.key)){e.preventDefault();choose(e.key==="Home"?0:e.key==="End"?real.length-1:selected+(e.key==="ArrowLeft"?-1:1));}});
+  window.RakursV7?.fitChart?.(svg);
   return svg;
 }
 function interactiveChart(points,unit,domain={}){

@@ -435,7 +435,7 @@
     let best=0;for(let i=1;i<timestamps.length;i++)if(Math.abs(Date.parse(timestamps[i])-target)<Math.abs(Date.parse(timestamps[best])-target))best=i;
     select(best);
    });
-   layer.appendChild(hit);chartbox.replaceChildren(layer);
+   layer.appendChild(hit);chartbox.replaceChildren(fitChart(layer));
    if(!slider){
     slider=h("input");slider.type="range";slider.min="0";
     slider.setAttribute("aria-label","Час архівного запису");
@@ -624,10 +624,24 @@
   host.replaceChildren(app);
   return Object.freeze({snapshot:snap,root:app,dispose:()=>disposeScope(scope)});
  }
+ // The chart keeps its compact height. Scale labels around their own axis anchors.
+ const chartSizeObserver=typeof ResizeObserver==="function"?new ResizeObserver(entries=>{
+  for(const {target,contentRect:{width,height}} of entries){
+   const box=target.viewBox.baseVal;
+   if(width&&height)target.style.setProperty("--chart-glyph-scale",height*box.width/(width*box.height));
+  }
+ }):null;
+ function fitChart(svg){
+  if(chartSizeObserver){
+   svg.setAttribute("preserveAspectRatio","none");
+   chartSizeObserver.observe(svg);
+  }
+  return svg;
+ }
  function enabled(){
   return true;
  }
- root.RakursV7=Object.freeze({render,enabled,geometry,diagram,
+ root.RakursV7=Object.freeze({render,enabled,geometry,diagram,fitChart,
    canAutoRefresh:()=>mode==="overview"&&Array.from(activeScopes).some(s=>s.canAutoRefresh?.()),
    updateDevices:(host,devices,status)=>{const scope=handlers.get(host);if(!scope?.canAutoRefresh?.()||mode!=="overview")return;chosenTime=null;render(host,{...scope.config,devices,status:status===undefined?scope.config.status:status});},
    disposeAll:()=>{for(const scope of Array.from(activeScopes))disposeScope(scope);},
