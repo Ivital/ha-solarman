@@ -580,3 +580,6 @@ body[data-theme] .product-alert-center summary{cursor:pointer}
 :is(.rv7-chart,.product-timeseries) text[text-anchor="end"]{transform-origin:right center}
 :is(.rv7-chart,.product-timeseries) :is(circle,text[text-anchor="middle"]){transform-origin:center}
 :is(.rv7-chart,.product-timeseries) :is(path,polyline,line){vector-effect:non-scaling-stroke}
+
+body[data-theme] .product-data-origin{display:block;margin:6px 0;color:var(--ux-muted);font-weight:600}
+.product-bms-records>summary{cursor:pointer;padding-block:10px}

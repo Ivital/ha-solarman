@@ -867,6 +867,7 @@ function multiDeviceChart(lines,unit,first,last){
   for(const [text,name,action] of [["+","Збільшити масштаб порівняння",()=>zoom(.5)],["−","Зменшити масштаб порівняння",()=>zoom(2)],["Увесь","Скинути масштаб порівняння",()=>{from=first;to=last;draw();}]]){
     const b=element("button","",text);b.type="button";b.setAttribute("aria-label",name);b.addEventListener("click",action);controls.appendChild(b);
   }
+  if(lines.some(line=>containsDemo(line.points)))host.appendChild(element("small","product-data-origin","Містить демонстраційні дані"));
   add(host,legend,plot,controls);draw();return host;
 }
 function technicalBars(label,entries){
@@ -890,7 +891,7 @@ function renderSolarForecast(cycle){
       if(!current(cycle)||revision!==token)return;clear(body);
       if(data.state!=="available"){
         const text=data.state==="not_configured"?"Потрібні координати установки, потужність і орієнтація обох PV-масивів та дозвіл на метеосервіс.":data.state==="configuration_error"?"Перевірте конфігурацію прогнозу на сервері.":"Метеодані тимчасово недоступні.";
-        body.appendChild(createEmpty("Прогноз не активовано",text));loaded=false;return;
+        body.appendChild(element("p","subtle",data.state==="not_configured"?"Прогноз очікує на налаштування. "+text:text));loaded=false;return;
       }
       const lines=data.arrays.map(a=>({label:"Deye №"+a.slot,points:a.hours.map(r=>({observed_at_utc:r.start_utc,value_decimal:r.kw,unit:"кВт"}))}));
       const times=lines.flatMap(l=>l.points.map(p=>Date.parse(p.observed_at_utc))).filter(Number.isFinite);
@@ -989,9 +990,11 @@ function renderTechnicalSummary(groups,values){
     modules.appendChild(card);
   }
   if(!modules.childNodes.length)modules.appendChild(element("p","subtle","Немає числових записів модулів BMS."));
-  box.appendChild(modules);
+  const moduleList=element("details","product-bms-records");
+  moduleList.appendChild(element("summary","","Архівні записи модулів · "+modules.querySelectorAll(".product-bms-module").length));
+  moduleList.appendChild(modules);box.appendChild(moduleList);
   const temperatures=Array.from({length:20},(_,i)=>({name:"BMS "+(i+1),r:read("bms_"+(i+1)+"_temperature")})).filter(x=>x.r);
-  if(temperatures.length)box.appendChild(technicalBars("Температури модулів",temperatures));
+  if(temperatures.length)moduleList.appendChild(technicalBars("Температури модулів",temperatures));
   renderBatteryEstimate(box,values);
   main.appendChild(box);
 }
@@ -1041,6 +1044,8 @@ async function renderGroup(groups, title, cycle) {
   const count = element("span", "catalog-count");
   controls.appendChild(search);
   controls.appendChild(count);
+  if(containsDemo(Object.values(values)))main.appendChild(element("p","product-data-origin",demoNotice(Object.values(values))));
+  if(groups[0]==="inverter")main.appendChild(element("p","subtle","Адреса Modbus у цьому каталозі — збережене поле інвертора. Налаштований Unit ID каналу наведено в розділі «Керування»."));
   const preferred={pv:["pv_power","pv_energy_today"],battery:["battery_soc","battery_power","battery_voltage","battery_current"],grid:["grid_power","grid_voltage","grid_frequency"],load:["load_power","load_energy_today"],inverter:["inverter_temperature","inverter_power","output_power"]};
   const priority=(preferred[groups[0]]||[]).map(key=>items.find(item=>item.key===key)).filter(Boolean);
   const highlight=priority.length?priority:items.filter(item=>values[item.key]?.value_decimal!=null).slice(0,3);
@@ -1138,7 +1143,7 @@ function svgChart(points, unit, domain={}) {
   let selected=real.length-1;
   function choose(i){selected=Math.max(0,Math.min(real.length-1,i));const p=real[selected],xx=x(p.t),yy=y(p.v);
     cursor.setAttribute("x1",xx);cursor.setAttribute("x2",xx);dot.setAttribute("cx",xx);dot.setAttribute("cy",yy);
-    label.textContent=pretty(p.v,3)+(unit?" "+unit:"")+" · "+timeFormat.format(new Date(p.t));
+    label.textContent=pretty(p.v,2)+(unit?" "+unit:"")+" · "+time(new Date(p.t).toISOString()).slice(0,-3);
     tip.textContent=time(new Date(p.t).toISOString())+" — "+pretty(p.v,3)+" "+(unit||"");
   }
   choose(selected);
@@ -1173,6 +1178,7 @@ function interactiveChart(points,unit,domain={}){
   plot.addEventListener("touchmove",e=>{if(pinch&&e.touches.length===2){if(e.cancelable)e.preventDefault();pinch.last=distance(e);}},{passive:false});
   plot.addEventListener("touchend",()=>{if(pinch){const f=pinch.initial/Math.max(1,pinch.last);pinch=null;if(Math.abs(f-1)>.08)zoom(f);}});
   plot.addEventListener("touchcancel",()=>{pinch=null;});
+  if(containsDemo(points))host.appendChild(element("small","product-data-origin",demoNotice(points)));
   add(host,plot,controls,status);redraw();return host;
 }
 async function renderHistory(cycle, archived) {
@@ -1311,7 +1317,13 @@ function deviceLabel(device, index = 0) {
 function deviceReading(values, key) {
   const item = values?.[key];
   return item && item.value_decimal !== null && item.value_decimal !== undefined && item.value_decimal !== "" ?
-    number(item.value_decimal) + " " + (item.unit || "") : "—";
+    pretty(Number(item.value_decimal), 2) + " " + (item.unit || "") : "—";
+}
+function containsDemo(records) {
+  return records.some(r => ["generated","demo","simulated","synthetic"].includes(r?.quality));
+}
+function demoNotice(records) {
+  return containsDemo(records) ? "Містить демонстраційні дані" : "";
 }
 function storedDeviceNote(reading) {
   return reading?.observed_at_utc ?
@@ -1347,7 +1359,7 @@ async function renderTwinSummary(cycle,preloadedDevices=null) {
     const card = element("article", "parallel-device parallel-home-device");
     const head = element("div", "parallel-device-head");
     add(head, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":demoNotice(Object.values(device.values))||"Архів"));
     card.appendChild(head);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));
@@ -1417,20 +1429,24 @@ async function renderParallel(cycle) {
     const card = element("article", "parallel-device");
     const heading = element("div", "parallel-device-head");
     add(heading, element("strong", "parallel-device-name", deviceLabel(device, i)),
-      element("span", "parallel-state", device.telemetry_error?"Недоступно":"Архів"));
+      element("span", "parallel-state", device.telemetry_error?"Недоступно":demoNotice(Object.values(device.values))||"Архів"));
     card.appendChild(heading);
     card.appendChild(element("p", "parallel-device-model",
       device.model || "SUN-20K-SG05LP3-EU-SM2"));
     const metrics = element("div", "parallel-metric-list");
-    for (const [key, label] of [
+    const fieldsToShow = [
       ["pv_power", "Генерація PV"], ["battery_power", "Потужність АКБ"],
       ["battery_soc", "SOC"], ["load_power", "Навантаження"],
       ["grid_power", "Мережа"], ["inverter_temperature", "Температура"]
-    ]) {
+    ];
+    const stamps=new Set(fieldsToShow.map(([key])=>device.values[key]?.observed_at_utc));
+    const sharedTime=stamps.size===1 && device.values.pv_power?.observed_at_utc;
+    if(sharedTime)card.appendChild(element("p","subtle",storedDeviceNote(device.values.pv_power)));
+    for (const [key,label] of fieldsToShow) {
       const tile = element("div", "parallel-reading");
       add(tile, element("small", "", label),
-        element("strong", "", deviceReading(device.values, key)),
-        element("span", "", storedDeviceNote(device.values[key])));
+        element("strong", "", deviceReading(device.values, key)));
+      if(!sharedTime)tile.appendChild(element("span","",storedDeviceNote(device.values[key])));
       metrics.appendChild(tile);
     }
     card.appendChild(metrics);
@@ -1780,7 +1796,8 @@ async function renderModbus(cycle) {
     const all = element("option", "", "Усі групи");
     all.value = "";
     group.appendChild(all);
-    const groups = [...new Set(fields.map(f => f.group_name || "Інше"))].sort();
+    root.appendChild(element("p","subtle","Значення адреси у полі регістра належить архівному запису. Налаштований Unit ID каналу наведено в «Керуванні»."));
+    const groups = [...new Set(fields.map(f => f.group_name || "Інше"))].sort((a,b)=>a.localeCompare(b,"uk",{numeric:true}));
     for (const name of groups) {
       const option = element("option", "", name);
       option.value = name;
@@ -2440,7 +2457,7 @@ async function render() {
     case "settings": await renderSettings(cycle); break;
   }
 }
-function overviewSignature(devices){return JSON.stringify((devices||[]).map(d=>[d.device_key,d.telemetry_error,Object.entries(d.values||{}).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,v.value_decimal,v.observed_at_utc])]));}
+function overviewSignature(devices){return JSON.stringify((devices||[]).map(d=>[d.device_key,d.telemetry_error,Object.entries(d.values||{}).sort(([a],[b])=>a.localeCompare(b)).map(([k,v])=>[k,v.value_decimal,v.observed_at_utc,v.quality,v.sign_verified,v.register_verified])]));}
 async function refreshOverviewInPlace(){
   if(state.autoBusy||state.route!=="overview"||document.hidden||!window.RakursV7?.canAutoRefresh?.())return;
   state.autoBusy=true;
@@ -2450,7 +2467,7 @@ async function refreshOverviewInPlace(){
     if(!current(cycle))return;
     const devices=results[0].status==="fulfilled"?results[0].value:null;
     const nextStatus=results[1].status==="fulfilled"?results[1].value:null;
-    const statusChanged=JSON.stringify([state.status?.collector_active,state.status?.physical_topology_verified,state.status?.register_semantics_verified])!==JSON.stringify([nextStatus?.collector_active,nextStatus?.physical_topology_verified,nextStatus?.register_semantics_verified]);
+    const statusChanged=JSON.stringify([state.status?.collector?.enabled,state.status?.collector_active,state.status?.physical_topology_verified,state.status?.register_semantics_verified])!==JSON.stringify([nextStatus?.collector?.enabled,nextStatus?.collector_active,nextStatus?.physical_topology_verified,nextStatus?.register_semantics_verified]);
     state.status=nextStatus;updateConnection(nextStatus!==null);
     if(!devices?.length||devices.some(d=>d.telemetry_error)||!window.RakursV7.canAutoRefresh())return;
     if(statusChanged||overviewSignature(devices)!==state.overviewSignature){
@@ -2539,7 +2556,7 @@ async function boot() {
   await render();
   if(typeof window.setInterval==="function")window.setInterval(refreshOverviewInPlace,30000);
 }
-window.addEventListener("hashchange", render);
+window.addEventListener("hashchange", () => { window.scrollTo?.(0,0); return render(); });
 boot();
 // An installable, network-only shell; never store authenticated telemetry.
 if(typeof navigator!=="undefined"&&navigator.serviceWorker&&window.isSecureContext){navigator.serviceWorker.register("/static/rakurs-sw.js",{scope:"/"}).catch(()=>{});}

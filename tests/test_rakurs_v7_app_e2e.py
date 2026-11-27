@@ -318,6 +318,7 @@ def run():
                     wait_rendered(page)
                     assert page.locator("body").get_attribute("data-theme") == theme
                     assert not page_errors, page_errors
+                    assert "демонстраційні дані" in page.locator(".rv7-status").inner_text()
                     assert "5,1 кВт" in page.locator(
                         ".rv7 [data-node='pv1'] .rv7-node-value").first.text_content()
                     assert "5,43 кВт" in page.locator(
@@ -457,6 +458,7 @@ def run():
                         if route=="battery":
                             assert page.locator(".bms-summary").count()==1
                             assert page.locator(".product-bms-gauge").count()==2
+                            page.locator(".product-bms-records > summary").click()
                             module=page.locator(".product-bms-module").first
                             module.locator("summary").click()
                             assert "40 мВ" in module.locator(".product-bms-delta").text_content()
