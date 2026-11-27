@@ -674,6 +674,43 @@ def energy():
                               "daily": daily, "counters": result, "aggregate_verified": False}))
 
 
+@app.get("/api/v1/solar/calendar")
+def solar_calendar():
+    month = request.args.get("month", "")
+    if not re.fullmatch(r"(?:19|20)\d{2}-(?:0[1-9]|1[0-2])", month):
+        abort(400, description="Некоректний місяць")
+    zone = ZoneInfo("Europe/Kyiv")
+    opening = datetime.strptime(month, "%Y-%m").replace(tzinfo=zone)
+    following = (opening + timedelta(days=32)).replace(day=1)
+    devices = parallel_registered_devices()
+    ids = tuple(d["id"] for d in devices)
+    days = {}
+    if ids:
+        # UTC hour buckets remain distinct during the autumn clock change.
+        utc_bounds = tuple(d.astimezone(timezone.utc).replace(tzinfo=None) for d in (opening, following))
+        hourly = rows(
+            "WITH ranked AS (SELECT m.device_id,m.observed_at_utc,m.value_decimal,"
+            "ROW_NUMBER() OVER (PARTITION BY m.device_id,DATE(m.observed_at_utc),"
+            "HOUR(m.observed_at_utc) ORDER BY m.observed_at_utc DESC) AS ordinal "
+            "FROM rakurs_samples m JOIN rakurs_signals s ON s.id=m.signal_id "
+            "WHERE s.signal_key='pv_energy_today' AND m.value_decimal IS NOT NULL "
+            "AND m.observed_at_utc >= %s AND m.observed_at_utc < %s AND m.device_id IN ("
+            + ",".join(["%s"]*len(ids)) + ")) SELECT device_id,observed_at_utc,value_decimal "
+            "FROM ranked WHERE ordinal=1 ORDER BY observed_at_utc", utc_bounds + ids)
+        slots = {d["id"]:str(d["slot_no"]) for d in devices}
+        for row in hourly:
+            local_day = row["observed_at_utc"].replace(tzinfo=timezone.utc).astimezone(zone).date().isoformat()
+            item = days.setdefault(local_day, {}).setdefault(slots[row["device_id"]], {"hours":0})
+            item["hours"] += 1
+            item["kwh"] = row["value_decimal"]
+    from .solar_forecast import load_config
+    try:
+        cfg = load_config()
+    except (OSError, ValueError):
+        cfg = None
+    return jsonify(serialize({"days":days, "kwp":{str(a["slot"]):a["kwp"] for a in (cfg or {}).get("arrays", [])}}))
+
+
 @app.get("/api/v1/solar-forecast")
 def solar_forecast():
     from .solar_forecast import forecast
@@ -835,6 +872,9 @@ def parallel_archive_frame():
     at = checked_utc("at")
     devices = parallel_registered_devices()
     output = [{"device_key":d["device_key"],"slot_no":d["slot_no"],"values":{}} for d in devices]
+    keys = PARALLEL_SIGNAL_KEYS
+    if request.args.get("group") == "mppt":
+        keys = tuple(f"pv{n}_{field}" for n in (1, 2) for field in ("power", "voltage", "current"))
     if devices:
         ids = tuple(d["id"] for d in devices)
         samples = rows(
@@ -842,8 +882,8 @@ def parallel_archive_frame():
             "FROM rakurs_samples AS m JOIN rakurs_signals AS s ON s.id=m.signal_id "
             "WHERE m.device_id IN ("+",".join(["%s"]*len(ids))+") "
             "AND m.observed_at_utc=%s AND s.signal_key IN ("+
-            ",".join(["%s"]*len(PARALLEL_SIGNAL_KEYS))+")",
-            ids+(at,)+PARALLEL_SIGNAL_KEYS)
+            ",".join(["%s"]*len(keys))+")",
+            ids+(at,)+keys)
         by_id = {d["id"]:item for d,item in zip(devices,output)}
         for sample in samples:
             item = by_id.get(sample["device_id"])

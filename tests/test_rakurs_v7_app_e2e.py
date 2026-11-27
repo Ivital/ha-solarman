@@ -150,6 +150,11 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 self.reply({"device_key": key,
                             "values": {} if scenario == "empty" else device_values(1 if key == D1 else 2)})
+        elif path == "/api/v1/solar/calendar":
+            self.reply({"days":{"2026-11-24":{"1":{"kwh":"8","hours":24},"2":{"kwh":"10","hours":20}}},"kwp":{}})
+        elif path == "/api/v1/parallel/frame" and args.get("group")==["mppt"]:
+            at=args["at"][0]
+            self.reply({"devices":[{"device_key":d,"values":{"pv1_voltage":reading(322,"В",at)}} for d in (D1,D2)]})
         elif path == "/api/v1/parallel/frame":
             at=args.get("at",[""])[0]
             self.reply({"at":at,"devices":[{"device_key":d,"slot_no":i,"values":{k:{**v,"observed_at_utc":at} for k,v in device_values(i).items()}} for i,d in enumerate([D1,D2],1)]})
@@ -491,6 +496,19 @@ def run():
                             assert "230 В" in page.locator(".product-phase-grid").inner_text()
                             assert page.locator(".product-technical-bars").count()>=1
                         if route=="pv":
+                            panel=page.locator(".solar-analysis")
+                            if width<761:
+                                panel.locator("summary").click()
+                            chosen=panel.get_by_role("button",name="2026-11-24 · 18 кВт·год · неповне погодинне покриття")
+                            chosen.click()
+                            panel.locator(".solar-tracker-row").first.wait_for()
+                            assert panel.locator(".solar-tracker-row").count()==4
+                            assert "322 В" in panel.locator(".solar-trackers").inner_text()
+                            assert panel.locator(".product-overlay-line").count()==2
+                            panel.locator("svg").focus()
+                            page.keyboard.press("Home")
+                            page.wait_for_function("document.querySelector('.solar-frame-time')?.textContent.includes('02:00')")
+                            panel.screenshot(path=str(OUT/f"solar-analysis-{width}.png"))
                             assert page.locator(".product-mppt").count()==1
                             assert page.locator(".product-mppt .product-phase-card").count()==2
                             page.locator(".product-forecast summary").click()

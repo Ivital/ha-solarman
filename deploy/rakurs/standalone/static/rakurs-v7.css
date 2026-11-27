@@ -601,3 +601,21 @@ body[data-theme] .product-timeseries .product-cursor{stroke:currentColor;stroke-
 .period-column {display:grid;justify-items:center;gap:.35rem;flex:1 0 5.5rem;text-align:center}
 .period-bar {width:min(65%,4rem);background:var(--v7-primary,#3874cd);border-radius:.25rem .25rem 0 0}
 .period-column:nth-child(even) .period-bar {background:var(--v7-pv,#ae740e)}
+.solar-analysis{display:grid;grid-template-columns:minmax(16rem,24rem) minmax(0,1fr);gap:clamp(1rem,2vw,2rem);align-items:start}
+.solar-calendar,.solar-detail{min-width:0}
+.solar-calendar summary{cursor:pointer;font-size:1.15rem;font-weight:700;text-transform:capitalize}
+.solar-month-nav{display:flex;gap:.5rem;margin:.6rem 0}
+.solar-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:.25rem;text-align:center;align-items:center}
+.solar-day{min-height:2.35rem;border:1px solid #8995a344;border-radius:.45rem;font:inherit;color:inherit;background:color-mix(in srgb,#d49b38 var(--heat,0%),transparent);cursor:pointer}
+.solar-day.incomplete{background-image:repeating-linear-gradient(135deg,transparent 0 5px,#8491a040 5px 7px)}
+.solar-day[aria-pressed=true]{outline:2px solid #4585db;outline-offset:-2px;font-weight:750}
+.solar-trackers{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:.5rem}
+.solar-frame-time{grid-column:1/-1}
+.solar-tracker-row{display:grid;grid-template-columns:repeat(4,auto);gap:.35rem;padding:.35rem 0;font-variant-numeric:tabular-nums}
+.solar-detail h3{margin-top:0}
+@media(max-width:900px){.solar-trackers{grid-template-columns:1fr}}
+@media(max-width:760px){.solar-analysis{grid-template-columns:minmax(0,1fr)}.solar-days{gap:.35rem}.solar-day{min-height:2.65rem}}
+
+body[data-theme] .solar-analysis .product-chart-legend span[data-series="0"]:before{background:#ad7109}
+body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:before{background:repeating-linear-gradient(90deg,#3779d2 0 4px,transparent 4px 6px)}
+.solar-detail button[hidden]{display:none}

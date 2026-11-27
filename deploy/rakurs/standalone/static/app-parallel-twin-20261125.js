@@ -949,11 +949,11 @@ async function renderComparativeAnalytics(cycle,devices){
   selector.addEventListener("change",compare);period.addEventListener("change",report);
   await Promise.allSettled([compare(),report()]);
 }
-function multiDeviceChart(lines,unit,first,last){
+function multiDeviceChart(lines,unit,first,last,onSelect=null){
   const host=element("div","product-chart-interactive product-overlay-chart"),plot=element("div","product-zoom-plot");
   const legend=element("div","product-chart-legend"),controls=element("div","product-zoom-controls");
   const colors=["#2e9b83","#4788e6","#ba7b26"];
-  const series=lines.map((line,i)=>({...line,color:colors[i%colors.length],data:line.points.map(p=>({t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t)}));
+  const series=lines.map((line,i)=>({...line,color:line.color||colors[i%colors.length],data:line.points.map(p=>({stamp:p.observed_at_utc,t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t)}));
   for(const l of series){const item=element("span","");add(item,element("strong","",l.label),element("small","",l.failed?"Недоступно":l.data.length+" точок"));item.setAttribute("data-series",String(series.indexOf(l)));legend.appendChild(item);}
   let from=first,to=last,selectedStamp=null;
   for(const line of lines.filter(l=>l.archive)){
@@ -976,7 +976,7 @@ function multiDeviceChart(lines,unit,first,last){
     for(let n=0;n<4;n++){const stamp=from+(to-from)*n/3;svg.appendChild(node("text",{x:x(stamp),y:232,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},new Date(stamp).toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",...(to-from>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})})));}
     for(const l of visible){const steps=l.data.slice(1).map((p,i)=>p.t-l.data[i].t).filter(n=>n>0).sort((a,b)=>a-b),gap=Math.max(1200000,(steps[Math.floor(steps.length/2)]||0)*3);let d="";
       for(const [i,p] of l.data.entries()){d+=(i&&p.t-l.data[i-1].t<=gap?" L":" M")+x(p.t)+" "+y(p.v);}
-      if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,"stroke-dasharray":l.forecast?"6 4":"none",class:"product-overlay-line","data-device":l.label}));
+      if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,"stroke-dasharray":l.forecast||l.dashed?"6 4":"none",class:"product-overlay-line","data-device":l.label}));
       for(const [i,p] of l.data.entries()){
         const before=i===0||p.t-l.data[i-1].t>gap;
         const after=i===l.data.length-1||l.data[i+1].t-p.t>gap;
@@ -985,7 +985,14 @@ function multiDeviceChart(lines,unit,first,last){
     }
     const cursor=node("line",{y1:top,y2:bottom,class:"product-cursor"}),label=node("text",{x:left,y:15,class:"product-chart-label"}),tip=node("text",{x:left,y:31,class:"product-axis"});add(svg,cursor,label,tip);
     let index=times.length-1;
-    function select(i){index=Math.max(0,Math.min(times.length-1,i));const t=times[index];selectedStamp=t;for(const l of visible)if(l.archive?.button)l.archive.button.disabled=!l.data.some(p=>p.t===t);cursor.setAttribute("x1",x(t));cursor.setAttribute("x2",x(t));label.textContent=time(new Date(t).toISOString());tip.textContent=visible.map(l=>{const p=l.data.find(p=>p.t===t);return l.label+": "+(p?number(p.v)+" "+unit:"—");}).join(" · ");}
+    function select(i){
+      index=Math.max(0,Math.min(times.length-1,i));
+      const t=times[index];
+      if(onSelect && selectedStamp!==t){
+        const sample=visible.flatMap(l=>l.data).find(p=>p.t===t);
+        if(sample)onSelect(sample.stamp);
+      }
+      selectedStamp=t;for(const l of visible)if(l.archive?.button)l.archive.button.disabled=!l.data.some(p=>p.t===t);cursor.setAttribute("x1",x(t));cursor.setAttribute("x2",x(t));label.textContent=time(new Date(t).toISOString());tip.textContent=visible.map(l=>{const p=l.data.find(p=>p.t===t);return l.label+": "+(p?number(p.v)+" "+unit:"—");}).join(" · ");}
     select(index);
     const choose=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const target=from+Math.max(0,Math.min(1,(p.matrixTransform(matrix.inverse()).x-left)/(right-left)))*(to-from);let i=0;for(let n=1;n<times.length;n++)if(Math.abs(times[n]-target)<Math.abs(times[i]-target))i=n;select(i);};
     svg.addEventListener("click",choose);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")choose(e);});
@@ -1007,6 +1014,115 @@ function technicalBars(label,entries){
   entries.forEach((x,i)=>{const yy=i*29+3,ok=valid.includes(x);node("text",{x:0,y:yy+13,fill:"currentColor","font-size":11},x.name);node("rect",{x:65,y:yy,width:155,height:15,rx:4,fill:"currentColor",opacity:.10});if(ok)node("rect",{x:65,y:yy,width:Math.abs(Number(x.r.value_decimal))/max*155,height:15,rx:4,fill:["#4788e6","#2e9b83","#c58b2d"][i%3]});node("text",{x:315,y:yy+13,"text-anchor":"end",fill:"currentColor","font-size":11},ok?number(x.r.value_decimal)+" "+x.r.unit:"—");});
   box.appendChild(svg);return box;
 }
+async function renderSolarAnalysis(cycle,host){
+  const devices=await fetchParallelDevices(cycle);
+  if(!current(cycle))return;
+  if(!devices?.length){host.textContent="Інвертори недоступні";return;}
+  const stamps=devices.map(d=>Date.parse(d.values?.pv_power?.observed_at_utc)).filter(Number.isFinite);
+  let day=localValue(new Date(stamps.length?Math.max(...stamps):Date.now())).slice(0,10);
+  let month=day.slice(0,7),monthRevision=0,dayRevision=0,frameRevision=0,timer,calendar={},capacities={};
+  const monthFormat=new Intl.DateTimeFormat("uk-UA",{month:"long",year:"numeric",timeZone:"UTC"});
+  const calendarBox=element("details","solar-calendar"),monthTitle=element("summary","");
+  calendarBox.open=window.innerWidth>760;
+  calendarBox.appendChild(monthTitle);
+  const navigation=element("div","solar-month-nav");
+  for(const [offset,label] of [[-1,"Попередній місяць"],[1,"Наступний місяць"]]){
+    const btn=element("button","rv7-range",offset<0?"‹":"›");btn.type="button";btn.setAttribute("aria-label",label);
+    btn.onclick=()=>{const date=new Date(month+"-01T12:00:00Z");date.setUTCMonth(date.getUTCMonth()+offset);month=date.toISOString().slice(0,7);loadMonth();};
+    navigation.appendChild(btn);
+  }
+  const cells=element("div","solar-days"),note=element("p","subtle");
+  add(calendarBox,navigation,cells,note);
+  const detail=element("div","solar-detail"),title=element("h3",""),chart=element("div",""),trackers=element("div","solar-trackers");
+  const yieldLine=element("p","subtle");
+  const normalize=element("button","rv7-range","На 1 кВтₚ");
+  normalize.type="button";normalize.hidden=true;
+  normalize.setAttribute("aria-pressed","false");
+  normalize.onclick=()=>{normalize.setAttribute("aria-pressed",String(normalize.getAttribute("aria-pressed")!=="true"));showYield();};
+  add(detail,title,normalize,yieldLine,chart,trackers);host.replaceChildren(calendarBox,detail);
+  function bounds(key){
+    const next=new Date(key+"T12:00:00Z");next.setUTCDate(next.getUTCDate()+1);
+    return [+parseKyiv(key+"T00:00",false),+parseKyiv(next.toISOString().slice(0,10)+"T00:00",false)];
+  }
+  function showYield(){
+    const row=calendar[day]||{};
+    normalize.hidden=!(capacities[1]>0 && capacities[2]>0);
+    const specific=!normalize.hidden && normalize.getAttribute("aria-pressed")==="true";
+    yieldLine.textContent=[1,2].map(slot=>{
+      const reading=row[slot],capacity=Number(capacities[slot]);
+      return "PV "+slot+" · "+(reading?pretty(Number(reading.kwh)/(specific?capacity:1))+(specific?" кВт·год/кВтₚ":" кВт·год"):"—");
+    }).join("     ");
+  }
+  function drawCalendar(){
+    cells.replaceChildren();
+    for(const weekDay of ["Пн","Вт","Ср","Чт","Пт","Сб","Нд"])cells.appendChild(element("small","",weekDay));
+    const first=new Date(month+"-01T12:00:00Z");
+    for(let i=0;i<(first.getUTCDay()+6)%7;i++)cells.appendChild(element("span",""));
+    const totals=Object.values(calendar).filter(row=>row[1]&&row[2]).map(row=>Number(row[1].kwh)+Number(row[2].kwh));
+    const peak=Math.max(1,...totals);
+    for(const date=new Date(first);date.getUTCMonth()===first.getUTCMonth();date.setUTCDate(date.getUTCDate()+1)){
+      const key=date.toISOString().slice(0,10),row=calendar[key]||{},both=row[1]&&row[2];
+      const value=both?Number(row[1].kwh)+Number(row[2].kwh):null;
+      const [a,b]=bounds(key),hours=(b-a)/3600000;
+      const incomplete=Object.keys(row).length>0 && (!both||Math.min(row[1].hours,row[2].hours)<hours);
+      const btn=element("button","solar-day"+(incomplete?" incomplete":""),String(date.getUTCDate()));
+      btn.type="button";btn.setAttribute("aria-pressed",String(key===day));
+      if(value!==null)btn.style.setProperty("--heat",Math.round(12+65*Math.min(1,Math.max(0,value/peak)))+"%");
+      btn.title=key+" · "+(value===null?"—":pretty(value)+" кВт·год")+(incomplete?" · неповне погодинне покриття":"");
+      btn.setAttribute("aria-label",btn.title);
+      btn.onclick=()=>{day=key;drawCalendar();if(window.innerWidth<=760)calendarBox.open=false;loadDay();};
+      cells.appendChild(btn);
+    }
+  }
+  async function loadMonth(){
+    const rev=++monthRevision;
+    monthTitle.textContent=monthFormat.format(new Date(month+"-01T12:00:00Z"));
+    calendar={};cells.replaceChildren();note.textContent="Читання календаря…";
+    try{
+      const result=await api("/solar/calendar?month="+month);
+      if(!current(cycle)||rev!==monthRevision)return;
+      calendar=result.days||{};capacities=result.kwp||{};
+      note.textContent="Насиченість кольору — сумарний виробіток. Штрихування — неповне погодинне покриття.";
+    }catch(error){if(!current(cycle)||rev!==monthRevision)return;note.textContent="Календар недоступний. Оберіть дату для перегляду потужності.";}
+    drawCalendar();if(day.startsWith(month))showYield();
+  }
+  async function loadDay(){
+    const rev=++dayRevision;frameRevision++;clearTimeout(timer);
+    title.textContent="Потужність за добу · "+day.split("-").reverse().join(".");
+    showYield();chart.textContent="Завантаження графіка…";trackers.replaceChildren();
+    const [start,end]=bounds(day);
+    const result=await Promise.allSettled(devices.map(d=>api("/history/range?"+new URLSearchParams({device:d.device_key,key:"pv_power",start:new Date(start).toISOString(),end:new Date(end-1).toISOString().replace(/Z$/,"999Z"),resolution:"auto"}))));
+    if(!current(cycle)||rev!==dayRevision)return;
+    const lines=devices.map((d,i)=>({label:"PV "+d.slot_no,color:Number(d.slot_no)===1?"#ad7109":"#3779d2",dashed:Number(d.slot_no)===2,points:result[i].value?.points||[],failed:result[i].status==="rejected"}));
+    function select(stamp){
+      const frame=++frameRevision;clearTimeout(timer);
+      trackers.textContent="MPPT · "+time(stamp)+" · завантаження…";
+      timer=setTimeout(async()=>{
+        if(!current(cycle)||frame!==frameRevision)return;
+        try{
+          const data=await api("/parallel/frame?group=mppt&at="+encodeURIComponent(stamp));
+          if(!current(cycle)||frame!==frameRevision)return;
+          trackers.replaceChildren(element("strong","solar-frame-time","MPPT · "+time(stamp)));
+          for(const d of devices){
+            const card=element("article","product-phase-card"),values=data.devices?.find(v=>v.device_key===d.device_key)?.values||{};
+            card.appendChild(element("h3","","Deye №"+d.slot_no));
+            for(const n of [1,2]){
+              const row=element("div","solar-tracker-row");row.appendChild(element("strong","","MPPT "+n));
+              for(const [key,unit] of [["power","кВт"],["voltage","В"],["current","А"]]){
+                const r=values["pv"+n+"_"+key];row.appendChild(element("span","",r?.value_decimal!=null?pretty(Number(r.value_decimal),2)+" "+(r.unit||unit):"— "+unit));
+              }
+              card.appendChild(row);
+            }
+            trackers.appendChild(card);
+          }
+        }catch(error){if(current(cycle)&&frame===frameRevision)trackers.textContent="Покази MPPT за цей час недоступні.";}
+      },140);
+    }
+    chart.replaceChildren(multiDeviceChart(lines,"кВт",start,end-1,select));
+  }
+  await Promise.all([loadMonth(),loadDay()]);
+}
+
 function renderSolarForecast(cycle){
   const box=element("details","product-analytics product-forecast");
   box.appendChild(element("summary","","Прогноз сонячної генерації · 48 годин"));
@@ -1145,6 +1261,11 @@ async function renderGroup(groups, title, cycle) {
   if (!items.length) {
     main.appendChild(createEmpty("Каталог недоступний", "Не вдалося прочитати реєстр."));
     return;
+  }
+  if(groups[0]==="pv"){
+    const host=element("section","product-analytics solar-analysis");
+    main.appendChild(host);
+    renderSolarAnalysis(cycle,host).catch(()=>{if(current(cycle))host.textContent="Сонячна аналітика недоступна.";});
   }
   const known = verifiedKeys();
   const keys = items.filter(i => known.has(i.key)).map(i => i.key);
