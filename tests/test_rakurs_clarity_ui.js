@@ -160,7 +160,7 @@ function prepare(mode = "seeded") {
         {model:"SUN-20K-SG05LP3-EU-SM2",expected_inverters:2,
          registered_inverters:stored.length,devices:stored,aggregate_verified:false}
       : url.includes("/latest?") ? {values:latest}
-      : url.includes("/history?") ? {signal:{unit:"кВт"},points:mode==="no-recent-history"?[]:mode==="single"?history.slice(0,1):history}
+      : (url.includes("/history?") || url.includes("/history/range?")) ? {signal:{unit:"кВт"},points:mode==="no-recent-history"?[]:mode==="single"?history.slice(0,1):history}
       : url.includes("/config") ? {available:true,enabled:false,interval_seconds:60,worker_online:false,
           devices:stored.map((d,i)=>({...d,id:i+2,display_name:"Deye №"+(i+1),enabled:false,
             transport:"unconfigured",function_code:3,register_count:1,timeout_ms:1500}))}
@@ -270,7 +270,7 @@ async function run() {
   assert(css.includes("@media(max-width:760px)"));
   assert(css.includes("prefers-reduced-motion"));
   assert(html.includes('href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"'));
-  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product20"'));
+  assert(html.includes('src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product21"'));
   assert(/\.trend-section\.full-trends \.trend-grid\s*\{\s*grid-template-columns:\s*repeat\(2,minmax\(0,1fr\)\)/.test(chartCss),
     "The dedicated charts route must have two compact columns");
   assert(/@media\(max-width:760px\)/.test(chartCss),
@@ -692,7 +692,7 @@ async function run() {
 
   app.loc.hash="#/trends";
   await app.events.hashchange();
-  assert.equal(byClass(app.main,"trend-card").length,4);
+  assert.equal(byClass(app.main,"trend-card").length,5);
   assert.equal(byClass(app.main,"full-trends").length,1,"Charts route remains a compact analytics layout");
   const chartTiles = byClass(app.main,"trend-card");
   assert.equal(chartTiles.filter(tile => tile.className.split(/\s+/).includes("trend-grid")).length,0,
@@ -705,7 +705,7 @@ async function run() {
   assert.equal(ranges.length,3);
   ranges[2].listeners.click();
   await settle();
-  assert(app.fetchCalls.some(x=>x.includes("hours=168")));
+  assert(app.fetchCalls.some(x=>{const q=new URLSearchParams(x.split("?")[1]);return x.includes("/history/range?") && Date.parse(q.get("end"))-Date.parse(q.get("start"))===168*3600000;}));
   console.log("CLARITY_TRENDS_24_72_168=PASS");
 
   app.loc.hash="#/modbus";

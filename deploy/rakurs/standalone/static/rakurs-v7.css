@@ -594,3 +594,10 @@ body[data-theme] .product-data-origin{display:block;margin:6px 0;color:var(--ux-
 body[data-theme] .product-timeseries .product-cursor-dot{stroke:var(--ux-card,#fff);stroke-width:1.6px}
 body[data-theme] .product-timeseries .product-cursor{stroke:currentColor;stroke-opacity:.7}
 @media(max-width:600px){.rv7-chart-card .rv7-series-button{min-height:32px;padding-inline:7px}.rv7-chart-box{margin-inline:2px}}
+
+.period-tooltip {display:flex;flex-wrap:wrap;align-items:center;gap:.4rem 1rem;margin:.5rem 0}
+.period-reading {display:block;font-variant-numeric:tabular-nums}
+.period-bars {display:flex;align-items:flex-end;gap:.6rem;overflow-x:auto;padding:.75rem 0}
+.period-column {display:grid;justify-items:center;gap:.35rem;flex:1 0 5.5rem;text-align:center}
+.period-bar {width:min(65%,4rem);background:var(--v7-primary,#3874cd);border-radius:.25rem .25rem 0 0}
+.period-column:nth-child(even) .period-bar {background:var(--v7-pv,#ae740e)}

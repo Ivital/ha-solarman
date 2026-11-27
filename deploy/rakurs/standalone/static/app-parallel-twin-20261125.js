@@ -20,6 +20,62 @@ const views = [
 ];
 const state = { catalog: null, status: null, verified: [], route: "overview", cycle: 0,
   selectedDeviceKey: null, selectedSlotNo: 1, role: "viewer", csrf: null, navQuery: "" };
+  // The controls are explicitly Kyiv wall time, regardless of client timezone.
+  const kyivFormatter=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
+  const localValue=date=>{
+    const p=Object.fromEntries(kyivFormatter.formatToParts(date).map(x=>[x.type,x.value]));
+    return p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute;
+  };
+  const parseKyiv=(value,upper)=>{
+    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return new Date(NaN);
+    const wall=Date.parse(value+":00Z");
+    if(!Number.isFinite(wall))return new Date(NaN);
+    const candidates=[];
+    for(let offset=-180;offset<=180;offset+=30){
+      const d=new Date(wall-offset*60000);
+      if(localValue(d)===value)candidates.push(d.getTime());
+    }
+    if(!candidates.length)return new Date(NaN);
+    // During autumn overlap include both occurrences, without losing samples.
+    return new Date(upper?Math.max(...candidates)+59999:Math.min(...candidates));
+  };
+
+// One interval follows the operator across the three history workspaces.
+let analysisRange=null, archiveFocus=null;
+function setRange(start,end){
+  if(!Number.isFinite(start)||!Number.isFinite(end)||start>=end||end-start>31*86400000)return false;
+  analysisRange={start,end};
+  return true;
+}
+function rangeQuery(range){
+  return new URLSearchParams({start:new Date(range.start).toISOString(),end:new Date(range.end).toISOString().replace(/Z$/,range.end-range.start>=31*86400000?"Z":"999Z")}).toString();
+}
+function rangeEditor(range,onApply){
+  const controls=element("div","settings-fields");
+  const from=settingsField(controls,"Від · Київ",localValue(new Date(range.start)),"datetime-local");
+  const to=settingsField(controls,"До · Київ",localValue(new Date(range.end)),"datetime-local");
+  const apply=element("button","settings-save","Застосувати період");
+  apply.type="button";
+  apply.addEventListener("click",()=>{
+    const start=+parseKyiv(from.value,false),end=+parseKyiv(to.value,true);
+    if(!setRange(start,end)){to.setCustomValidity("Виберіть інтервал до 31 доби");to.reportValidity();return;}
+    to.setCustomValidity("");onApply();
+  });
+  to.addEventListener("input",()=>to.setCustomValidity(""));
+  controls.syncRange=(start,end)=>{from.value=localValue(new Date(start));to.value=localValue(new Date(end));};
+  controls.appendChild(apply);return controls;
+}
+function openArchivePoint(key,stamp,device){
+  if(device){
+    const select=document.getElementById("device-select");
+    if(select && [...select.options].some(o=>o.value===device)){
+      const opt=[...select.options].find(o=>o.value===device);
+      state.selectedDeviceKey=device;state.selectedSlotNo=Number(opt.textContent.match(/№\s*(\d+)/)?.[1])||state.selectedSlotNo;
+    }
+  }
+  archiveFocus={key,stamp,device};
+  location.hash="#/archive";
+}
 const main = document.getElementById("content");
 const navigation = document.getElementById("nav");
 function setupColorTheme() {
@@ -559,6 +615,7 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
         historyLoader:(device,key,frame)=>api("/parallel/history?device="+
           encodeURIComponent(device)+"&key="+encodeURIComponent(key)+
           "&hours="+encodeURIComponent(frame)+"&anchor=latest&resolution=auto"),
+        range:analysisRange,setRange,rangeEditor,openArchivePoint,
         frameLoader:at=>api("/parallel/frame?at="+encodeURIComponent(at)),
         historyRangeLoader:(device,key,start,end)=>api("/history/range?device="+encodeURIComponent(device)+
           "&key="+encodeURIComponent(key)+"&start="+encodeURIComponent(start)+"&end="+encodeURIComponent(end)+"&resolution=auto")
@@ -627,7 +684,7 @@ async function renderOverview(cycle, primedValues = null, preparedDevices = null
     element("span", "", "Збережені показники MySQL"));
   main.appendChild(footer);
 }
-async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
+async function renderTrendDeck(cycle, initialHours = 24, compact = false,sharedKey=null) {
   const root = element("section", compact ? "trend-section" : "trend-section full-trends");
   const heading = element("div", "trend-section-head");
   const title = element("div", "");
@@ -638,7 +695,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
   ranges.setAttribute("role", "group");
   ranges.setAttribute("aria-label", "Період графіків");
   const frames = [[24, "24 год"], [72, "3 доби"], [168, "7 діб"]];
-  let hours = initialHours;
+  let hours = !compact && analysisRange?(analysisRange.end-analysisRange.start)/3600000:initialHours;
   const buttons = frames.map(([value, label]) => {
     const btn = element("button", value === hours ? "active" : "", label);
     btn.type = "button";
@@ -650,6 +707,8 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
   heading.appendChild(element("span","subtle","Deye №"+state.selectedSlotNo));
   heading.appendChild(ranges);
   root.appendChild(heading);
+  const tooltip=element("div","period-tooltip");
+  if(!compact)root.appendChild(tooltip);
   const grid = element("div", "trend-grid");
   root.appendChild(grid);
   const compactEmpty = element("div", "trend-empty-summary");
@@ -662,6 +721,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     ["battery_soc", "Заряд акумулятора", "%", "battery"],
     ["grid_power", "Обмін із мережею", "кВт", "network"]
   ];
+  if(!compact)series.push(["battery_power","Потужність АКБ","кВт","battery"]);
   const bodies = series.map(([key, label, unit, tone]) => {
     const chartCard = element("article", "trend-card trend-" + tone);
     const cap = element("div", "trend-card-caption");
@@ -676,6 +736,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
   let requestIndex = 0;
   function selectHours(value) {
     hours = value;
+    if(!compact && analysisRange){setRange(analysisRange.end-hours*3600000,analysisRange.end);render();return;}
     buttons.forEach((button, i) => {
       button.className = frames[i][0] === hours ? "active" : "";
       button.setAttribute("aria-pressed", String(frames[i][0] === hours));
@@ -686,7 +747,7 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
     const index = ++requestIndex;
     bodies.forEach(body => body.replaceChildren(element("p", "subtle", "Завантаження графіка…")));
     const results = await Promise.allSettled(series.map(([key]) =>
-      api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours+"&anchor=latest&resolution=auto")));
+      (!compact && analysisRange)?api("/history/range?key="+encodeURIComponent(key)+"&"+rangeQuery(analysisRange)+"&resolution=auto"+(key!=="pv_power"&&sharedKey?"&device="+encodeURIComponent(sharedKey):"")):api("/history?key=" + encodeURIComponent(key) + "&hours=" + hours+"&anchor=latest&resolution=auto")));
     if (!current(cycle) || index !== requestIndex) return;
     const allEmpty = results.every(result => result.status === "fulfilled" &&
       !(result.value.points || []).some(point => point.value_decimal !== null &&
@@ -737,7 +798,29 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
       const currentValue = numeric[numeric.length - 1].value_decimal;
       body.appendChild(element("strong", "trend-latest", pretty(Number(currentValue)) +
         " " + series[i][2]));
-      body.appendChild(interactiveChart(points, series[i][2]));
+      const values=numeric.map(p=>Number(p.value_decimal));
+      body.appendChild(element("p","subtle","Мін. "+pretty(Math.min(...values))+" · Макс. "+pretty(Math.max(...values))+" "+series[i][2]));
+      const key=series[i][0];
+      const domain=!compact?{...analysisRange,key,onSelect:stamp=>{
+        const group=grid.querySelectorAll("svg.product-timeseries");
+        for(const graph of group)graph.showStamp?.(stamp,key);
+        tooltip.replaceChildren(element("strong","",time(new Date(stamp).toISOString())));
+        for(const [j,peer] of bodies.entries()){
+          const readout=peer.querySelector(".period-reading");
+          const value=results[j].status==="fulfilled"?results[j].value.points.find(p=>Date.parse(p.observed_at_utc)===stamp):null;
+          const entry=element(series[j][0]===key?"strong":"span","",series[j][1]+" · "+(value?.value_decimal!=null?pretty(Number(value.value_decimal))+" "+series[j][2]:"—"));
+          tooltip.appendChild(entry);
+          if(readout)readout.textContent=time(new Date(stamp).toISOString())+" · "+(value?.value_decimal!=null?pretty(Number(value.value_decimal))+" "+series[j][2]:"—");
+        }
+      }}:{};
+      const graph=interactiveChart(points,series[i][2],domain);
+      body.appendChild(graph);
+      if(!compact){
+        const readout=element("strong","period-reading");
+        const action=element("button","settings-save","Відкрити в архіві");
+        action.onclick=()=>openArchivePoint(key,graph.querySelector("svg")?.dataset.stamp||numeric.at(-1).observed_at_utc,key==="pv_power"?state.selectedDeviceKey:sharedKey);
+        add(body,readout,action);
+      }
       body.appendChild(element("p", "subtle", (result.value.resolution==="extrema"?"Деталізація: "+points.length+" із "+result.value.sample_count+" · ":"") + points.length +
         " точок · " + time(points[0].observed_at_utc) +
         " — " + time(points[points.length - 1].observed_at_utc)));
@@ -747,12 +830,18 @@ async function renderTrendDeck(cycle, initialHours = 24, compact = false) {
 }
 async function renderTrends(cycle) {
   addStatusMessage();
-  const comparison=renderComparativeAnalytics(cycle);
-  await Promise.allSettled([comparison,renderTrendDeck(cycle,72,false)]);
+  const devices=await fetchParallelDevices(cycle);
+  if(!current(cycle))return;
+  const stamps=devices.flatMap(d=>Object.values(d.values||{}).map(r=>Date.parse(r.observed_at_utc))).filter(Number.isFinite);
+  const latest=stamps.length?Math.max(...stamps):Date.now();
+  if(!analysisRange)setRange(latest-24*3600000,latest);
+  main.appendChild(rangeEditor(analysisRange,render));
+  const comparison=renderComparativeAnalytics(cycle,devices);
+  await Promise.allSettled([comparison,renderTrendDeck(cycle,72,false,devices[0]?.device_key)]);
 }
 
 // Independent report comparison and observed energy counters, on existing Graphs route.
-async function renderComparativeAnalytics(cycle){
+async function renderComparativeAnalytics(cycle,devices){
   const panelRoot=element("section","product-analytics");
   const head=element("div","product-analytics-head");
   add(head,element("h2","","Порівняння Deye №1 і №2"),element("p","subtle","Спільний часовий інтервал і масштаб; показники спільних вузлів не сумуються."));
@@ -761,17 +850,13 @@ async function renderComparativeAnalytics(cycle){
   const keys=[["pv_power","Генерація PV","кВт"],["load_power","Навантаження","кВт"],["battery_power","Потужність АКБ","кВт"],["battery_soc","SOC","%"],["grid_power","Мережа","кВт"],["output_power","Вихід інвертора","кВт"],["inverter_temperature","Температура","°C"],["pv1_power","MPPT 1","кВт"],["pv2_power","MPPT 2","кВт"],["grid_l1_voltage","Напруга L1","В"],["grid_l2_voltage","Напруга L2","В"],["grid_l3_voltage","Напруга L3","В"],["output_l1_current","Струм L1","А"],["output_l2_current","Струм L2","А"],["output_l3_current","Струм L3","А"]];
   for(const [key,label] of keys){const opt=element("option","",label);opt.value=key;selector.appendChild(opt);}
   selector.value="pv_power";
-  const span=element("select","");span.setAttribute("aria-label","Період порівняння");
-  for(const [value,label] of [[24,"24 години"],[72,"3 доби"],[168,"7 діб"]]){const opt=element("option","",label);opt.value=String(value);span.appendChild(opt);}span.value="72";
-  add(controls,selector,span);const body=element("div","product-comparison-grid");
+  add(controls,selector);const body=element("div","product-comparison-grid");
   add(panelRoot,head,controls,body);main.appendChild(panelRoot);
   const energy=element("section","product-analytics");
   add(energy,element("h2","","Енергетична аналітика"),element("p","subtle","Різниця накопичувальних лічильників за наявним архівом. Не повний баланс без підтвердженого покриття."));
   const period=element("select","");period.setAttribute("aria-label","Період енергетичного звіту");
-  for(const [value,label] of [["day","Доба"],["month","Місяць"],["year","Рік"],["all","Весь час"]]){const opt=element("option","",label);opt.value=value;period.appendChild(opt);}period.value="day";
+  for(const [value,label] of [["range","Вибраний період"],["day","Доба"],["month","Місяць"],["year","Рік"],["all","Весь час"]]){const opt=element("option","",label);opt.value=value;period.appendChild(opt);}period.value="range";
   const totals=element("div","product-comparison-grid");add(energy,period,totals);main.appendChild(energy);
-  let devices;
-  try{devices=await fetchParallelDevices(cycle);}catch(_error){}
   if(!current(cycle))return;
   if(!devices?.length){body.appendChild(createEmpty("Немає інверторів","Порівняння недоступне."));return;}
   let requestNo=0,energyNo=0;
@@ -780,15 +865,31 @@ async function renderComparativeAnalytics(cycle){
     body.replaceChildren(element("p","subtle","Читання архіву…"));
     const dates=devices.flatMap(d=>Object.values(d.values||{}).map(r=>Date.parse(r.observed_at_utc))).filter(Number.isFinite);
     if(!dates.length){body.replaceChildren(createEmpty("Немає часу запису","Неможливо визначити спільний період."));return;}
-    const end=Math.max(...dates),start=end-Number(span.value||72)*3600000;
+    const {start,end}=analysisRange;
     const results=await Promise.allSettled(devices.map(d=>api("/history/range?device="+encodeURIComponent(d.device_key)+"&key="+metric[0]+"&start="+encodeURIComponent(new Date(start).toISOString())+"&end="+encodeURIComponent(new Date(end).toISOString().replace(/Z$/,"999Z"))+"&resolution=auto")));
+    let forecast=[];
+    if(metric[0]==="pv_power" && end>=Date.now()-3600000 && start<Date.now()+72*3600000){
+      const data=await api("/solar-forecast").catch(()=>null);
+      if(data?.state==="available")forecast=(data.arrays||[]).map(a=>({label:"Прогноз PV "+a.slot,forecast:true,points:(a.hours||[]).filter(h=>Date.parse(h.start_utc)>=start && Date.parse(h.start_utc)<=end).map(h=>({observed_at_utc:h.start_utc,value_decimal:h.kw}))})).filter(l=>l.points.length);
+    }
     if(!current(cycle)||token!==requestNo)return;
     clear(body);
     const card=element("article","product-comparison-card product-comparison-full");
     const lines=devices.map((d,i)=>({label:deviceLabel(d,i),points:results[i].status==="fulfilled"?(results[i].value.points||[]):[],failed:results[i].status!=="fulfilled"}));
     const units=[...new Set(lines.flatMap(l=>l.points.map(p=>p.unit).filter(Boolean)))];
     if(units.length>1)card.appendChild(createEmpty("Різні одиниці вимірювання","Порівняння потребує однакових одиниць."));
-    else card.appendChild(multiDeviceChart(lines,units[0]||metric[2],start,end));
+    else {
+      const shared=["load_power","grid_power","battery_power","battery_soc"].includes(metric[0]);
+      const primary=lines[0];
+      const shown=shared?[{...primary,label:metric[1]}]:lines;
+      card.appendChild(multiDeviceChart(shown.map((line,i)=>({...line,archive:{key:metric[0],device:devices[i].device_key}})).concat(forecast),units[0]||metric[2],start,end));
+      if(shared && lines[1]){
+        const other=new Map(lines[1].points.filter(p=>p.value_decimal!=null).map(p=>[p.observed_at_utc,Number(p.value_decimal)]));
+        const delta=primary.points.filter(p=>p.value_decimal!=null && other.has(p.observed_at_utc))
+          .map(p=>Math.abs(Number(p.value_decimal)-other.get(p.observed_at_utc)));
+        if(delta.length && Math.max(...delta)>0)card.appendChild(element("p","subtle","Найбільша різниця одночасних показів Deye: "+pretty(Math.max(...delta),3)+" "+metric[2]));
+      }
+    }
     if(lines.some(l=>l.failed))card.appendChild(element("p","subtle","Частина архіву недоступна."));
     if(results.some(r=>r.status==="fulfilled"&&r.value.resolution==="extrema"))card.appendChild(element("p","subtle","Показано піки й мінімуми всього періоду."));
     body.appendChild(card);
@@ -797,9 +898,25 @@ async function renderComparativeAnalytics(cycle){
   async function report(){
     const token=++energyNo;
     totals.replaceChildren(element("p","subtle","Розрахунок за лічильниками…"));
-    const results=await Promise.allSettled(devices.map(d=>api("/energy?device="+encodeURIComponent(d.device_key)+"&period="+encodeURIComponent(period.value))));
+    const results=await Promise.allSettled(devices.map(d=>api("/energy?device="+encodeURIComponent(d.device_key)+"&period="+encodeURIComponent(period.value)+(period.value==="range"?"&"+rangeQuery(analysisRange):""))));
     if(!current(cycle)||token!==energyNo)return;
     clear(totals);
+    if(period.value==="range"){
+      const chart=element("article","product-comparison-card product-comparison-full");
+      chart.appendChild(element("h3","","Сонячна генерація за днями · кВт·год"));
+      const readings=results.flatMap((r,i)=>r.status==="fulfilled"?(r.value.daily||[]).map(day=>({...day,label:deviceLabel(devices[i],i)})):[]);
+      const peak=Math.max(1,...readings.map(r=>Number(r.value)));
+      const bars=element("div","period-bars");chart.appendChild(bars);
+      for(const row of readings.sort((a,b)=>a.day.localeCompare(b.day))){
+        const line=element("div","period-column"),bar=element("div","period-bar");
+        bar.style.height=(Math.max(0,Number(row.value))/peak*100)+"px";
+        const label=row.day+" · "+row.label;
+        bar.setAttribute("aria-label",label);
+        add(line,element("strong","",number(row.value)),bar,element("small","",label));bars.appendChild(line);
+      }
+      chart.appendChild(element("p","subtle",readings.length?"Останній показ добового лічильника в кожному дні вибірки.":"Немає добових показів за цей період."));
+      totals.appendChild(chart);
+    }
     devices.forEach((d,i)=>{
       const card=element("article","product-comparison-card");card.appendChild(element("h3","",deviceLabel(d,i)));
       const r=results[i];
@@ -828,7 +945,7 @@ async function renderComparativeAnalytics(cycle){
       totals.appendChild(summary);
     }
   }
-  selector.addEventListener("change",compare);span.addEventListener("change",compare);period.addEventListener("change",report);
+  selector.addEventListener("change",compare);period.addEventListener("change",report);
   await Promise.allSettled([compare(),report()]);
 }
 function multiDeviceChart(lines,unit,first,last){
@@ -837,7 +954,15 @@ function multiDeviceChart(lines,unit,first,last){
   const colors=["#2e9b83","#4788e6","#ba7b26"];
   const series=lines.map((line,i)=>({...line,color:colors[i%colors.length],data:line.points.map(p=>({t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)})).filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t)}));
   for(const l of series){const item=element("span","");add(item,element("strong","",l.label),element("small","",l.failed?"Недоступно":l.data.length+" точок"));item.setAttribute("data-series",String(series.indexOf(l)));legend.appendChild(item);}
-  let from=first,to=last;
+  let from=first,to=last,selectedStamp=null;
+  for(const line of lines.filter(l=>l.archive)){
+    const button=element("button","","Архів · "+line.label);
+    button.type="button";button.onclick=()=>{
+      const point=line.points.find(p=>Date.parse(p.observed_at_utc)===selectedStamp);
+      if(point)openArchivePoint(line.archive.key,point.observed_at_utc,line.archive.device);
+    };
+    line.archive.button=button;controls.appendChild(button);
+  }
   function draw(){
     const visible=series.map(l=>({...l,data:l.data.filter(p=>p.t>=from&&p.t<=to)}));
     const values=visible.flatMap(l=>l.data.map(p=>p.v)),times=[...new Set(visible.flatMap(l=>l.data.map(p=>p.t)))].sort((a,b)=>a-b);
@@ -850,7 +975,7 @@ function multiDeviceChart(lines,unit,first,last){
     for(let n=0;n<4;n++){const stamp=from+(to-from)*n/3;svg.appendChild(node("text",{x:x(stamp),y:232,"text-anchor":n===0?"start":n===3?"end":"middle",class:"product-axis"},new Date(stamp).toLocaleString("uk-UA",{timeZone:"Europe/Kyiv",...(to-from>86400000?{day:"2-digit",month:"2-digit"}:{hour:"2-digit",minute:"2-digit"})})));}
     for(const l of visible){const steps=l.data.slice(1).map((p,i)=>p.t-l.data[i].t).filter(n=>n>0).sort((a,b)=>a-b),gap=Math.max(1200000,(steps[Math.floor(steps.length/2)]||0)*3);let d="";
       for(const [i,p] of l.data.entries()){d+=(i&&p.t-l.data[i-1].t<=gap?" L":" M")+x(p.t)+" "+y(p.v);}
-      if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,class:"product-overlay-line","data-device":l.label}));
+      if(d)svg.appendChild(node("path",{d,fill:"none",stroke:l.color,"stroke-width":2.6,"stroke-dasharray":l.forecast?"6 4":"none",class:"product-overlay-line","data-device":l.label}));
       for(const [i,p] of l.data.entries()){
         const before=i===0||p.t-l.data[i-1].t>gap;
         const after=i===l.data.length-1||l.data[i+1].t-p.t>gap;
@@ -859,7 +984,7 @@ function multiDeviceChart(lines,unit,first,last){
     }
     const cursor=node("line",{y1:top,y2:bottom,class:"product-cursor"}),label=node("text",{x:left,y:15,class:"product-chart-label"}),tip=node("text",{x:left,y:31,class:"product-axis"});add(svg,cursor,label,tip);
     let index=times.length-1;
-    function select(i){index=Math.max(0,Math.min(times.length-1,i));const t=times[index];cursor.setAttribute("x1",x(t));cursor.setAttribute("x2",x(t));label.textContent=time(new Date(t).toISOString());tip.textContent=visible.map(l=>{const p=l.data.find(p=>p.t===t);return l.label+": "+(p?number(p.v)+" "+unit:"—");}).join(" · ");}
+    function select(i){index=Math.max(0,Math.min(times.length-1,i));const t=times[index];selectedStamp=t;for(const l of visible)if(l.archive?.button)l.archive.button.disabled=!l.data.some(p=>p.t===t);cursor.setAttribute("x1",x(t));cursor.setAttribute("x2",x(t));label.textContent=time(new Date(t).toISOString());tip.textContent=visible.map(l=>{const p=l.data.find(p=>p.t===t);return l.label+": "+(p?number(p.v)+" "+unit:"—");}).join(" · ");}
     select(index);
     const choose=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;const target=from+Math.max(0,Math.min(1,(p.matrixTransform(matrix.inverse()).x-left)/(right-left)))*(to-from);let i=0;for(let n=1;n<times.length;n++)if(Math.abs(times[n]-target)<Math.abs(times[i]-target))i=n;select(i);};
     svg.addEventListener("click",choose);svg.addEventListener("pointermove",e=>{if(e.pointerType==="mouse")choose(e);});
@@ -1109,7 +1234,7 @@ function svgChart(points, unit, domain={}) {
   const node=(tag,attrs={},text)=>{const e=document.createElementNS(ns,tag);
     for(const [k,v] of Object.entries(attrs))e.setAttribute(k,String(v));
     if(text!==undefined)e.textContent=text;return e;};
-  const real=(points||[]).map(p=>({t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)}))
+  const real=(points||[]).map(p=>({stamp:p.observed_at_utc,t:Date.parse(p.observed_at_utc),v:p.value_decimal==null||p.value_decimal===""?NaN:Number(p.value_decimal)}))
     .filter(p=>Number.isFinite(p.t)&&Number.isFinite(p.v)).sort((a,b)=>a.t-b.t);
   if(!real.length)return createEmpty("Графік без точок","За вибраний період числових значень немає.");
   const svg=node("svg",{class:"chart product-timeseries",viewBox:"0 0 640 226",role:"group",tabindex:0,"aria-label":"Інтерактивний графік. Стрілки ліворуч і праворуч вибирають запис."});
@@ -1159,12 +1284,21 @@ function svgChart(points, unit, domain={}) {
   const tip=node("title");
   svg.appendChild(cursor);svg.appendChild(dot);svg.appendChild(label);svg.appendChild(tip);
   let selected=real.length-1;
-  function choose(i){selected=Math.max(0,Math.min(real.length-1,i));const p=real[selected],xx=x(p.t),yy=y(p.v);
+  function choose(i,notify=true){selected=Math.max(0,Math.min(real.length-1,i));const p=real[selected],xx=x(p.t),yy=y(p.v);
+    svg.dataset.stamp=p.stamp;
+    if(notify)domain.onSelect?.(p.t);
     cursor.setAttribute("x1",xx);cursor.setAttribute("x2",xx);dot.setAttribute("cx",xx);dot.setAttribute("cy",yy);
     label.textContent=pretty(p.v,2)+(unit?" "+unit:"")+" · "+time(new Date(p.t).toISOString()).slice(0,-3);
     tip.textContent=time(new Date(p.t).toISOString())+" — "+pretty(p.v,3)+" "+(unit||"");
   }
-  choose(selected);
+  svg.showStamp=(stamp,active)=>{
+    const idx=real.findIndex(p=>p.t===stamp);
+    svg.style.opacity=active===domain.key?"1":".78";
+    dot.style.visibility=idx>=0?"visible":"hidden";
+    if(idx>=0)choose(idx,false);
+    else {cursor.setAttribute("x1",x(stamp));cursor.setAttribute("x2",x(stamp));label.textContent="—";svg.dataset.stamp=new Date(stamp).toISOString();}
+  };
+  choose(selected,false);
   const interact=e=>{if(!svg.getScreenCTM||!svg.createSVGPoint)return;const matrix=svg.getScreenCTM();if(!matrix)return;
     const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;
     const xx=p.matrixTransform(matrix.inverse()).x;
@@ -2185,7 +2319,7 @@ async function renderSettings(cycle) {
     "підтвердження порту, Modbus ID, окремого агента та дозволеного шлюза."));
 }
 async function renderArchive(cycle) {
-  section("Архів · Deye №"+state.selectedSlotNo,
+  section("Архів",
     "Точний часовий інтервал і експорт лише фактично повернених MySQL записів");
   const root=panel("Пошук в архіві","Діапазон до 31 доби · адаптивний графік · точний CSV");
   root.className+=" history-workspace";
@@ -2195,27 +2329,25 @@ async function renderArchive(cycle) {
     main.appendChild(createEmpty("Каталог порожній","Немає доступних сигналів для архіву."));
     return;
   }
-  const picker=settingsField(controls,"Показник","pv_power","select",
-    signals.map(x=>[x.signal_key,x.label_uk+" · "+x.signal_key]));
-  // The controls are explicitly Kyiv wall time, regardless of client timezone.
-  const kyivFormatter=new Intl.DateTimeFormat("en-GB",{timeZone:"Europe/Kyiv",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
-  const localValue=date=>{
-    const p=Object.fromEntries(kyivFormatter.formatToParts(date).map(x=>[x.type,x.value]));
-    return p.year+"-"+p.month+"-"+p.day+"T"+p.hour+":"+p.minute;
-  };
-  const parseKyiv=(value,upper)=>{
-    if(!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(value))return new Date(NaN);
-    const wall=Date.parse(value+":00Z");
-    if(!Number.isFinite(wall))return new Date(NaN);
-    const candidates=[];
-    for(let offset=-180;offset<=180;offset+=30){
-      const d=new Date(wall-offset*60000);
-      if(localValue(d)===value)candidates.push(d.getTime());
+  let focus=archiveFocus;archiveFocus=null;
+  const search=settingsField(controls,"Пошук показника","","search");
+  const picker=settingsField(controls,"Показник",focus?.key||"pv_power","select",[]);
+  const primary=["pv_power","load_power","grid_power","battery_power","battery_soc"];
+  function filterSignals(){
+    const wanted=picker.value||focus?.key||"pv_power";
+    picker.replaceChildren();
+    const groups=new Map();
+    for(const item of signals){
+      if(!(item.label_uk+" "+item.signal_key).toLowerCase().includes(search.value.trim().toLowerCase()))continue;
+      const key=item.signal_key;
+      const group=primary.includes(key)?"Основні":/^pv/.test(key)?"Сонце":/^battery|^bms/.test(key)?"АКБ":/^grid/.test(key)?"Мережа":/^load/.test(key)?"Навантаження":"Інвертор та інші";
+      if(!groups.has(group)){const el=document.createElement("optgroup");el.label=group;groups.set(group,el);}
+      const opt=element("option","",item.label_uk+" · "+key);opt.value=key;groups.get(group).appendChild(opt);
     }
-    if(!candidates.length)return new Date(NaN);
-    // During autumn overlap include both occurrences, without losing samples.
-    return new Date(upper?Math.max(...candidates)+59999:Math.min(...candidates));
-  };
+    for(const name of ["Основні","Сонце","АКБ","Мережа","Навантаження","Інвертор та інші"])if(groups.has(name))picker.appendChild(groups.get(name));
+    if(signals.some(o=>o.signal_key===wanted && (o.label_uk+" "+o.signal_key).toLowerCase().includes(search.value.trim().toLowerCase())))picker.value=wanted;
+  }
+  filterSignals();search.addEventListener("input",filterSignals);
   const now=new Date();
   const start=settingsField(controls,"Від (час Києва)",
     localValue(new Date(now.getTime()-72*3600*1000)),"datetime-local");
@@ -2234,20 +2366,26 @@ async function renderArchive(cycle) {
     clear(resultArea);
     resultArea.appendChild(element("p","subtle","Читання архіву MySQL…"));
     try{
-      const from=parseKyiv(start.value,false),to=parseKyiv(end.value,true);
+      const sameRange=analysisRange && start.value===localValue(new Date(analysisRange.start)) && end.value===localValue(new Date(analysisRange.end));
+      const from=sameRange?new Date(analysisRange.start):parseKyiv(start.value,false),to=sameRange?new Date(analysisRange.end):parseKyiv(end.value,true);
       if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||
          from>=to||(to-from)>31*86400*1000)
         throw Error("Вкажіть коректний інтервал тривалістю до 31 доби");
       const requestedKey=picker.value,requestedSlot=state.selectedSlotNo;
+      const device=focus?.device||state.selectedDeviceKey;
       const query="/history/range?key="+encodeURIComponent(requestedKey)+
         "&start="+encodeURIComponent(from.toISOString())+
         "&end="+encodeURIComponent(to.toISOString().replace(/Z$/,"999Z"))+
-        (state.selectedDeviceKey?"&device="+encodeURIComponent(state.selectedDeviceKey):"");
+        (device?"&device="+encodeURIComponent(device):"");
       const response=await api(query+"&resolution=auto");
       if(!current(cycle)||token!==request)return;
       clear(resultArea);
       const points=response.points||[];
       resultArea.appendChild(element("p","subtle",response.resolution==="extrema"?points.length+" точок графіка з "+response.sample_count+" записів":points.length+" записів"+(response.truncated?" · частковий результат":"")));
+      if(focus){
+        const chosen=points.find(p=>p.observed_at_utc===focus.stamp)||points.find(p=>Date.parse(p.observed_at_utc)===Date.parse(focus.stamp));
+        resultArea.appendChild(element("strong","period-reading",time(focus.stamp)+" · "+(chosen?.value_decimal!=null?number(chosen.value_decimal)+" "+(chosen.unit||signals.find(x=>x.signal_key===requestedKey)?.unit||""):"—")));
+      }
       if(!points.length){
         resultArea.appendChild(createEmpty("Вимірювань немає",
           "Виберіть іншу дату або інший показник."));
@@ -2309,7 +2447,14 @@ async function renderArchive(cycle) {
       }
     }
   }
-  button.addEventListener("click",refresh);
+  button.addEventListener("click",()=>{focus=null;if(picker.value && setRange(+parseKyiv(start.value,false),+parseKyiv(end.value,true)))refresh();else resultArea.textContent="Виберіть показник та коректний період до 31 доби.";});
+  if(analysisRange||focus){
+    const anchor=focus?Date.parse(focus.stamp):analysisRange.end;
+    start.value=localValue(new Date(focus?anchor:analysisRange.start));
+    end.value=localValue(new Date(anchor));
+
+    await refresh();return;
+  }
   // Prefer the actual latest saved measurement over the current clock.
   try{
     const latest=await api("/latest?keys=pv_power,load_power,battery_power,grid_power,battery_soc");

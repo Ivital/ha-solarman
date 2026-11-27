@@ -293,11 +293,18 @@
   const ranges=h("div","rv7-ranges");
   heading.appendChild(ranges);card.appendChild(heading);
   const latest=Date.parse(snap.updated_at_utc),hasRange=Number.isFinite(latest)&&typeof config.historyRangeLoader==="function";
-  let endTime=hasRange?latest:null;
+  let endTime=config.range?.end??(hasRange?latest:null);
+  let startTime=config.range?.start??(endTime-hours*3600000);
+  if(config.range)hours=(endTime-startTime)/3600000;
+  const editor=hasRange && config.rangeEditor?config.rangeEditor({start:startTime,end:endTime},()=>root.dispatchEvent(new Event("hashchange"))):null;
+  if(editor){
+   const custom=h("details","rv7-custom-period");custom.appendChild(h("summary","","Вибрати дату й час"));
+   custom.appendChild(editor);card.appendChild(custom);
+  }
   const calendar=h("div","rv7-calendar"),day=h("input","rv7-date");day.type="date";day.setAttribute("aria-label","Кінцева дата архіву");
   const periodLabel=h("span","rv7-period-label");
-  if(hasRange){day.max=kyivDay(latest);day.value=day.max;put(calendar,h("label","","До дати"),day,periodLabel);card.appendChild(calendar);}
-  day.addEventListener("change",()=>{const selected=kyivDayEnd(day.value);if(!Number.isFinite(selected)){day.value=kyivDay(endTime);return;}endTime=Math.min(latest,selected);day.value=kyivDay(endTime);chosenTime=null;explicitSelection=endTime!==latest;if(!explicitSelection)onRestore?.();fetchSeries();});
+  if(hasRange){day.max=kyivDay(latest);day.value=kyivDay(endTime);put(calendar,h("label","","До дати"),day,periodLabel);card.appendChild(calendar);}
+  day.addEventListener("change",()=>{const selected=kyivDayEnd(day.value);if(!Number.isFinite(selected)){day.value=kyivDay(endTime);return;}endTime=Math.min(latest,selected);startTime=endTime-hours*3600000;config.setRange?.(startTime,endTime);day.value=kyivDay(endTime);chosenTime=null;explicitSelection=endTime!==latest;if(!explicitSelection)onRestore?.();fetchSeries();});
   const chartbox=h("div","rv7-chart-box"),legend=h("div","rv7-series");
   const time=h("div","rv7-history-time"),control=h("div","rv7-time-control");
   card.appendChild(chartbox);card.appendChild(legend);
@@ -305,7 +312,7 @@
   const historyNote=h("p","rv7-note","Дані MySQL. Натисніть на графік або перемістіть повзунок часу.");
   card.appendChild(historyNote);
   container.appendChild(card);
-  let series=[],revision=0,explicitSelection=false,timer=null,availableTimes=[];
+  let series=[],revision=0,explicitSelection=hasRange&&endTime!==latest,timer=null,availableTimes=[];
   let failedHistoryRequests=0,frameRevision=0;
   let slider=null;
   const historyError=h("p","rv7-history-error");
@@ -407,6 +414,12 @@
     const stat=h("div","rv7-chart-stat");stat.style.setProperty("--series-color",line.color);
     const label=h("small","",line.label);label.style.color=line.color;
     put(stat,label,h("strong","",v?M.pretty(v.number)+" "+(v.unit||(line.id==="soc"?"%":"кВт")):"—"));
+    if(config.openArchivePoint && v){
+      const link=h("button","rv7-range","Відкрити в архіві");
+      link.type="button";link.setAttribute("aria-label","Відкрити в архіві · "+line.label);
+      link.onclick=()=>config.openArchivePoint(line.key,chosenTime,line.device?.device_key);
+      stat.appendChild(link);
+    }
     return stat;
    });
    time.replaceChildren(h("div","rv7-chart-date",M.ukTime(chosenTime)),put(h("div","rv7-chart-stats"),...active));
@@ -473,7 +486,10 @@
    const other=snap.devices.find(d=>d.device_key!==snap.sharedDevice?.device_key);
    if(other)for(const [id,label,key,slot,color] of metadata.filter(item=>item[3]===0))
      planned.push({id:id+"-other",label,key,color,device:other,diagnostic:true});
-   if(hasRange)periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
+   if(hasRange){
+    periodLabel.textContent=kyivDay(endTime-hours*3600000)+" — "+kyivDay(endTime);
+    editor?.syncRange?.(startTime,endTime);
+   }
    const got=await Promise.allSettled(planned.map(async item=>{
     if(!item.device?.device_key)return {points:[],truncated:false};
     const r=hasRange?await config.historyRangeLoader(item.device.device_key,item.key,new Date(endTime-hours*3600000).toISOString(),new Date(endTime).toISOString().replace(/Z$/,"999Z")):await config.historyLoader(item.device.device_key,item.key,hours);
@@ -510,7 +526,7 @@
     const button=h("button","rv7-range",label);
     button.type="button";button.setAttribute("aria-pressed",String(hours===value));
     button.addEventListener("click",()=>{
-     hours=value;savePreferences();chosenTime=null;explicitSelection=hasRange&&endTime!==latest;
+     hours=value;startTime=endTime-hours*3600000;if(hasRange)config.setRange?.(startTime,endTime);savePreferences();chosenTime=null;explicitSelection=hasRange&&endTime!==latest;
      if(!explicitSelection&&typeof onRestore==="function")onRestore();
      drawRanges();fetchSeries();
     });

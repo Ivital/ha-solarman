@@ -184,7 +184,7 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/api/v1/solar-forecast":
             self.reply({"state":"available","arrays":[{"slot":i,"hours":[{"start_utc":f"2026-11-27T{hour:02d}:00:00Z","kw":float(hour-7)*i} for hour in range(8,11)]} for i in (1,2)],"common_hours":3,"estimated_kwh":18,"updated_at_utc":MEASURED})
         elif path == "/api/v1/energy":
-            self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
+            self.reply({"period":args.get("period",["day"])[0],"start":"2026-11-24T22:00:00Z","anchor":MEASURED,"daily":[{"day":"2026-11-24","value":"12.5"}],"counters":[{"key":"pv_energy_total","unit":"кВт·год","value":"12.5","samples":8,"first_at":"2026-11-24T22:00:00Z","last_at":MEASURED,"decreases":0}],"aggregate_verified":False})
         elif path == "/api/v1/history/range" and args.get("device") and "start" in args:
             key=args.get("key",[""])[0]
             device=args["device"][0]
@@ -451,6 +451,21 @@ def run():
                             assert page.locator(".product-overlay-line").count()==2
                             page.wait_for_selector(".product-energy-row")
                             assert page.locator(".product-energy-row").count()==12
+                            assert page.locator(".period-column").count()==2
+                            page.get_by_label("Показник порівняння").select_option("load_power")
+                            page.wait_for_function("document.querySelectorAll('.product-overlay-line').length===1")
+                            series=page.locator(".trend-card svg").first
+                            series.focus()
+                            page.keyboard.press("Home")
+                            assert "Навантаження" in page.locator(".period-tooltip").inner_text()
+                            chosen=series.get_attribute("data-stamp")
+                            page.locator(".trend-card").first.get_by_text("Відкрити в архіві").click()
+                            page.wait_for_selector(".history-workspace .period-reading")
+                            assert page.locator(".history-workspace select").input_value()=="pv_power"
+                            assert len(page.locator(".history-workspace optgroup").all())>0
+                            assert datetime.fromisoformat(chosen.replace("Z","+00:00")).minute==int(page.locator("input[type=datetime-local]").last.input_value()[-2:])
+                            page.go_back()
+                            page.wait_for_selector(".period-column")
                             page.get_by_label("Період енергетичного звіту").select_option("month")
                             page.wait_for_selector(".product-energy-row")
                             assert any("/energy?" in path and "period=month" in path for _,path in server.calls)

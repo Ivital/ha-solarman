@@ -603,7 +603,7 @@ def energy_period(anchor, period):
 def energy():
     """Read-only observed counter differences; never sum shared device reports."""
     period = request.args.get("period", "day")
-    if period not in {"day", "month", "year", "all"}:
+    if period not in {"day", "month", "year", "all", "range"}:
         abort(400, description="Некоректний період енергії")
     device_id = selected_overview_device_id()
     if device_id is None:
@@ -615,7 +615,11 @@ def energy():
         return jsonify({"period": period, "counters": [], "anchor": None})
     if anchor.tzinfo is not None:
         anchor = anchor.astimezone(timezone.utc).replace(tzinfo=None)
-    if period == "all":
+    if period == "range":
+        start, anchor = checked_utc("start"), checked_utc("end")
+        if not 0 < (anchor-start).total_seconds() <= 31*86400:
+            abort(400, description="Некоректний часовий інтервал")
+    elif period == "all":
         opening = one("SELECT MIN(observed_at_utc) AS stamp FROM rakurs_samples WHERE device_id=%s",(device_id,))
         start = (opening or {}).get("stamp") or anchor
     else:
@@ -649,8 +653,25 @@ def energy():
                        "last_at": item["last_at"], "decreases": item["decreases"],
                        "coverage_seconds": max(0,(item["last_at"]-item["first_at"]).total_seconds()),
                        "requested_seconds": max(0,(anchor-start).total_seconds())})
+    daily = []
+    if period == "range":
+        zone = ZoneInfo("Europe/Kyiv")
+        local = start.replace(tzinfo=timezone.utc).astimezone(zone).replace(hour=0, minute=0, second=0, microsecond=0)
+        while local.astimezone(timezone.utc).replace(tzinfo=None) <= anchor:
+            following = local + timedelta(days=1)
+            lower = max(start, local.astimezone(timezone.utc).replace(tzinfo=None))
+            upper = following.astimezone(timezone.utc).replace(tzinfo=None)
+            reading = one("SELECT m.value_decimal AS value FROM rakurs_samples m "
+                          "JOIN rakurs_signals s ON s.id=m.signal_id "
+                          "WHERE m.device_id=%s AND s.signal_key='pv_energy_today' "
+                          "AND m.value_decimal IS NOT NULL AND m.observed_at_utc >= %s "
+                          "AND m.observed_at_utc < %s AND m.observed_at_utc <= %s "
+                          "ORDER BY m.observed_at_utc DESC LIMIT 1", (device_id, lower, upper, anchor))
+            if reading:
+                daily.append({"day": local.date().isoformat(), "value": reading["value"]})
+            local = following
     return jsonify(serialize({"period": period, "anchor": anchor, "start": start,
-                              "counters": result, "aggregate_verified": False}))
+                              "daily": daily, "counters": result, "aggregate_verified": False}))
 
 
 @app.get("/api/v1/solar-forecast")
