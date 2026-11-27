@@ -194,7 +194,7 @@ function createLogout(auth) {
   actions.appendChild(form);
 }
 function activeRoute() {
-  const name = location.hash.replace(/^#\/?/, "");
+  const name = location.hash.replace(/^#\/?/, "").split("?")[0];
   return views.some(v => v[0] === name) ? name : "overview";
 }
 function buildNav() {
@@ -3060,151 +3060,190 @@ async function renderSettings(cycle) {
     "підтвердження порту, Modbus ID, окремого агента та дозволеного шлюза."));
 }
 async function renderArchive(cycle) {
-  section("Архів",
-    "Точний часовий інтервал і експорт лише фактично повернених MySQL записів");
-  const root=panel("Пошук в архіві","Діапазон до 31 доби · адаптивний графік · точний CSV");
-  root.className+=" history-workspace";
-  const controls=element("div","settings-fields");
-  const signals=state.verified || [];
-  if(!signals.length){
-    main.appendChild(createEmpty("Каталог порожній","Немає доступних сигналів для архіву."));
-    return;
-  }
-  let focus=archiveFocus;archiveFocus=null;
-  if(!analysisRange && overviewRange)setRange(overviewRange.start,overviewRange.end);
-  const search=settingsField(controls,"Пошук показника","","search");
-  const picker=settingsField(controls,"Показник",focus?.key||"pv_power","select",[]);
-  const primary=["pv_power","load_power","grid_power","battery_power","battery_soc"];
-  function filterSignals(){
-    const wanted=picker.value||focus?.key||"pv_power";
-    picker.replaceChildren();
-    const groups=new Map();
-    for(const item of signals){
-      if(!(item.label_uk+" "+item.signal_key).toLowerCase().includes(search.value.trim().toLowerCase()))continue;
-      const key=item.signal_key;
-      const group=primary.includes(key)?"Основні":/^pv/.test(key)?"Сонце":/^battery|^bms/.test(key)?"АКБ":/^grid/.test(key)?"Мережа":/^load/.test(key)?"Навантаження":"Інвертор та інші";
-      if(!groups.has(group)){const el=document.createElement("optgroup");el.label=group;groups.set(group,el);}
-      const opt=element("option","",item.label_uk+" · "+key);opt.value=key;groups.get(group).appendChild(opt);
+  section("Архів","Вимірювання за вибраний період · час Києва");
+  const root=panel("Пошук в архіві","");root.className+=" history-workspace archive-workbench";main.appendChild(root);
+  const devices=await fetchParallelDevices(cycle);
+  if(!current(cycle))return;
+  const signals=state.verified||[];
+  if(!devices?.length||!signals.length){root.appendChild(createEmpty("Архів недоступний","Немає зареєстрованого джерела або показників."));return;}
+  const shared=k=>/^(battery_|bms_|grid_|load_)/.test(k);
+  const sharedTitle=k=>/^(battery_|bms_)/.test(k)?"Спільна АКБ":k.startsWith("grid_")?"Мережа":"Навантаження";
+  const primary=devices.find(d=>d.device_key===state.selectedDeviceKey)||devices[0];
+  const focus=archiveFocus;archiveFocus=null;
+  const params=new URLSearchParams(location.hash.split("?")[1]||"");
+  const fields=element("div","settings-fields"),actions=element("div","archive-actions"),chips=element("div","archive-chips"),plot=element("div","archive-plots"),inspect=element("div","archive-inspect"),status=element("p","subtle");
+  const search=settingsField(fields,"Пошук показника","","search"),picker=settingsField(fields,"Показник","","select",[]);
+  const device=settingsField(fields,"Джерело",focus?.device||primary.device_key,"select",devices.map(d=>[d.device_key,deviceLabel(d)]));
+  picker.setAttribute("aria-label","Показник");device.setAttribute("aria-label","Джерело");
+  const latest=devices.flatMap(d=>Object.values(d.values||{})).map(p=>Date.parse(p.observed_at_utc)).filter(Number.isFinite);
+  const anchor=focus?Date.parse(focus.stamp):latest.length?Math.max(...latest):Date.now();
+  let initial=focus?{start:anchor-3600000,end:Math.floor(anchor/60000)*60000+59999}:analysisRange||overviewRange||{start:anchor-72*3600000+60000,end:anchor};
+  const validRange=(a,b)=>Number.isFinite(a)&&Number.isFinite(b)&&a<b&&b-a<=31*86400000;
+  const sa=Date.parse(params.get("a")),sb=Date.parse(params.get("b"));
+  if(validRange(sa,sb))initial={start:sa,end:sb};
+  let range={...initial},whole={...range},selected=focus?.stamp||params.get("t")||null,series=[],revision=0,detailRevision=0;
+  const stampKey=s=>{
+    const t=Date.parse(s);if(!Number.isFinite(t))return null;
+    const frac=(String(s).match(/\.(\d+)(?:Z|[+-]\d\d:\d\d)$/)||[])[1]||"";
+    return new Date(t).toISOString().slice(0,19)+"."+frac.padEnd(6,"0").slice(0,6)+"Z";
+  };
+  selected=stampKey(selected);
+  const fullTime=s=>time(s)+(s.slice(20,26)!=="000000"?"."+s.slice(20,26):"");
+  const begin=settingsField(fields,"Від (час Києва)",localValue(new Date(range.start)),"datetime-local");
+  const end=settingsField(fields,"До (час Києва)",localValue(new Date(range.end)),"datetime-local");
+  const action=(label,fn)=>{const b=element("button","rv7-range",label);b.type="button";b.onclick=fn;return b;};
+  function filter(wanted){
+    picker.replaceChildren();const groups=new Map();
+    for(const s of signals){
+      if(!(s.label_uk+" "+s.signal_key).toLowerCase().includes(search.value.trim().toLowerCase()))continue;
+      const group=["pv_power","load_power","grid_power","battery_power","battery_soc"].includes(s.signal_key)?"Основні":/^pv/.test(s.signal_key)?"Сонце":/^(battery|bms)/.test(s.signal_key)?"АКБ":/^grid/.test(s.signal_key)?"Мережа":/^load/.test(s.signal_key)?"Навантаження":"Інвертор та інші";
+      if(!groups.has(group)){const g=document.createElement("optgroup");g.label=group;groups.set(group,g);}
+      const opt=element("option","",s.label_uk+" · "+s.signal_key);opt.value=s.signal_key;groups.get(group).appendChild(opt);
     }
-    for(const name of ["Основні","Сонце","АКБ","Мережа","Навантаження","Інвертор та інші"])if(groups.has(name))picker.appendChild(groups.get(name));
-    if(signals.some(o=>o.signal_key===wanted && (o.label_uk+" "+o.signal_key).toLowerCase().includes(search.value.trim().toLowerCase())))picker.value=wanted;
+    for(const group of ["Основні","Сонце","АКБ","Мережа","Навантаження","Інвертор та інші"])if(groups.has(group))picker.appendChild(groups.get(group));
+    if([...picker.options].some(o=>o.value===wanted))picker.value=wanted;
+    device.disabled=shared(picker.value);
   }
-  filterSignals();search.addEventListener("input",filterSignals);
-  const now=new Date();
-  const start=settingsField(controls,"Від (час Києва)",
-    localValue(new Date(now.getTime()-72*3600*1000)),"datetime-local");
-  const end=settingsField(controls,"До (час Києва)",
-    localValue(now),"datetime-local");
-  root.appendChild(controls);
-  const button=element("button","settings-save","Знайти в архіві");
-  button.type="button";
-  root.appendChild(button);
-  const resultArea=element("div","history-records");
-  root.appendChild(resultArea);
-  main.appendChild(root);
-  let request=0;
-  async function refresh(){
-    const token=++request;
-    clear(resultArea);
-    resultArea.appendChild(element("p","subtle","Читання архіву MySQL…"));
+  function addSeries(key,dk){
+    const sig=signals.find(s=>s.signal_key===key),d=shared(key)?devices[0]:devices.find(x=>x.device_key===dk);
+    if(!sig||!d||series.some(s=>s.key===key&&s.d===d.device_key))return false;
+    series.push({key,d:d.device_key,unit:sig.unit||"",label:(shared(key)?sharedTitle(key):deviceLabel(d))+" · "+sig.label_uk});return true;
+  }
+  for(const v of params.getAll("s")){const [dk,k]=v.split("/");if(k)addSeries(k,dk);}
+  if(!series.length)addSeries(focus?.key||"pv_power",focus?.device||primary.device_key);
+  if(!series.length)addSeries(signals[0].signal_key,primary.device_key);
+  filter(series[0].key);device.value=series[0].d;
+  search.oninput=()=>filter(picker.value);picker.onchange=()=>{device.disabled=shared(picker.value);};
+  function inputs(){begin.value=localValue(new Date(range.start));end.value=localValue(new Date(range.end));}
+  const apply=action("Знайти в архіві",()=>{
+    const a=+parseKyiv(begin.value,false),b=+parseKyiv(end.value,true);
+    if(!picker.value||!validRange(a,b)){status.textContent="Оберіть показник і період до 31 доби.";return;}
+    range={start:a,end:b};whole={...range};setRange(a,b);selected=null;series=[];addSeries(picker.value,device.value);refresh();
+  });
+  const addLine=action("Додати показник поруч",()=>{if(addSeries(picker.value,device.value))refresh();else status.textContent="Цей показник уже вибрано.";});
+  const reset=action("Увесь період",()=>{range={...whole};inputs();refresh();});
+  const zoom=action("Година навколо точки",()=>{if(!selected)return;const t=Date.parse(selected);range={start:Math.max(whole.start,t-1800000),end:Math.min(whole.end,t+1800000)};inputs();refresh();});
+  const urlFor=()=>{const p=new URLSearchParams({a:new Date(range.start).toISOString(),b:new Date(range.end).toISOString()});for(const s of series)p.append("s",s.d+"/"+s.key);if(selected)p.set("t",selected);return location.origin+location.pathname+"#/archive?"+p;};
+  const share=action("Скопіювати посилання",async()=>{const url=urlFor();try{await navigator.clipboard.writeText(url);status.textContent="Посилання на вибірку скопійовано.";}catch(_){const a=element("a","","Посилання на вибірку");a.href=url;status.replaceChildren(a);}});
+  const query=s=>"/history/range?"+new URLSearchParams({device:s.d,key:s.key,start:new Date(range.start).toISOString(),end:new Date(range.end).toISOString().replace(/Z$/,range.end-range.start===31*86400000?"Z":"999Z")});
+  const download=action("Експорт CSV",async()=>{
+    const token=revision,lines=[...series];download.disabled=true;
     try{
-      const sameRange=analysisRange && start.value===localValue(new Date(analysisRange.start)) && end.value===localValue(new Date(analysisRange.end));
-      const from=sameRange?new Date(analysisRange.start):parseKyiv(start.value,false),to=sameRange?new Date(analysisRange.end):parseKyiv(end.value,true);
-      if(Number.isNaN(from.getTime())||Number.isNaN(to.getTime())||
-         from>=to||(to-from)>31*86400*1000)
-        throw Error("Вкажіть коректний інтервал тривалістю до 31 доби");
-      const requestedKey=picker.value,requestedSlot=state.selectedSlotNo;
-      const device=focus?.device||state.selectedDeviceKey;
-      const query="/history/range?key="+encodeURIComponent(requestedKey)+
-        "&start="+encodeURIComponent(from.toISOString())+
-        "&end="+encodeURIComponent(to.toISOString().replace(/Z$/,"999Z"))+
-        (device?"&device="+encodeURIComponent(device):"");
-      const response=await api(query+"&resolution=auto");
-      if(!current(cycle)||token!==request)return;
-      clear(resultArea);
-      const points=response.points||[];
-      resultArea.appendChild(element("p","subtle",response.resolution==="extrema"?points.length+" точок графіка з "+response.sample_count+" записів":new Intl.NumberFormat("uk-UA").format(points.length)+" "+({one:"запис",few:"записи",many:"записів"}[new Intl.PluralRules("uk-UA").select(points.length)]||"записів")+(response.truncated?" · частковий результат":"")));
-      if(focus){
-        const chosen=points.find(p=>p.observed_at_utc===focus.stamp)||points.find(p=>Date.parse(p.observed_at_utc)===Date.parse(focus.stamp));
-        resultArea.appendChild(element("strong","period-reading",time(focus.stamp)+" · "+(chosen?.value_decimal!=null?number(chosen.value_decimal)+" "+(chosen.unit||signals.find(x=>x.signal_key===requestedKey)?.unit||""):"—")));
+      const data=new Map();
+      for(const [i,s] of lines.entries()){
+        let before="";
+        do{
+          const page=await api(query(s)+(before?"&before="+encodeURIComponent(before):""));
+          if(!current(cycle)||token!==revision)return;
+          for(const p of page.points||[]){const t=stampKey(p.observed_at_utc);if(!data.has(t))data.set(t,[]);data.get(t)[i]=p;}
+          if(page.truncated&&(!page.next_before||page.next_before===before))throw Error("Помилка сторінки експорту.");
+          before=page.truncated?page.next_before:"";
+        }while(before);
       }
-      if(!points.length){
-        resultArea.appendChild(createEmpty("Вимірювань немає",
-          "Виберіть іншу дату або інший показник."));
-        return;
-      }
-      resultArea.appendChild(interactiveChart(points,response.signal?.unit||signals.find(s=>s.signal_key===requestedKey)?.unit||""));
-      const exportButton=element("button","settings-save","Експорт CSV");
-      exportButton.type="button";
-      exportButton.addEventListener("click",async()=>{
-        exportButton.disabled=true;exportButton.textContent="Експорт…";
-        try{
-        let all=[],before=null;
-        for(let page=0;page<100;page++){
-          const raw=await api(query+(before?"&before="+encodeURIComponent(before):""));
-          if(!current(cycle)||token!==request)return;
-          all.unshift(...(raw.points||[]));
-          if(!raw.truncated){before=null;break;}
-          if(!raw.next_before||raw.next_before===before)throw Error("Неможливо продовжити точний експорт");
-          before=raw.next_before;
+      if(!data.size)throw Error("За цей період немає записів.");
+      const cell=v=>{
+        const text=String(v??"");
+        const safe=/^[=+@\t\r\n-]/.test(text)&&!/^[-+]?\d+(?:\.\d+)?$/.test(text)?"'"+text:text;
+        return '"'+safe.replaceAll('"','""')+'"';
+      };
+      const head=["observed_at_utc",...lines.flatMap(s=>[s.label+" ["+s.unit+"]",s.key+" "+s.d+" · якість"])];
+      const out=[head.map(cell).join(",")];
+      for(const t of [...data.keys()].sort()){const r=data.get(t);out.push([t,...lines.flatMap((s,i)=>[r[i]?.value_decimal,r[i]?.quality])].map(cell).join(","));}
+      const url=URL.createObjectURL(new Blob(["\ufeff"+out.join("\r\n")],{type:"text/csv;charset=utf-8"}));
+      const a=element("a","");a.href=url;a.download="rakurs-archive-"+begin.value.slice(0,10)+".csv";document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+    }catch(e){if(current(cycle)&&token===revision)status.textContent=e.message;}finally{if(token===revision)download.disabled=false;}
+  });
+  const chooser=element("details","archive-chooser"),chooseActions=element("div","archive-actions");
+  chooser.open=!window.matchMedia("(max-width:760px)").matches;
+  add(chooseActions,apply,addLine);add(chooser,element("summary","","Показники й період"),fields,chooseActions);
+  add(actions,zoom,reset,share,download);add(root,chooser,actions,chips,status,plot,inspect);
+  const palette=["#347bc6","#bb7619","#168d79","#9268bf","#bb5865","#537c86"];
+  let display=[],times=[],cursors=[];
+  const exactFmt=v=>v==null?"—":String(v).replace(/(\.\d*?[1-9])0+$|\.0+$/,"$1").replace(".",",");
+  async function select(stamp){
+    const t=stampKey(stamp);if(!t)return;
+    selected=t;const token=++detailRevision;
+    for(const move of cursors)move(t);
+    try{
+      const nearby=await Promise.all(display.map(async(line,i)=>{
+        if(line.resolution==="extrema"){
+          const r=await api(query(series[i])+"&around="+encodeURIComponent(t));return r.points||[];
         }
-        if(before)throw Error("Понад 100 000 записів. Виберіть коротший період.");
-        if(!all.length)throw Error("Немає записів для експорту");
-        const csvCell=value=>'"'+String(value??"").replaceAll('"','""')+'"';
-        const safeText=value=>/^[=+\-@\t\r\n]/.test(String(value??""))?"'"+value:value;
-        const lines=["observed_at_utc,value_decimal,quality"];
-        for(const p of all) lines.push([
-          csvCell(safeText(p.observed_at_utc)),csvCell(p.value_decimal),csvCell(safeText(p.quality))].join(","));
-        const blob=new Blob(["\ufeff"+lines.join("\r\n")],
-          {type:"text/csv;charset=utf-8"});
-        const url=URL.createObjectURL(blob);
-        const link=document.createElement("a");
-        link.href=url;link.download="rakurs-"+requestedKey+"-Deye"+
-          requestedSlot+".csv";
-        document.body.appendChild(link);
-        link.click();link.remove();URL.revokeObjectURL(url);
-        }catch(error){if(current(cycle)&&token===request)resultArea.appendChild(createEmpty("Експорт не завершено",error.message));}
-        finally{exportButton.disabled=false;exportButton.textContent="Експорт CSV";}
-      });
-      resultArea.appendChild(exportButton);
-      const wrap=element("div","table-wrap");
-      const table=element("table","data-table");
-      const th=element("tr","");
-      ["Дата й час","Значення"].forEach(x=>
-        th.appendChild(element("th","",x)));
-      const head=element("thead","");head.appendChild(th);table.appendChild(head);
-      const body=element("tbody","");
-      if(points.length>50)resultArea.appendChild(element("p","subtle","У таблиці — останні 50 точок графіка. CSV містить точні записи за вибраний період."));
-      for(const p of points.slice(-50).reverse()){
-        const row=element("tr","");
-        [time(p.observed_at_utc),p.value_decimal==null?"—":number(p.value_decimal)]
-          .forEach(x=>row.appendChild(element("td","",x)));
-        body.appendChild(row);
+        return line.points;
+      }));
+      if(token!==detailRevision||!current(cycle))return;
+      const map=new Map();
+      nearby.forEach((points,i)=>{for(const p of points){const k=stampKey(p.observed_at_utc);if(!map.has(k))map.set(k,[]);map.get(k)[i]=p;}});
+      const stamps=[...new Set([...map.keys(),t])].sort(),idx=stamps.indexOf(t),row=map.get(t)||[];
+      const nav=element("div","archive-actions"),prev=action("Попередній запис",()=>select(stamps[idx-1])),next=action("Наступний запис",()=>select(stamps[idx+1]));
+      prev.disabled=!idx;next.disabled=idx===stamps.length-1;add(nav,prev,next);
+      const values=element("div","archive-inspect-values");
+      series.forEach((s,i)=>{const v=row[i]?.value_decimal;const entry=element("div","");add(entry,element("small","",s.label),element("strong","",v==null?"—":exactFmt(v)+" "+s.unit));values.appendChild(entry);});
+      const table=element("table","data-table"),header=element("tr","");header.appendChild(element("th","","Час (Київ)"));
+      for(const s of series)header.appendChild(element("th","",s.label+" · "+s.unit));table.appendChild(header);
+      for(const k of stamps.slice(Math.max(0,idx-2),idx+3)){
+        const tr=element("tr",k===t?"archive-active":""),td=element("td","");
+        td.appendChild(action(fullTime(k),()=>select(k)));tr.appendChild(td);
+        series.forEach((_,i)=>tr.appendChild(element("td","",exactFmt(map.get(k)?.[i]?.value_decimal))));
+        tr.onclick=()=>{if(selected!==k)select(k);};table.appendChild(tr);
       }
-      table.appendChild(body);wrap.appendChild(table);resultArea.appendChild(wrap);
-    }catch(error){
-      if(current(cycle)&&token===request){
-        clear(resultArea);
-        resultArea.appendChild(createEmpty("Архів не відкрито",error.message));
+      const wrap=element("div","archive-rows");wrap.appendChild(table);
+      inspect.replaceChildren(element("strong","period-reading",fullTime(t)+(series.length===1?" · "+exactFmt(row[0]?.value_decimal)+" "+series[0].unit:"")),nav,values,wrap);
+    }catch(e){if(current(cycle)&&token===detailRevision)inspect.textContent="Записи недоступні: "+e.message;}
+  }
+  function draw(){
+    plot.replaceChildren();cursors=[];
+    const groups=new Map();series.forEach((s,i)=>{if(!groups.has(s.unit))groups.set(s.unit,[]);groups.get(s.unit).push(i);});
+    const svgNode=(tag,attrs={},txt)=>{const n=document.createElementNS("http://www.w3.org/2000/svg",tag);for(const [k,v] of Object.entries(attrs))n.setAttribute(k,v);if(txt!==undefined)n.textContent=txt;return n;};
+    for(const [unit,ids] of groups){
+      const legend=element("div","archive-legend");for(const i of ids){const label=element("strong","",series[i].label);label.style.borderColor=palette[i%palette.length];legend.appendChild(label);}plot.appendChild(legend);
+      const values=ids.flatMap(i=>display[i].points.filter(p=>p.value_decimal!=null).map(p=>Number(p.value_decimal)));
+      if(!values.length){plot.appendChild(element("p","subtle","Немає числових вимірювань за цей період."));continue;}
+      const min=values.reduce((a,b)=>Math.min(a,b)),max=values.reduce((a,b)=>Math.max(a,b)),pad=Math.max(.01,(max-min)*.08);
+      const svg=svgNode("svg",{class:"chart product-timeseries",viewBox:"0 0 640 194",tabindex:0,role:"group","aria-label":"Архів · "+unit+" · стрілки переміщують курсор"});
+      const x=t=>49+(t-range.start)/(range.end-range.start)*576,y=v=>153-(v-min+pad)/(max-min+2*pad)*120;
+      for(let j=0;j<4;j++){
+        const v=min-pad+(max-min+2*pad)*j/3,t=range.start+(range.end-range.start)*j/3;
+        add(svg,svgNode("line",{x1:49,x2:625,y1:y(v),y2:y(v),class:"product-gridline"}),svgNode("text",{x:44,y:y(v)+4,"text-anchor":"end",class:"product-axis"},pretty(v,2)),svgNode("text",{x:x(t),y:184,"text-anchor":j===0?"start":j===3?"end":"middle",class:"product-axis"},localValue(new Date(t)).slice(range.end-range.start>86400000?5:11).replace("T"," ")));
       }
+      svg.appendChild(svgNode("text",{x:5,y:15,class:"product-axis"},unit));
+      for(const i of ids){
+        const points=display[i].points,steps=points.slice(1).map((p,n)=>Date.parse(p.observed_at_utc)-Date.parse(points[n].observed_at_utc)).filter(v=>v>0).sort((a,b)=>a-b),gap=3*(steps[Math.floor((steps.length-1)/2)]||Infinity);
+        let prev=null,path="";const color=palette[i%palette.length];
+        for(const p of points){if(p.value_decimal==null){prev=null;continue;}const t=Date.parse(p.observed_at_utc),v=Number(p.value_decimal),first=prev===null||t-prev>gap;
+          path+=(first?" M":" L")+x(t)+" "+y(v);if(first)svg.appendChild(svgNode("circle",{cx:x(t),cy:y(v),r:2,fill:color}));prev=t;}
+        svg.appendChild(svgNode("path",{d:path,stroke:color,fill:"none","stroke-width":2.5,"stroke-dasharray":i%2?"7 3":"none"}));
+      }
+      const cursor=svgNode("line",{y1:22,y2:155,class:"product-cursor"}),caption=svgNode("text",{x:625,y:16,"text-anchor":"end",class:"product-chart-label"});add(svg,cursor,caption);
+      cursors.push(t=>{cursor.setAttribute("x1",x(Date.parse(t)));cursor.setAttribute("x2",x(Date.parse(t)));caption.textContent=fullTime(t);});
+      const eventX=e=>{const p=svg.createSVGPoint();p.x=e.clientX;p.y=e.clientY;return Math.max(0,Math.min(1,(p.matrixTransform(svg.getScreenCTM().inverse()).x-49)/576));};
+      const brush=svgNode("rect",{y:22,height:133,width:0,fill:"#548cd0",opacity:".2","pointer-events":"none"});svg.appendChild(brush);
+      let drag=null;
+      svg.onpointermove=e=>{if(drag){const f=eventX(e);brush.setAttribute("x",49+Math.min(f,drag.f)*576);brush.setAttribute("width",Math.abs(f-drag.f)*576);}};
+      svg.onpointerdown=e=>{drag={x:e.clientX,f:eventX(e)};svg.setPointerCapture(e.pointerId);};
+      svg.onpointercancel=()=>{drag=null;brush.setAttribute("width",0);};
+      svg.onpointerup=e=>{if(!drag)return;const f=eventX(e),g=drag.f,moved=Math.abs(e.clientX-drag.x)>10;drag=null;brush.setAttribute("width",0);
+        const point=u=>Math.round(range.start+u*(range.end-range.start));
+        if(moved&&Math.abs(point(f)-point(g))>=1){range={start:point(Math.min(f,g)),end:point(Math.max(f,g))};inputs();refresh();}
+        else {const target=point(f);select(times.reduce((a,b)=>Math.abs(Date.parse(a)-target)<=Math.abs(Date.parse(b)-target)?a:b));}};
+      svg.onkeydown=e=>{if(["Home","End","ArrowLeft","ArrowRight"].includes(e.key)){e.preventDefault();if(e.key==="Home"||e.key==="End")select(e.key==="Home"?times[0]:times.at(-1));else inspect.querySelectorAll("button")[e.key==="ArrowLeft"?0:1]?.click();}};
+      plot.appendChild(svg);window.RakursV7?.fitChart?.(svg);
     }
   }
-  button.addEventListener("click",()=>{focus=null;if(picker.value && setRange(+parseKyiv(start.value,false),+parseKyiv(end.value,true)))refresh();else resultArea.textContent="Виберіть показник та коректний період до 31 доби.";});
-  if(analysisRange||focus){
-    const anchor=focus?Date.parse(focus.stamp):analysisRange.end;
-    start.value=localValue(new Date(focus?anchor:analysisRange.start));
-    end.value=localValue(new Date(anchor));
-
-    await refresh();return;
+  async function refresh(){
+    const token=++revision;++detailRevision;
+    plot.replaceChildren();inspect.replaceChildren();chips.replaceChildren();status.textContent="Читання архіву…";download.disabled=true;
+    for(const s of series){const chip=action(s.label+" ×",()=>{series=series.filter(v=>v!==s);refresh();});chip.disabled=series.length===1;chip.setAttribute("aria-label","Прибрати "+s.label);chips.appendChild(chip);}
+    try{
+      const loaded=await Promise.all(series.map(s=>api(query(s)+"&resolution=auto")));
+      if(!current(cycle)||token!==revision)return;
+      display=loaded;times=[...new Set(display.flatMap(l=>l.points.map(p=>stampKey(p.observed_at_utc))))].sort();
+      status.textContent=times.length?"":"За вибраний період немає записів.";download.disabled=!times.length;
+      if(!times.length)return;
+      draw();await select(selected&&Date.parse(selected)>=range.start&&Date.parse(selected)<=range.end?selected:times.at(-1));
+    }catch(e){if(current(cycle)&&token===revision)status.textContent="Архів недоступний: "+e.message;}
   }
-  // Prefer the actual latest saved measurement over the current clock.
-  try{
-    const latest=await api("/latest?keys=pv_power,load_power,battery_power,grid_power,battery_soc");
-    if(!current(cycle))return;
-    const stamps=Object.values(latest.values||{}).map(r=>Date.parse(r.observed_at_utc)).filter(Number.isFinite);
-    if(stamps.length){const anchor=Math.max(...stamps);end.value=localValue(new Date(anchor));start.value=localValue(new Date(anchor-72*3600*1000+60000));}
-  }catch(_error){/* manual search remains available */}
-  if(current(cycle))await refresh();
+  await refresh();
 }
 async function renderSystem(cycle) {
   addStatusMessage();

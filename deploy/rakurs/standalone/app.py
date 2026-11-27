@@ -1071,6 +1071,15 @@ def history_range():
     if selected is None:
         return jsonify({"data_source":"mysql","signal_key":key,
                         "points":[],"truncated":False})
+    if request.args.get("around"):
+        at = checked_utc("around")
+        sql = ("SELECT m.observed_at_utc,m.value_decimal,m.quality,s.unit FROM rakurs_samples m "
+               "JOIN rakurs_signals s ON s.id=m.signal_id WHERE m.device_id=%s AND s.signal_key=%s ")
+        preceding = rows(sql+"AND m.observed_at_utc BETWEEN %s AND %s AND m.observed_at_utc<=%s "
+                         "ORDER BY m.observed_at_utc DESC LIMIT 4",(selected,key,start,end,at))
+        following = rows(sql+"AND m.observed_at_utc BETWEEN %s AND %s AND m.observed_at_utc>%s "
+                         "ORDER BY m.observed_at_utc LIMIT 3",(selected,key,start,end,at))
+        return jsonify({"points":serialize(preceding[::-1]+following)})
     if request.args.get("resolution") == "auto":
         return jsonify({"data_source":"mysql","signal_key":key,"primary_device_id":selected,
                         **chart_points(selected,key,start,end)})

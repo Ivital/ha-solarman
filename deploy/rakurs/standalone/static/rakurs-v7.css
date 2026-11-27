@@ -695,3 +695,9 @@ body[data-theme] .solar-analysis .product-chart-legend span[data-series="1"]:bef
 .hourly-balance .settings-field:has(input[type=checkbox]){display:flex;align-items:center;gap:.4rem}
 .hourly-balance .settings-field input[type=checkbox]{width:1.1rem;height:1.1rem}
 @media(max-width:760px){.balance-compare .data-table{min-width:0;table-layout:fixed;font-size:.76rem}.balance-compare .data-table :is(th,td){padding:.4rem .25rem;white-space:normal;overflow-wrap:anywhere}.balance-compare .data-table :is(th,td):first-child{width:24%}}
+.archive-workbench{min-width:0}.archive-actions,.archive-chips,.archive-legend{display:flex;flex-wrap:wrap;align-items:center;gap:.4rem .7rem;margin:.6rem 0}
+.archive-plots svg{width:100%;touch-action:pan-y;user-select:none}.archive-legend strong{border-left:4px solid;padding-left:.45rem;font-size:.9rem}
+.archive-rows{overflow-x:auto;max-width:100%}.archive-rows table{width:100%}.archive-rows tr{cursor:pointer}.archive-active{background:#508cd225}
+.archive-inspect-values{display:none}.archive-chips button:disabled{opacity:.85}
+@media(max-width:760px){.archive-rows{display:none}.archive-inspect-values{display:grid;gap:.4rem}.archive-inspect-values>div{display:flex;align-items:center;justify-content:space-between;gap:.8rem}.archive-inspect-values strong{white-space:nowrap}}
+.archive-chooser summary{cursor:pointer;font-weight:650;padding:.4rem 0}.archive-chooser[open] summary{margin-bottom:.5rem}

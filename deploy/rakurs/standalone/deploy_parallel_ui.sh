@@ -29,7 +29,7 @@ cd "$ROOT"
 for path in "${FILES[@]}"; do
   test -s "$HERE/$path" || { echo "STOP: missing $path" >&2; exit 2; }
 done
-grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product30"' "$HERE/templates/index.html"
+grep -Fq 'src="/static/app-parallel-twin-20261125.js?v=rakurs-flow-v4-20261127-product31"' "$HERE/templates/index.html"
 grep -Fq 'href="/static/parallel-twin-20261125.css?v=rakurs-ux4-20261126-1"' "$HERE/templates/index.html"
 grep -Fq '@app.get("/api/v1/parallel")' "$HERE/app.py"
 grep -Fq 'from .parallel_support import' "$HERE/app.py"
@@ -45,7 +45,7 @@ grep -Fq 'rakurs-mobile-nav-20261126.css?v=rakurs-mobile-nav-v2' "$HERE/template
 grep -Fq 'rakurs-mobile-nav-20261126.js?v=rakurs-mobile-nav-v2' "$HERE/templates/index.html"
 ! grep -Fq '/static/rakurs-energy-board-20261126' "$HERE/templates/index.html"
 grep -Fq 'window.RakursV7.render(boardHost' "$HERE/static/app-parallel-twin-20261125.js"
-grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-43' "$HERE/templates/index.html"
+grep -Fq 'rakurs-v7.js?v=rakurs-v7-20261127-44' "$HERE/templates/index.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/login.html"
 grep -Fq '/static/rakurs-pages-20261126.css?v=rakurs-ux2-20261126' "$HERE/templates/deye_server.html"
 grep -Fq 'Архів MySQL' "$HERE/templates/index.html"

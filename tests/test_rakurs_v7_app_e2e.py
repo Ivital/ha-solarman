@@ -250,6 +250,8 @@ class Handler(BaseHTTPRequestHandler):
             latest_stamp=datetime.fromisoformat(MEASURED.replace("Z","+00:00"))
             latest_row=device_values(1 if device==D1 else 2).get(key)
             if latest_row and start<=latest_stamp<=end:
+                if device==D2 and key=="pv_power":
+                    points.append({**latest_row,"observed_at_utc":MEASURED.replace("000786","000785")})
                 points.append(dict(latest_row))
             # Internal archive also uses this route; keep its fixture deterministic.
             if not points and scenario=="normal" and key=="pv_power" and end>datetime(2026,11,25,12,tzinfo=timezone.utc):
@@ -518,7 +520,7 @@ def run():
                             chosen=series.get_attribute("data-stamp")
                             page.locator(".trend-card").first.get_by_text("Відкрити в архіві").click()
                             page.wait_for_selector(".history-workspace .period-reading")
-                            assert page.locator(".history-workspace select").input_value()=="pv_power"
+                            assert page.get_by_label("Показник",exact=True).input_value()=="pv_power"
                             assert len(page.locator(".history-workspace optgroup").all())>0
                             assert datetime.fromisoformat(chosen.replace("Z","+00:00")).minute==int(page.locator("input[type=datetime-local]").last.input_value()[-2:])
                             page.go_back()
@@ -607,6 +609,29 @@ def run():
                             assert page.locator(".product-health").count()==1
                         if route=="archive":
                             assert page.locator("input[type=datetime-local]").last.input_value()=="2026-11-25T02:16"
+                            wb=page.locator(".archive-workbench")
+                            if width<=760:
+                                wb.get_by_text("Показники й період",exact=True).click()
+                            wb.get_by_label("Джерело",exact=True).select_option(D2)
+                            wb.get_by_role("button",name="Додати показник поруч").click()
+                            wb.get_by_label("Показник",exact=True).select_option("battery_soc")
+                            wb.get_by_role("button",name="Додати показник поруч").click()
+                            page.wait_for_function("document.querySelectorAll('.archive-plots svg').length === 2")
+                            wb.get_by_role("button",name="Попередній запис").click()
+                            assert len(set(wb.locator(".product-chart-label").all_text_contents()))==1
+                            with page.expect_download() as exported:
+                                wb.get_by_role("button",name="Експорт CSV").click()
+                            csv=Path(exported.value.path()).read_text(encoding="utf-8-sig")
+                            assert "observed_at_utc" in csv and "[%]" in csv and ".000786Z" in csv and ".000785Z" in csv
+                            context.grant_permissions(["clipboard-read","clipboard-write"])
+                            wb.get_by_role("button",name="Скопіювати посилання").click()
+                            link=page.evaluate("navigator.clipboard.readText()")
+                            chosen=wb.locator(".period-reading").inner_text()
+                            assert link.count("s=")==3
+                            page.goto(link)
+                            page.wait_for_function("document.querySelectorAll('.archive-plots svg').length === 2")
+                            assert wb.locator(".period-reading").inner_text()==chosen
+                            wb.screenshot(path=str(OUT/f"archive-multi-{width}.png"))
                         if route in {"history","archive","trends","parallel"}:
                             chart=page.locator("#content .product-timeseries").first
                             label=chart.locator(".product-chart-label")
