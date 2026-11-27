@@ -1176,7 +1176,7 @@ async function renderLoadProfile(host,cycle,devices){
         cell.setAttribute("aria-label",cell.title);
         if(!cell.disabled){
           cell.style.setProperty("--intensity",(16+78*(max?Math.max(0,v)/max:0))+"%");
-          cell.onclick=()=>refresh(d,h);
+          cell.onclick=()=>{day.value=d;refresh(d,h);};
         }
         grid.appendChild(cell);
       }
