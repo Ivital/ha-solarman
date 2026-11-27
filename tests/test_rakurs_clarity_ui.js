@@ -773,7 +773,7 @@ async function run() {
   assert(parallelText.includes("5,1"));
   assert(parallelText.includes("815"));
   assert(parallelText.includes("Поля Modbus"));
-  assert(parallelText.includes("Містить демонстраційні дані"));
+  assert(!parallelText.includes("Містить демонстраційні дані"));
   const rawButton=byClass(app.main,"parallel-raw-viewer")[0].childNodes
     .find(x=>x.tagName==="button");
   await rawButton.listeners.click();

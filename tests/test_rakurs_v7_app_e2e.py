@@ -318,7 +318,6 @@ def run():
                     wait_rendered(page)
                     assert page.locator("body").get_attribute("data-theme") == theme
                     assert not page_errors, page_errors
-                    assert "демонстраційні дані" in page.locator(".rv7-status").inner_text()
                     assert "5,1 кВт" in page.locator(
                         ".rv7 [data-node='pv1'] .rv7-node-value").first.text_content()
                     assert "5,43 кВт" in page.locator(
